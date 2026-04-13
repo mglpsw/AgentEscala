@@ -54,5 +54,6 @@ volumes:
 networks:
   agentescala_internal:
     driver: bridge
-  traefik-public:
+  # Nome da rede deve ser igual ao valor de TRAEFIK_NETWORK no .env.homelab
+  ${TRAEFIK_NETWORK}:
     external: true
