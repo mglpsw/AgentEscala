@@ -1,5 +1,5 @@
 """
-Authentication dependencies for FastAPI endpoints.
+Dependências de autenticação para endpoints FastAPI.
 """
 from typing import Optional
 from fastapi import Depends, HTTPException, status
@@ -9,7 +9,7 @@ from ..config.database import get_db
 from ..models.models import User, UserRole
 from ..utils.auth import decode_access_token
 
-# HTTP Bearer token scheme
+# Esquema de token HTTP Bearer
 security = HTTPBearer()
 
 
@@ -18,17 +18,17 @@ async def get_current_user(
     db: Session = Depends(get_db)
 ) -> User:
     """
-    Get the current authenticated user from JWT token.
+    Obter o usuário autenticado a partir do token JWT.
 
     Args:
-        credentials: HTTP Bearer credentials
-        db: Database session
+        credentials: Credenciais HTTP Bearer
+        db: Sessão do banco de dados
 
     Returns:
-        User object if authenticated
+        Objeto User se autenticado
 
     Raises:
-        HTTPException: If authentication fails
+        HTTPException: Se a autenticação falhar
     """
     token = credentials.credentials
     payload = decode_access_token(token)
@@ -36,7 +36,7 @@ async def get_current_user(
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Não foi possível validar as credenciais",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -44,7 +44,7 @@ async def get_current_user(
     if user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Não foi possível validar as credenciais",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -52,14 +52,14 @@ async def get_current_user(
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail="Usuário não encontrado",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
+            detail="A conta do usuário está inativa"
         )
 
     return user
@@ -69,16 +69,16 @@ async def get_current_active_user(
     current_user: User = Depends(get_current_user)
 ) -> User:
     """
-    Get the current active user.
+    Obter o usuário atual ativo.
 
     Args:
-        current_user: Current user from token
+        current_user: Usuário atual obtido do token
 
     Returns:
-        User object if active
+        Objeto User se ativo
 
     Raises:
-        HTTPException: If user is inactive
+        HTTPException: Se o usuário estiver inativo
     """
     return current_user
 
@@ -87,21 +87,21 @@ async def require_admin(
     current_user: User = Depends(get_current_user)
 ) -> User:
     """
-    Require the current user to be an admin.
+    Exigir que o usuário atual seja administrador.
 
     Args:
-        current_user: Current user from token
+        current_user: Usuário atual obtido do token
 
     Returns:
-        User object if admin
+        Objeto User se administrador
 
     Raises:
-        HTTPException: If user is not an admin
+        HTTPException: Se o usuário não for administrador
     """
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required"
+            detail="Privilégios de administrador são necessários"
         )
 
     return current_user

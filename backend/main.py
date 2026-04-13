@@ -6,24 +6,24 @@ from .config.settings import settings
 from .api import users, shifts, swaps, auth
 from .api.schemas import HealthResponse
 
-# Initialize FastAPI app
+# Inicializa o app FastAPI
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="AgentEscala - Shift Management and Swap System",
+    description="AgentEscala - Sistema de gestão e troca de turnos",
     debug=settings.DEBUG
 )
 
-# Configure CORS
+# Configura CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["*"],  # Ajustar adequadamente para produção
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
+# Inclui os routers
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(shifts.router)
@@ -32,13 +32,13 @@ app.include_router(swaps.router)
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize database on startup"""
+    """Inicializar o banco de dados na inicialização"""
     init_db()
 
 
 @app.get("/", response_model=HealthResponse)
 async def root():
-    """Root endpoint"""
+    """Endpoint raiz"""
     return {
         "status": "ok",
         "timestamp": datetime.utcnow(),
@@ -48,7 +48,7 @@ async def root():
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check endpoint"""
+    """Endpoint de verificação de saúde"""
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow(),
@@ -58,7 +58,7 @@ async def health_check():
 
 @app.get("/api/v1/info")
 async def api_info():
-    """API information endpoint"""
+    """Endpoint de informações da API"""
     return {
         "name": settings.APP_NAME,
         "version": settings.APP_VERSION,

@@ -6,22 +6,22 @@ from ..models import Shift
 
 
 class ICSExporter:
-    """Simple ICS (iCalendar) exporter for shifts"""
+    """Exportador simples de ICS (iCalendar) para turnos"""
 
     @staticmethod
-    def export_shifts(shifts: List[Shift], calendar_name: str = "Work Shifts") -> BytesIO:
+    def export_shifts(shifts: List[Shift], calendar_name: str = "Turnos de trabalho") -> BytesIO:
         """
-        Export shifts to ICS format (simple, unidirectional)
+        Exportar turnos para o formato ICS (simples, unidirecional)
 
         Args:
-            shifts: List of Shift objects to export
-            calendar_name: Name of the calendar
+            shifts: Lista de objetos Shift a serem exportados
+            calendar_name: Nome do calendário
 
         Returns:
-            BytesIO: ICS file in memory
+            BytesIO: Arquivo ICS em memória
         """
         cal = Calendar()
-        cal.add('prodid', '-//AgentEscala//Work Shifts//EN')
+        cal.add('prodid', '-//AgentEscala//Turnos//PT-BR')
         cal.add('version', '2.0')
         cal.add('calscale', 'GREGORIAN')
         cal.add('method', 'PUBLISH')
@@ -44,9 +44,9 @@ class ICSExporter:
             if shift.location:
                 event.add('location', shift.location)
 
-            # Add agent information in description
+            # Adiciona informações do agente na descrição
             if shift.agent:
-                description_text = f"Agent: {shift.agent.name} ({shift.agent.email})"
+                description_text = f"Agente: {shift.agent.name} ({shift.agent.email})"
                 if shift.description:
                     description_text = f"{shift.description}\n\n{description_text}"
                 event['description'] = description_text
@@ -62,12 +62,12 @@ class ICSExporter:
     @staticmethod
     def export_single_shift(shift: Shift) -> BytesIO:
         """
-        Export a single shift to ICS format
+        Exportar um turno para o formato ICS
 
         Args:
-            shift: Shift object to export
+            shift: Objeto Shift a ser exportado
 
         Returns:
-            BytesIO: ICS file in memory
+            BytesIO: Arquivo ICS em memória
         """
-        return ICSExporter.export_shifts([shift], calendar_name=f"Shift - {shift.title}")
+        return ICSExporter.export_shifts([shift], calendar_name=f"Turno - {shift.title}")

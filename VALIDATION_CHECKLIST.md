@@ -1,53 +1,53 @@
-# Validation Checklist for AgentEscala MVP
+# Checklist de Validação do MVP do AgentEscala
 
-This checklist can be used to validate the complete MVP implementation.
+Use esta checklist para validar a implementação completa do MVP.
 
-## Prerequisites Validation
+## Validação de pré-requisitos
 
-- [ ] Docker installed (`docker --version`)
-- [ ] Docker Compose installed (`docker-compose --version`)
-- [ ] Git repository cloned
-- [ ] Located in project root directory
+- [ ] Docker instalado (`docker --version`)
+- [ ] Docker Compose instalado (`docker-compose --version`)
+- [ ] Repositório clonado
+- [ ] Estar na raiz do projeto
 
-## Local Development Validation
+## Validação em desenvolvimento local
 
-### 1. Start the Application
+### 1. Subir a aplicação
 
 ```bash
 cd /path/to/AgentEscala
 docker-compose up -d
 ```
 
-**Expected:**
-- PostgreSQL container starts
-- Backend container starts after DB is healthy
-- Alembic migrations run automatically before the API starts
-- No error messages
+**Esperado:**
+- Container do PostgreSQL sobe
+- Container do backend sobe após o DB ficar saudável
+- Migrações Alembic rodam automaticamente antes da API iniciar
+- Sem mensagens de erro
 
-**Validation:**
+**Validação:**
 ```bash
 docker-compose ps
-# Both containers should be "Up" and healthy
+# Ambos containers devem estar "Up" e saudáveis
 ```
 
-### 2. Check Logs
+### 2. Checar logs
 
 ```bash
 docker-compose logs backend
 ```
 
-**Expected:**
-- No error messages
-- "Application startup complete" message
-- Uvicorn running on port 8000
+**Esperado:**
+- Sem mensagens de erro
+- Mensagem "Application startup complete"
+- Uvicorn rodando na porta 8000
 
-### 3. Health Check
+### 3. Health check
 
 ```bash
 curl http://localhost:8000/health
 ```
 
-**Expected Response:**
+**Resposta esperada:**
 ```json
 {
   "status": "healthy",
@@ -56,97 +56,97 @@ curl http://localhost:8000/health
 }
 ```
 
-### 4. API Documentation
+### 4. Documentação da API
 
-Open in browser: http://localhost:8000/docs
+Abra no navegador: http://localhost:8000/docs
 
-**Expected:**
-- Swagger UI loads
-- Three API sections visible: users, shifts, swaps
-- All endpoints listed with documentation
+**Esperado:**
+- Swagger UI carrega
+- Três seções visíveis: users, shifts, swaps
+- Todos os endpoints listados com documentação
 
-### 5. Database Seeding
+### 5. Seed do banco
 
 ```bash
 docker-compose exec backend python -m backend.seed
 ```
 
-**Expected Output:**
-- "Initializing database..."
-- "Creating users..."
-- "Creating shifts..."
-- "Creating sample swap requests..."
-- "Seed Complete"
-- No errors
-- Default password for all seeded users: `password123`
+**Saída esperada:**
+- "Inicializando banco de dados..."
+- "Criando usuários..."
+- "Criando turnos..."
+- "Criando solicitações de troca de exemplo..."
+- "Seed concluído"
+- Sem erros
+- Senha padrão para todos os usuários: `password123`
 
-**Validation:**
+**Validação:**
 ```bash
 curl http://localhost:8000/users
 ```
 
-**Expected:** JSON array with 6 users (1 admin + 5 agents)
+**Esperado:** array JSON com 6 usuários (1 admin + 5 agentes)
 
-### 6. Basic API Operations
+### 6. Operações básicas da API
 
-**List Shifts:**
+**Listar turnos:**
 ```bash
 curl http://localhost:8000/shifts | jq '.[:2]'
 ```
 
-**Expected:** JSON array with shift objects
+**Esperado:** array JSON com objetos de turno
 
-**Get Single Shift:**
+**Obter um turno:**
 ```bash
 curl http://localhost:8000/shifts/1
 ```
 
-**Expected:** Single shift object with agent information
+**Esperado:** objeto de turno com informações do agente
 
-**List Pending Swaps:**
+**Listar trocas pendentes:**
 ```bash
 curl http://localhost:8000/swaps/pending
 ```
 
-**Expected:** JSON array with pending swap requests
+**Esperado:** array JSON com solicitações de troca pendentes
 
-### 7. Excel Export
+### 7. Exportação Excel
 
 ```bash
 curl http://localhost:8000/shifts/export/excel -o test_shifts.xlsx
 ```
 
-**Expected:**
-- File created: `test_shifts.xlsx`
-- File size > 0 bytes
-- Can be opened in Excel/LibreOffice
+**Esperado:**
+- Arquivo `test_shifts.xlsx` gerado
+- Tamanho do arquivo > 0 bytes
+- Abre em Excel/LibreOffice
 
-**Validation:**
+**Validação:**
 ```bash
 ls -lh test_shifts.xlsx
-# Should show file with size ~5-15KB
+# Deve mostrar tamanho ~5-15KB
 ```
 
-### 8. ICS Export
+### 8. Exportação ICS
 
 ```bash
 curl http://localhost:8000/shifts/export/ics -o test_shifts.ics
 ```
 
-**Expected:**
-- File created: `test_shifts.ics`
-- File size > 0 bytes
-- Valid iCalendar format
+**Esperado:**
+- Arquivo `test_shifts.ics` gerado
+- Tamanho do arquivo > 0 bytes
+- Formato iCalendar válido
 
-**Validation:**
+**Validação:**
 ```bash
 head -5 test_shifts.ics
-# Should start with "BEGIN:VCALENDAR"
+# Deve começar com "BEGIN:VCALENDAR"
 ```
 
-### 9. Swap Approval Workflow
+### 9. Fluxo de aprovação de trocas
 
-**Create a Swap Request:**
+**Criar uma solicitação de troca:**
 ```bash
 curl -X POST "http://localhost:8000/swaps?requester_id=2" \
   -H "Content-Type: application/json" \
@@ -154,55 +154,55 @@ curl -X POST "http://localhost:8000/swaps?requester_id=2" \
     "target_agent_id": 3,
     "origin_shift_id": 1,
     "target_shift_id": 2,
-    "reason": "Test swap request"
+    "reason": "Teste de troca"
   }'
 ```
 
-**Expected:** JSON response with swap request (status: "pending")
+**Esperado:** resposta JSON com a solicitação (status: "pending")
 
-**Approve the Swap (as admin):**
+**Aprovar a troca (como admin):**
 ```bash
 curl -X POST "http://localhost:8000/swaps/4/approve?admin_id=1" \
   -H "Content-Type: application/json" \
-  -d '{"admin_notes": "Approved for testing"}'
+  -d '{"admin_notes": "Aprovado para teste"}'
 ```
 
-**Expected:**
-- Status changed to "approved"
-- `reviewed_by` set to 1
-- Shifts have swapped agents
+**Esperado:**
+- Status alterado para "approved"
+- `reviewed_by` definido como 1
+- Turnos com agentes trocados
 
-**Verify Swap Execution:**
+**Verificar execução da troca:**
 ```bash
-# Check that shifts 1 and 2 have swapped agents
+# Confirmar que os turnos 1 e 2 trocaram de agente
 curl http://localhost:8000/shifts/1
 curl http://localhost:8000/shifts/2
 ```
 
-### 10. Validation Script
+### 10. Script de validação
 
 ```bash
 docker-compose exec backend python -m backend.validate
 ```
 
-**Expected Output:**
-- "=== AgentEscala MVP Validation ==="
-- All checks show "✓"
-- "MVP is functional and ready to use!"
-- Exit code 0
+**Saída esperada:**
+- "=== Validação do MVP AgentEscala ==="
+- Todas as checagens com "✓"
+- "O MVP está funcional e pronto para uso!"
+- Código de saída 0
 
-## Homelab Deployment Validation
+## Validação de implantação em homelab
 
-### 1. Prerequisites Check
+### 1. Conferir pré-requisitos
 
 ```bash
-# Check Traefik network
+# Verificar rede do Traefik
 docker network inspect traefik-public
 
-# Expected: Network exists with external: true
+# Esperado: rede existe com external: true
 ```
 
-### 2. Configuration
+### 2. Configuração
 
 ```bash
 cd infra
@@ -210,12 +210,12 @@ cp .env.homelab.example .env.homelab
 nano .env.homelab
 ```
 
-**Required edits:**
-- [ ] POSTGRES_PASSWORD changed
-- [ ] SECRET_KEY generated and set
-- [ ] ADMIN_EMAIL set
-- [ ] DOMAIN set to your domain
-- [ ] TRAEFIK_NETWORK matches your setup
+**Edições necessárias:**
+- [ ] POSTGRES_PASSWORD alterado
+- [ ] SECRET_KEY gerado e definido
+- [ ] ADMIN_EMAIL definido
+- [ ] DOMAIN ajustado para seu domínio
+- [ ] TRAEFIK_NETWORK de acordo com seu ambiente
 
 ### 3. Deploy
 
@@ -223,58 +223,58 @@ nano .env.homelab
 ./infra/scripts/couple_to_homelab.sh --build
 ```
 
-**Expected:**
-- Script validates configuration
-- Image builds successfully
-- Containers start
-- "Deployment Complete" message
+**Esperado:**
+- Script valida a configuração
+- Imagem é construída com sucesso
+- Containers sobem
+- Mensagem "Deployment Complete"
 
-### 4. Verify Deployment
+### 4. Verificar deploy
 
 ```bash
 docker-compose -f infra/docker-compose.homelab.yml ps
 ```
 
-**Expected:**
-- Both containers "Up"
-- Backend has "healthy" status
+**Esperado:**
+- Ambos containers "Up"
+- Backend com status "healthy"
 
-### 5. Access via Domain
+### 5. Acesso via domínio
 
 ```bash
-curl https://agentescala.yourdomain.com/health
+curl https://agentescala.seudominio.com/health
 ```
 
-**Expected:**
-- HTTPS connection successful (SSL certificate valid)
-- JSON response with "healthy" status
+**Esperado:**
+- Conexão HTTPS ok (certificado SSL válido)
+- Resposta JSON com status "healthy"
 
-### 6. Check Traefik Dashboard
+### 6. Traefik Dashboard
 
-Open: https://traefik.yourdomain.com/dashboard/
+Abrir: https://traefik.seudominio.com/dashboard/
 
-**Expected:**
-- AgentEscala router visible
-- Green (healthy) status
-- Correct domain and entrypoint
+**Esperado:**
+- Roteador do AgentEscala visível
+- Status verde (healthy)
+- Domínio e entrypoint corretos
 
-## Code Quality Validation
+## Validação de qualidade de código
 
-### 1. Python Syntax
+### 1. Sintaxe Python
 
 ```bash
 find backend -name "*.py" -exec python3 -m py_compile {} \;
 ```
 
-**Expected:** No syntax errors
+**Esperado:** sem erros de sintaxe
 
-### 2. File Structure
+### 2. Estrutura de arquivos
 
 ```bash
 tree -L 2 -I '__pycache__|*.pyc|.git'
 ```
 
-**Expected Structure:**
+**Estrutura esperada:**
 ```
 .
 ├── backend/
@@ -290,77 +290,77 @@ tree -L 2 -I '__pycache__|*.pyc|.git'
 └── Dockerfile
 ```
 
-### 3. Documentation Exists
+### 3. Documentação presente
 
-- [ ] README.md exists and is comprehensive
-- [ ] QUICKSTART.md exists with step-by-step guide
-- [ ] PROJECT_STATUS.md exists with current status
-- [ ] IMPLEMENTATION_SUMMARY.md exists with code details
-- [ ] docs/architecture.md exists
-- [ ] docs/assumptions.md exists
-- [ ] docs/homelab_deploy.md exists
+- [ ] README.md existe e é completo
+- [ ] QUICKSTART.md existe com passo a passo
+- [ ] PROJECT_STATUS.md existe com status atual
+- [ ] IMPLEMENTATION_SUMMARY.md existe com detalhes de código
+- [ ] docs/architecture.md existe
+- [ ] docs/assumptions.md existe
+- [ ] docs/homelab_deploy.md existe
 
-## Functional Requirements Validation
+## Validação de requisitos funcionais
 
-- [x] **Backend functional**: FastAPI running with all endpoints
-- [x] **Database**: PostgreSQL with proper models and relationships
-- [x] **User Management**: CRUD operations work
-- [x] **Shift Management**: CRUD operations work
-- [x] **Swap Workflow**: Create, approve, reject, cancel work
-- [x] **Excel Export**: Generates valid professional Excel files
-- [x] **ICS Export**: Generates valid iCalendar files
-- [x] **Admin Approval**: Swap requires admin approval
-- [x] **Swap Execution**: Shifts swap on approval
-- [x] **Health Check**: Endpoint responds correctly
-- [x] **Docker Local**: One-command startup works
-- [x] **Docker Homelab**: Deployment script works
-- [x] **Documentation**: Comprehensive and current
-- [x] **Seed Data**: Sample data creation works
-- [x] **Validation**: Validation script passes
+- [x] **Backend funcional**: FastAPI rodando com todos os endpoints
+- [x] **Banco de dados**: PostgreSQL com modelos e relacionamentos corretos
+- [x] **Gestão de Usuários**: CRUD funcionando
+- [x] **Gestão de Turnos**: CRUD funcionando
+- [x] **Fluxo de Trocas**: criar, aprovar, rejeitar, cancelar funcionando
+- [x] **Exportação Excel**: gera arquivos profissionais válidos
+- [x] **Exportação ICS**: gera arquivos iCalendar válidos
+- [x] **Aprovação do Admin**: trocas exigem aprovação
+- [x] **Execução da Troca**: turnos são trocados na aprovação
+- [x] **Health Check**: endpoint responde corretamente
+- [x] **Docker Local**: subida em um comando
+- [x] **Docker Homelab**: script de deploy funciona
+- [x] **Documentação**: completa e atual
+- [x] **Seed**: criação de dados de exemplo funciona
+- [x] **Validação**: script de validação passa
 
-## Non-Functional Requirements Validation
+## Validação de requisitos não funcionais
 
-- [x] **Clean Code**: Three-layer architecture implemented
-- [x] **Separation of Concerns**: API, Services, Models separated
-- [x] **Type Safety**: Pydantic models for validation
-- [x] **Error Handling**: HTTPException with proper codes
-- [x] **Documentation**: Auto-generated API docs available
-- [x] **Logging**: Uvicorn logs all requests
-- [x] **Security**: Database on isolated network
-- [x] **SSL/TLS**: Traefik labels configured
-- [x] **Health Checks**: Database and backend health checks
-- [x] **Restart Policy**: Auto-restart configured
+- [x] **Código limpo**: arquitetura em três camadas implementada
+- [x] **Separação de responsabilidades**: API, Services, Models separados
+- [x] **Segurança de tipos**: modelos Pydantic para validação
+- [x] **Tratamento de erros**: HTTPException com códigos corretos
+- [x] **Documentação**: docs automáticas da API disponíveis
+- [x] **Logging**: Uvicorn registra todas as requisições
+- [x] **Segurança**: banco em rede isolada
+- [x] **SSL/TLS**: labels do Traefik configuradas
+- [x] **Health Checks**: verificações de DB e backend
+- [x] **Restart Policy**: reinício automático configurado
 
-## Known Limitations (Expected)
+## Limitações conhecidas (esperadas)
 
-- [ ] Authentication not enforced (JWT login available; endpoints still accept ids)
-- [ ] No frontend (expected - future work)
-- [ ] No tests (expected - future work)
-- [ ] No email notifications (expected - future work)
-- [ ] Single timezone (UTC) (expected - future work)
+- [ ] Autenticação não aplicada (login JWT disponível; endpoints ainda aceitam ids)
+- [ ] Sem frontend (futuro)
+- [ ] Sem testes (futuro)
+- [ ] Sem notificações por e-mail (futuro)
+- [ ] Fuso único (UTC) (futuro)
 
-## Issue Tracking
+## Registro de problemas
 
-If any validation fails:
+Se alguma validação falhar:
 
-1. Note which step failed
-2. Check logs: `docker-compose logs`
-3. Verify configuration: `.env` files
-4. Check GitHub issues: https://github.com/mglpsw/AgentEscala/issues
-5. Review documentation in `/docs`
+1. Anote qual passo falhou
+2. Verifique logs: `docker-compose logs`
+3. Revise configuração: arquivos `.env`
+4. Consulte issues no GitHub: https://github.com/mglpsw/AgentEscala/issues
+5. Revise a documentação em `/docs`
 
-## Success Criteria
+## Critério de sucesso
 
-✅ **MVP is complete when:**
-- All "Local Development Validation" steps pass
-- All "Functional Requirements" are validated
-- Documentation is comprehensive and current
-- Code is clean and follows architecture
-- Can be deployed to homelab successfully
+✅ **O MVP está completo quando:**
+- Todos os passos de "Validação em desenvolvimento local" passam
+- Todos os "Requisitos Funcionais" estão validados
+- Documentação está completa e atual
+- Código está limpo e segue a arquitetura
+- Deploy em homelab é possível com sucesso
 
-## Final Validation Command
+## Comando final de validação
 
-Run all validations in sequence:
+Execute todas as validações em sequência:
 
 ```bash
 # Start local
@@ -391,4 +391,4 @@ ls -lh test.xlsx test.ics
 ls -1 *.md docs/*.md
 ```
 
-**If all pass:** ✅ MVP is complete and functional!
+**Se tudo passar:** ✅ O MVP está completo e funcional!

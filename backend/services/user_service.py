@@ -5,7 +5,7 @@ from ..utils.auth import get_password_hash
 
 
 class UserService:
-    """Service for managing users"""
+    """Serviço para gerenciar usuários"""
 
     @staticmethod
     def create_user(
@@ -15,7 +15,7 @@ class UserService:
         password: str,
         role: UserRole = UserRole.AGENT
     ) -> User:
-        """Create a new user"""
+        """Criar um novo usuário"""
         hashed_password = get_password_hash(password)
         user = User(email=email, name=name, hashed_password=hashed_password, role=role)
         db.add(user)
@@ -25,32 +25,32 @@ class UserService:
 
     @staticmethod
     def get_user(db: Session, user_id: int) -> Optional[User]:
-        """Get a user by ID"""
+        """Obter um usuário pelo ID"""
         return db.query(User).filter(User.id == user_id).first()
 
     @staticmethod
     def get_user_by_email(db: Session, email: str) -> Optional[User]:
-        """Get a user by email"""
+        """Obter um usuário pelo e-mail"""
         return db.query(User).filter(User.email == email).first()
 
     @staticmethod
     def get_all_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
-        """Get all users with pagination"""
+        """Listar todos os usuários com paginação"""
         return db.query(User).offset(skip).limit(limit).all()
 
     @staticmethod
     def get_agents(db: Session) -> List[User]:
-        """Get all agents"""
+        """Listar todos os agentes ativos"""
         return db.query(User).filter(User.role == UserRole.AGENT, User.is_active == True).all()
 
     @staticmethod
     def get_admins(db: Session) -> List[User]:
-        """Get all admins"""
+        """Listar todos os administradores ativos"""
         return db.query(User).filter(User.role == UserRole.ADMIN, User.is_active == True).all()
 
     @staticmethod
     def update_user(db: Session, user_id: int, **kwargs) -> Optional[User]:
-        """Update a user"""
+        """Atualizar um usuário"""
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return None
@@ -65,7 +65,7 @@ class UserService:
 
     @staticmethod
     def deactivate_user(db: Session, user_id: int) -> bool:
-        """Deactivate a user"""
+        """Desativar um usuário"""
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return False

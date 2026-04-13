@@ -1,5 +1,5 @@
 """
-Seed script for AgentEscala - Creates sample data for testing
+Script de seed do AgentEscala - Cria dados de exemplo para testes
 """
 from datetime import datetime, timedelta
 from backend.config.database import SessionLocal
@@ -9,25 +9,25 @@ from backend.utils.auth import get_password_hash
 
 
 def seed_database():
-    """Seed the database with sample data"""
-    print("Initializing database...")
+    """Popular o banco de dados com dados de exemplo"""
+    print("Inicializando banco de dados...")
     init_db()
 
     db = SessionLocal()
 
     try:
-        # Check if data already exists
+        # Verifica se já existem dados
         existing_users = db.query(User).count()
         if existing_users > 0:
-            print(f"Database already contains {existing_users} users. Skipping seed.")
+            print(f"O banco já contém {existing_users} usuários. Pulando seed.")
             return
 
-        print("Creating users...")
+        print("Criando usuários...")
 
-        # Default password for all users: "password123"
+        # Senha padrão para todos os usuários: "password123"
         default_password = get_password_hash("password123")
 
-        # Create admin
+        # Cria admin
         admin = User(
             email="admin@agentescala.com",
             name="Admin User",
@@ -37,7 +37,7 @@ def seed_database():
         )
         db.add(admin)
 
-        # Create agents
+        # Cria agentes
         agents = [
             User(email="alice@agentescala.com", name="Alice Silva", hashed_password=default_password, role=UserRole.AGENT),
             User(email="bob@agentescala.com", name="Bob Santos", hashed_password=default_password, role=UserRole.AGENT),
@@ -50,77 +50,77 @@ def seed_database():
             db.add(agent)
 
         db.commit()
-        print(f"Created {len(agents) + 1} users (1 admin + {len(agents)} agents)")
+        print(f"Criados {len(agents) + 1} usuários (1 admin + {len(agents)} agentes)")
 
-        # Refresh to get IDs
+        # Atualiza para obter os IDs
         db.refresh(admin)
         for agent in agents:
             db.refresh(agent)
 
-        print("Creating shifts...")
+        print("Criando turnos...")
 
-        # Create shifts for the next 30 days
+        # Cria turnos para os próximos 30 dias
         base_date = datetime.utcnow()
         shifts = []
 
         for day in range(30):
             current_date = base_date + timedelta(days=day)
 
-            # Morning shift (8:00 - 16:00)
+            # Turno da manhã (8:00 - 16:00)
             morning_agent = agents[day % len(agents)]
             morning_shift = Shift(
                 agent_id=morning_agent.id,
                 start_time=current_date.replace(hour=8, minute=0, second=0, microsecond=0),
                 end_time=current_date.replace(hour=16, minute=0, second=0, microsecond=0),
-                title="Morning Shift",
-                description="Regular morning shift",
-                location="Office"
+                title="Turno da Manhã",
+                description="Turno regular da manhã",
+                location="Escritório"
             )
             shifts.append(morning_shift)
             db.add(morning_shift)
 
-            # Afternoon shift (16:00 - 00:00)
+            # Turno da tarde (16:00 - 00:00)
             afternoon_agent = agents[(day + 1) % len(agents)]
             afternoon_shift = Shift(
                 agent_id=afternoon_agent.id,
                 start_time=current_date.replace(hour=16, minute=0, second=0, microsecond=0),
                 end_time=(current_date + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0),
-                title="Afternoon Shift",
-                description="Regular afternoon shift",
-                location="Office"
+                title="Turno da Tarde",
+                description="Turno regular da tarde",
+                location="Escritório"
             )
             shifts.append(afternoon_shift)
             db.add(afternoon_shift)
 
-            # Night shift (00:00 - 08:00)
+            # Turno da noite (00:00 - 08:00)
             night_agent = agents[(day + 2) % len(agents)]
             night_shift = Shift(
                 agent_id=night_agent.id,
                 start_time=(current_date + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0),
                 end_time=(current_date + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0),
-                title="Night Shift",
-                description="Regular night shift",
-                location="Office"
+                title="Turno da Noite",
+                description="Turno regular da noite",
+                location="Escritório"
             )
             shifts.append(night_shift)
             db.add(night_shift)
 
         db.commit()
-        print(f"Created {len(shifts)} shifts")
+        print(f"Criados {len(shifts)} turnos")
 
-        # Refresh shifts to get IDs
+        # Atualiza turnos para obter os IDs
         for shift in shifts:
             db.refresh(shift)
 
-        print("Creating sample swap requests...")
+        print("Criando solicitações de troca de exemplo...")
 
-        # Create a few sample swap requests
+        # Cria algumas solicitações de troca de exemplo
         swap1 = SwapRequest(
             requester_id=agents[0].id,
             target_agent_id=agents[1].id,
             origin_shift_id=shifts[0].id,
             target_shift_id=shifts[1].id,
-            reason="Need to attend medical appointment",
+            reason="Preciso ir a uma consulta médica",
             status=SwapStatus.PENDING
         )
         db.add(swap1)
@@ -130,7 +130,7 @@ def seed_database():
             target_agent_id=agents[3].id,
             origin_shift_id=shifts[6].id,
             target_shift_id=shifts[7].id,
-            reason="Family commitment",
+            reason="Compromisso familiar",
             status=SwapStatus.PENDING
         )
         db.add(swap2)
@@ -140,27 +140,27 @@ def seed_database():
             target_agent_id=agents[4].id,
             origin_shift_id=shifts[3].id,
             target_shift_id=shifts[4].id,
-            reason="Personal reasons",
+            reason="Motivos pessoais",
             status=SwapStatus.APPROVED,
             reviewed_by=admin.id,
-            admin_notes="Approved - Valid reason"
+            admin_notes="Aprovado - Motivo válido"
         )
         db.add(swap3)
 
         db.commit()
-        print("Created 3 sample swap requests (2 pending, 1 approved)")
+        print("Criadas 3 solicitações de troca (2 pendentes, 1 aprovada)")
 
-        print("\n=== Seed Complete ===")
-        print("\nSample Credentials:")
+        print("\n=== Seed concluído ===")
+        print("\nCredenciais de exemplo:")
         print(f"  Admin: {admin.email}")
-        print(f"  Agents: {', '.join([a.email for a in agents])}")
-        print("\nYou can now:")
-        print("  - Access the API at http://localhost:8000")
-        print("  - View API docs at http://localhost:8000/docs")
-        print("  - Check health at http://localhost:8000/health")
+        print(f"  Agentes: {', '.join([a.email for a in agents])}")
+        print("\nAgora você pode:")
+        print("  - Acessar a API em http://localhost:8000")
+        print("  - Ver a documentação em http://localhost:8000/docs")
+        print("  - Verificar saúde em http://localhost:8000/health")
 
     except Exception as e:
-        print(f"Error seeding database: {e}")
+        print(f"Erro ao realizar seed do banco: {e}")
         db.rollback()
         raise
     finally:

@@ -1,5 +1,5 @@
 """
-Authentication utilities for JWT token management and password hashing.
+Utilitários de autenticação para gestão de tokens JWT e hashing de senhas.
 """
 from datetime import datetime, timedelta
 from typing import Optional
@@ -7,34 +7,34 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from ..config.settings import settings
 
-# Password hashing context
+# Contexto de hashing de senha
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# JWT settings
+# Configurações de JWT
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 horas
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
+    """Verificar uma senha em relação ao seu hash."""
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password."""
+    """Gerar o hash de uma senha."""
     return pwd_context.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
-    Create a JWT access token.
+    Criar um token JWT de acesso.
 
     Args:
-        data: Data to encode in the token (typically {"sub": user_id})
-        expires_delta: Optional expiration time delta
+        data: Dados a serem codificados no token (normalmente {"sub": user_id})
+        expires_delta: Tempo opcional de expiração
 
     Returns:
-        Encoded JWT token string
+        String do token JWT codificado
     """
     to_encode = data.copy()
 
@@ -51,13 +51,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def decode_access_token(token: str) -> Optional[dict]:
     """
-    Decode and verify a JWT access token.
+    Decodificar e validar um token JWT.
 
     Args:
-        token: JWT token string
+        token: String do token JWT
 
     Returns:
-        Decoded token data if valid, None otherwise
+        Dados decodificados do token se válido, None caso contrário
     """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])

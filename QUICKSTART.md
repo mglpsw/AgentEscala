@@ -1,150 +1,150 @@
-# Quick Start Guide
+# Guia de Início Rápido
 
-This guide will get you up and running with AgentEscala in under 5 minutes.
+Este guia coloca o AgentEscala para rodar em menos de 5 minutos.
 
-## Prerequisites
+## Pré-requisitos
 
-- Docker and Docker Compose installed
+- Docker e Docker Compose instalados
 - Git
 
-## Steps
+## Passo a passo
 
-### 1. Clone the Repository
+### 1. Clone o repositório
 
 ```bash
 git clone https://github.com/mglpsw/AgentEscala.git
 cd AgentEscala
 ```
 
-### 2. Start the Application
+### 2. Suba a aplicação
 
 ```bash
 docker-compose up -d
 ```
 
-This will start:
-- PostgreSQL database on port 5432
-- FastAPI backend on port 8000
+Isso inicia:
+- Banco PostgreSQL na porta 5432
+- Backend FastAPI na porta 8000
 
-Migrations are applied automatically before the API starts. Wait for services to be healthy (about 10-20 seconds).
+As migrações são aplicadas automaticamente antes de a API subir. Aguarde os serviços ficarem saudáveis (cerca de 10–20 segundos).
 
-### 3. Seed Sample Data (password: `password123`)
+### 3. Execute o seed (senha: `password123`)
 
 ```bash
 docker-compose exec backend python -m backend.seed
 ```
 
-This creates:
-- 1 admin user
-- 5 agent users
-- 90 shifts (30 days × 3 shifts/day)
-- 3 sample swap requests
+Isso cria:
+- 1 usuário admin
+- 5 usuários agente
+- 90 turnos (30 dias × 3 turnos/dia)
+- 3 solicitações de troca de exemplo
 
-### 4. Access the Application
+### 4. Acesse a aplicação
 
-- **API Documentation**: http://localhost:8000/docs
+- **Documentação da API**: http://localhost:8000/docs
 - **Health Check**: http://localhost:8000/health
-- **API Root**: http://localhost:8000
+- **Raiz da API**: http://localhost:8000
 
-### 5. Try It Out
+### 5. Teste rapidamente
 
-#### View All Shifts
+#### Ver todos os turnos
 ```bash
 curl http://localhost:8000/shifts
 ```
 
-#### Export Shifts to Excel
+#### Exportar turnos para Excel
 ```bash
 curl http://localhost:8000/shifts/export/excel -o shifts.xlsx
 ```
 
-#### Export Shifts to ICS
+#### Exportar turnos para ICS
 ```bash
 curl http://localhost:8000/shifts/export/ics -o shifts.ics
 ```
 
-#### View Pending Swap Requests
+#### Ver trocas pendentes
 ```bash
 curl http://localhost:8000/swaps/pending
 ```
 
-#### Approve a Swap Request (as admin, user_id=1)
+#### Aprovar uma troca (como admin, user_id=1)
 ```bash
 curl -X POST "http://localhost:8000/swaps/1/approve?admin_id=1" \
   -H "Content-Type: application/json" \
-  -d '{"admin_notes": "Approved"}'
+  -d '{"admin_notes": "Aprovado"}'
 ```
 
-### 6. Explore the API
+### 6. Explore a API
 
-Open http://localhost:8000/docs in your browser to see the interactive API documentation powered by Swagger UI.
+Abra http://localhost:8000/docs no navegador para usar a documentação interativa (Swagger UI).
 
-## Sample Credentials
+## Credenciais de exemplo
 
-After seeding, you'll have:
+Após o seed, você terá:
 
 **Admin**:
-- Email: admin@agentescala.com
-- Name: Admin User
-- Password: password123
+- E-mail: admin@agentescala.com
+- Nome: Admin User
+- Senha: password123
 
-**Agents**:
+**Agentes**:
 - alice@agentescala.com (Alice Silva)
 - bob@agentescala.com (Bob Santos)
 - carol@agentescala.com (Carol Oliveira)
 - david@agentescala.com (David Costa)
 - eve@agentescala.com (Eve Martins)
-- Password for all sample users: password123
+- Senha para todos os usuários de exemplo: password123
 
-## Common Commands
+## Comandos úteis
 
-### View Logs
+### Ver logs
 ```bash
 docker-compose logs -f backend
 ```
 
-### Stop Application
+### Parar aplicação
 ```bash
 docker-compose down
 ```
 
-### Restart Application
+### Reiniciar backend
 ```bash
 docker-compose restart backend
 ```
 
-### Reset Database
+### Resetar banco
 ```bash
 docker-compose down -v
 docker-compose up -d
 docker-compose exec backend python -m backend.seed
 ```
 
-### Access Database Directly
+### Acessar o banco direto
 ```bash
 docker-compose exec db psql -U agentescala -d agentescala
 ```
 
-## Troubleshooting
+## Solução de problemas
 
-### Backend won't start
-Check if the database is healthy:
+### Backend não inicia
+Verifique se o banco está saudável:
 ```bash
 docker-compose ps
 ```
 
-### Database connection errors
-Ensure the database container is running:
+### Erros de conexão com o banco
+Garanta que o container do banco está rodando:
 ```bash
 docker-compose up -d db
 ```
 
-### Port already in use
-If port 8000 or 5432 is already in use, edit `docker-compose.yml` to use different ports.
+### Porta em uso
+Se a porta 8000 ou 5432 já estiver ocupada, ajuste `docker-compose.yml` para usar outras portas.
 
-## Next Steps
+## Próximos passos
 
-- Read [README.md](README.md) for full feature documentation
-- Check [PROJECT_STATUS.md](PROJECT_STATUS.md) for current status
-- See [docs/architecture.md](docs/architecture.md) for technical details
-- Review [docs/homelab_deploy.md](docs/homelab_deploy.md) for production deployment
+- Leia [README.md](README.md) para a documentação completa de funcionalidades
+- Veja [PROJECT_STATUS.md](PROJECT_STATUS.md) para o status atual
+- Consulte [docs/architecture.md](docs/architecture.md) para detalhes técnicos
+- Revise [docs/homelab_deploy.md](docs/homelab_deploy.md) para implantação em produção
