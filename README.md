@@ -70,7 +70,6 @@ AgentEscala/
 ├── infra/             # Implantação homelab
 │   ├── scripts/       # Scripts de deploy
 │   └── docker-compose.homelab.yml
-├── tests/             # Testes (futuro)
 ├── docker-compose.yml # Ambiente local
 └── Dockerfile         # Imagem do container
 ```
@@ -111,32 +110,33 @@ AgentEscala/
 ## Endpoints da API
 
 ### Usuários
-- `POST /users` - Criar usuário
-- `GET /users` - Listar usuários
+- `POST /users/` - Criar usuário
+- `GET /users/` - Listar usuários
 - `GET /users/agents` - Listar agentes
 - `GET /users/admins` - Listar administradores
 - `GET /users/{id}` - Detalhar usuário
 
 ### Turnos
-- `POST /shifts` - Criar turno
-- `GET /shifts` - Listar turnos
+- `POST /shifts/` - Criar turno
+- `GET /shifts/` - Listar turnos
 - `GET /shifts/agent/{id}` - Listar turnos de um agente
+- `GET /shifts/export/excel` - Exportar para Excel
+- `GET /shifts/export/ics` - Exportar para ICS
 - `GET /shifts/{id}` - Detalhar turno
 - `PATCH /shifts/{id}` - Atualizar turno
 - `DELETE /shifts/{id}` - Excluir turno
-- `GET /shifts/export/excel` - Exportar para Excel
-- `GET /shifts/export/ics` - Exportar para ICS
+- `GET /shifts/{id}/export/ics` - Exportar turno individual para ICS
 
 ### Trocas
-- `POST /swaps` - Criar solicitação de troca
-- `GET /swaps` - Listar trocas
+- `POST /swaps/` - Criar solicitação de troca
+- `GET /swaps/` - Listar trocas
 - `GET /swaps/pending` - Listar trocas pendentes
 - `GET /swaps/agent/{id}` - Listar trocas de um agente
+- `GET /swaps/export/excel` - Exportar para Excel
 - `GET /swaps/{id}` - Detalhar troca
 - `POST /swaps/{id}/approve` - Aprovar troca (admin)
 - `POST /swaps/{id}/reject` - Rejeitar troca (admin)
 - `POST /swaps/{id}/cancel` - Cancelar troca (solicitante)
-- `GET /swaps/export/excel` - Exportar para Excel
 
 ## Implantação
 

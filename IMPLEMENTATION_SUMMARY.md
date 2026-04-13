@@ -1,10 +1,19 @@
 # Resumo de Implementação
 
 **Última auditoria de consolidação**: 2026-04-13  
-**Branch**: codex/finalizar-validar-corrigir  
-**Status**: Backend validado; aplicação de auth/testes pendentes ⚠️
+**Branch**: main  
+**Status**: Backend validado e corrigido; aplicação de auth/testes pendentes ⚠️
 
-**Correções mais recentes (2026-04-13)**:
+**Correções desta sessão (2026-04-13)**:
+- `email-validator` atualizado de `2.1.0` (yanked) para `2.2.0`
+- `python-multipart` atualizado de `0.0.22` para `0.0.24` (correção de segurança)
+- Rotas de exportação (`/export/excel`, `/export/ics`) movidas para antes das rotas parametrizadas (`/{id}`) em `shifts.py` e `swaps.py`
+- `docker-compose.homelab.yml`: rede hardcoded `traefik-public` substituída por `${TRAEFIK_NETWORK}` para consistência com o restante do arquivo
+- `VALIDATION_CHECKLIST.md`: exemplos de `curl` corrigidos para usar trailing slash (ex: `/users/`, `/shifts/`)
+- `README.md`: endpoints documentados com trailing slash correto; referência a `tests/` (diretório inexistente) removida
+- Todos os imports e utilitários validados em venv local (auth JWT, exportadores Excel/ICS)
+
+**Correções anteriores (2026-04-13)**:
 - Migrações Alembic agora rodam automaticamente antes do app iniciar (compose local e homelab)
 - Scripts de seed/validação rodam sem erros após fixar `bcrypt==3.2.2`
 - Listagem de trocas e exportação Excel retornam todas as solicitações (não só pendentes)

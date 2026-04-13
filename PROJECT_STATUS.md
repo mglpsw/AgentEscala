@@ -6,15 +6,18 @@
 
 AgentEscala é um sistema de gestão e troca de turnos que permite às equipes administrar escalas com um fluxo de aprovação obrigatória por administrador.
 
-## Status atual: Backend do MVP rodando (aplicação de auth + testes pendentes) ⚠️
+## Status atual: Backend do MVP validado e corrigido (aplicação de auth + testes pendentes) ⚠️
 
 O backend roda fim a fim com migrações automáticas, seed, exportações e fluxo de trocas. Endpoints de autenticação existem, mas a aplicação de papéis e a suíte de testes ainda estão pendentes.
 
 ### Última validação (2026-04-13)
-- Build/up do docker-compose aplica migrações Alembic automaticamente e inicia com sucesso
-- Script de seed conclui (6 usuários, 90 turnos, 3 trocas)
-- Script de validação passa (health, consultas, exports, validação de trocas)
-- Listagem e exportação de trocas retornam todas as solicitações (não apenas pendentes)
+- Todos os imports Python validados com sucesso (sem erros de runtime estático)
+- Auth JWT (hash de senha, geração/decodificação de token): testado e OK
+- Exportadores Excel e ICS: testados com objetos mock e funcionando
+- Rotas de exportação movidas para antes das rotas parametrizadas (corretude explícita)
+- Dependências atualizadas: `email-validator==2.2.0`, `python-multipart==0.0.24`
+- `docker-compose.homelab.yml`: variável `${TRAEFIK_NETWORK}` agora consistente em toda a configuração
+- **Nota**: validação de runtime completa (docker-compose up + seed + API) requer ambiente Docker operacional e não foi executada nesta sessão
 
 ## Funcionalidades implementadas
 

@@ -50,7 +50,7 @@ Isso cria:
 
 #### Ver todos os turnos
 ```bash
-curl http://localhost:8000/shifts
+curl http://localhost:8000/shifts/
 ```
 
 #### Exportar turnos para Excel

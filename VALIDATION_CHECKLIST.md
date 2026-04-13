@@ -82,7 +82,7 @@ docker-compose exec backend python -m backend.seed
 
 **Validação:**
 ```bash
-curl http://localhost:8000/users
+curl http://localhost:8000/users/
 ```
 
 **Esperado:** array JSON com 6 usuários (1 admin + 5 agentes)
@@ -91,7 +91,7 @@ curl http://localhost:8000/users
 
 **Listar turnos:**
 ```bash
-curl http://localhost:8000/shifts | jq '.[:2]'
+curl http://localhost:8000/shifts/ | jq '.[:2]'
 ```
 
 **Esperado:** array JSON com objetos de turno
@@ -227,7 +227,7 @@ nano .env.homelab
 - Script valida a configuração
 - Imagem é construída com sucesso
 - Containers sobem
-- Mensagem "Deployment Complete"
+- Mensagem "=== Deploy concluído ==="
 
 ### 4. Verificar deploy
 
@@ -377,8 +377,8 @@ docker-compose exec backend python -m backend.validate
 
 # Test API
 curl http://localhost:8000/health
-curl http://localhost:8000/users
-curl http://localhost:8000/shifts
+curl http://localhost:8000/users/
+curl http://localhost:8000/shifts/
 
 # Test exports
 curl http://localhost:8000/shifts/export/excel -o test.xlsx
