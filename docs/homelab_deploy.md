@@ -36,9 +36,9 @@ docker-compose -f docker-compose.homelab.yml ps
 Containers devem estar `Up` e backend com healthcheck `healthy`.
 
 4. **Acessar**
-- API: `https://agentescala.SEUDOMINIO.com`
-- Health: `https://agentescala.SEUDOMINIO.com/health`
-- Traefik dashboard (se habilitado): `https://traefik.SEUDOMINIO.com/dashboard/`
+- API: `https://$DOMAIN`
+- Health: `https://$DOMAIN/health`
+- Traefik dashboard (se habilitado): `https://traefik.$DOMAIN/dashboard/`
 
 ## Migrações e seed
 - Migrações Alembic rodam automaticamente na inicialização do container backend.
