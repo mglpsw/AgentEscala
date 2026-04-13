@@ -4,7 +4,7 @@ from datetime import datetime
 from ..models import UserRole, SwapStatus
 
 
-# User schemas
+# Esquemas de usuário
 class UserBase(BaseModel):
     email: EmailStr
     name: str
@@ -26,11 +26,11 @@ class UserResponse(UserBase):
         from_attributes = True
 
 
-# Shift schemas
+# Esquemas de turno
 class ShiftBase(BaseModel):
     start_time: datetime
     end_time: datetime
-    title: str = "Work Shift"
+    title: str = "Turno de trabalho"
     description: Optional[str] = None
     location: Optional[str] = None
 
@@ -64,7 +64,7 @@ class ShiftWithAgent(ShiftResponse):
         from_attributes = True
 
 
-# SwapRequest schemas
+# Esquemas de SwapRequest
 class SwapRequestCreate(BaseModel):
     target_agent_id: int
     origin_shift_id: int
@@ -107,7 +107,7 @@ class SwapRejection(BaseModel):
     admin_notes: Optional[str] = None
 
 
-# Health check
+# Verificação de saúde
 class HealthResponse(BaseModel):
     status: str
     timestamp: datetime

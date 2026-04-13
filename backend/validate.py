@@ -1,6 +1,6 @@
 """
-Simple validation script to verify AgentEscala MVP functionality
-Run this after seeding the database to validate core operations
+Script simples de validação para verificar a funcionalidade do MVP do AgentEscala
+Execute-o após semear o banco de dados para validar as operações principais
 """
 import sys
 from sqlalchemy import create_engine
@@ -16,98 +16,98 @@ from backend.utils import ExcelExporter, ICSExporter
 from backend.config.database import init_db
 
 def validate_mvp():
-    """Validate core MVP functionality"""
+    """Validar a funcionalidade principal do MVP"""
 
-    # Use environment variable or default
+    # Usa variável de ambiente ou padrão
     database_url = os.getenv("DATABASE_URL", "postgresql://agentescala:agentescala_dev@db:5432/agentescala")
 
-    print("=== AgentEscala MVP Validation ===\n")
+    print("=== Validação do MVP AgentEscala ===\n")
 
     try:
-        # Ensure tables exist before running checks
+        # Garante que as tabelas existam antes de executar as verificações
         init_db()
 
-        # Connect to database
-        print("1. Connecting to database...")
+        # Conecta ao banco de dados
+        print("1. Conectando ao banco de dados...")
         engine = create_engine(database_url)
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         db = SessionLocal()
-        print("   ✓ Database connection successful\n")
+        print("   ✓ Conexão com o banco realizada\n")
 
-        # Test 1: Check users exist
-        print("2. Testing user queries...")
+        # Teste 1: verificar se existem usuários
+        print("2. Testando consultas de usuários...")
         users = UserService.get_all_users(db)
         admins = UserService.get_admins(db)
         agents = UserService.get_agents(db)
-        print(f"   ✓ Found {len(users)} users ({len(admins)} admins, {len(agents)} agents)\n")
+        print(f"   ✓ Encontrados {len(users)} usuários ({len(admins)} admins, {len(agents)} agentes)\n")
 
-        # Test 2: Check shifts exist
-        print("3. Testing shift queries...")
+        # Teste 2: verificar se existem turnos
+        print("3. Testando consultas de turnos...")
         shifts = ShiftService.get_all_shifts(db)
         if agents:
             agent_shifts = ShiftService.get_shifts_by_agent(db, agents[0].id)
-            print(f"   ✓ Found {len(shifts)} shifts (agent 1 has {len(agent_shifts)} shifts)\n")
+            print(f"   ✓ Encontrados {len(shifts)} turnos (agente 1 tem {len(agent_shifts)} turnos)\n")
         else:
-            print(f"   ✓ Found {len(shifts)} shifts\n")
+            print(f"   ✓ Encontrados {len(shifts)} turnos\n")
 
-        # Test 3: Check swap requests exist
-        print("4. Testing swap queries...")
+        # Teste 3: verificar se existem solicitações de troca
+        print("4. Testando consultas de trocas...")
         pending_swaps = SwapService.get_pending_swaps(db)
-        print(f"   ✓ Found {len(pending_swaps)} pending swap requests\n")
+        print(f"   ✓ Encontradas {len(pending_swaps)} solicitações pendentes\n")
 
-        # Test 4: Excel export
-        print("5. Testing Excel export...")
+        # Teste 4: exportação Excel
+        print("5. Testando exportação Excel...")
         if shifts:
             excel_file = ExcelExporter.export_shifts(shifts[:10], include_agent_info=True)
             excel_size = len(excel_file.getvalue())
-            print(f"   ✓ Excel export successful ({excel_size} bytes)\n")
+            print(f"   ✓ Exportação Excel bem-sucedida ({excel_size} bytes)\n")
         else:
-            print("   ⚠ No shifts to export\n")
+            print("   ⚠ Não há turnos para exportar\n")
 
-        # Test 5: ICS export
-        print("6. Testing ICS export...")
+        # Teste 5: exportação ICS
+        print("6. Testando exportação ICS...")
         if shifts:
             ics_file = ICSExporter.export_shifts(shifts[:10])
             ics_size = len(ics_file.getvalue())
-            print(f"   ✓ ICS export successful ({ics_size} bytes)\n")
+            print(f"   ✓ Exportação ICS bem-sucedida ({ics_size} bytes)\n")
         else:
-            print("   ⚠ No shifts to export\n")
+            print("   ⚠ Não há turnos para exportar\n")
 
-        # Test 6: Swap workflow validation
-        print("7. Testing swap workflow validation...")
+        # Teste 6: validação do fluxo de trocas
+        print("7. Testando validação do fluxo de trocas...")
         if admins and agents and shifts:
-            # Try creating an invalid swap (should fail)
+            # Tenta criar uma troca inválida (deve falhar)
             try:
                 SwapService.create_swap_request(
                     db,
                     requester_id=agents[0].id,
                     target_agent_id=agents[1].id,
-                    origin_shift_id=999999,  # Invalid shift
+                    origin_shift_id=999999,  # Turno inválido
                     target_shift_id=shifts[0].id,
                     reason="Test"
                 )
-                print("   ✗ Validation failed - accepted invalid shift\n")
+                print("   ✗ Validação falhou - turno inválido foi aceito\n")
             except ValueError:
-                print("   ✓ Validation working - rejected invalid swap\n")
+                print("   ✓ Validação funcionando - troca inválida rejeitada\n")
         else:
-            print("   ⚠ Insufficient data for swap validation test\n")
+            print("   ⚠ Dados insuficientes para testar validação de troca\n")
 
-        # Summary
-        print("=== Validation Complete ===\n")
-        print("✓ Database connectivity: OK")
-        print(f"✓ Users: {len(users)} found")
-        print(f"✓ Shifts: {len(shifts)} found")
-        print(f"✓ Swap requests: {len(pending_swaps)} pending")
-        print("✓ Excel export: Working")
-        print("✓ ICS export: Working")
-        print("✓ Swap validation: Working")
-        print("\nMVP is functional and ready to use!")
+        # Resumo
+        print("=== Validação Concluída ===\n")
+        print("✓ Conectividade com o banco: OK")
+        print(f"✓ Usuários: {len(users)} encontrados")
+        print(f"✓ Turnos: {len(shifts)} encontrados")
+        print(f"✓ Solicitações de troca: {len(pending_swaps)} pendentes")
+        print("✓ Exportação Excel: Funcionando")
+        print("✓ Exportação ICS: Funcionando")
+        print("✓ Validação de trocas: Funcionando")
+        print("\nO MVP está funcional e pronto para uso!")
 
         db.close()
         return True
 
     except Exception as e:
-        print(f"\n✗ Validation failed: {e}")
+        print(f"\n✗ Falha na validação: {e}")
         import traceback
         traceback.print_exc()
         return False

@@ -1,39 +1,37 @@
-# AgentEscala Architecture
+# Arquitetura do AgentEscala
 
-## Overview
+## Visão geral
 
-AgentEscala is a shift management and swap system built with a modern, scalable architecture. This document describes the technical architecture and design decisions.
+AgentEscala é um sistema de gestão e troca de turnos construído com uma arquitetura moderna e escalável. Este documento descreve a estrutura técnica, os componentes e as decisões principais.
 
-## System Architecture
+## Arquitetura do sistema
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         Client Layer                         │
-│  (Future: Web UI, Mobile App, Telegram Bot)                 │
+│                         Camada de Cliente                    │
+│   (Futuro: Web UI, App Mobile, Bot Telegram)                │
 └───────────────────────────┬─────────────────────────────────┘
                             │
                             │ HTTP/REST
                             │
 ┌───────────────────────────┴─────────────────────────────────┐
-│                      API Layer (FastAPI)                     │
+│                     Camada de API (FastAPI)                 │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
 │  │  Users   │  │  Shifts  │  │  Swaps   │                  │
-│  │  Router  │  │  Router  │  │  Router  │                  │
+│  │ Router   │  │ Router   │  │ Router   │                  │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘                  │
 └───────┼─────────────┼─────────────┼────────────────────────┘
         │             │             │
-        │             │             │
 ┌───────┴─────────────┴─────────────┴────────────────────────┐
-│                   Service Layer                              │
+│                      Camada de Serviço                     │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
 │  │  User    │  │  Shift   │  │  Swap    │                  │
 │  │ Service  │  │ Service  │  │ Service  │                  │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘                  │
 └───────┼─────────────┼─────────────┼────────────────────────┘
         │             │             │
-        │             │             │
 ┌───────┴─────────────┴─────────────┴────────────────────────┐
-│                   Data Layer (SQLAlchemy)                    │
+│                  Camada de Dados (SQLAlchemy)              │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
 │  │   User   │  │  Shift   │  │  Swap    │                  │
 │  │  Model   │  │  Model   │  │ Request  │                  │
@@ -47,41 +45,31 @@ AgentEscala is a shift management and swap system built with a modern, scalable 
               └────────────────┘
 ```
 
-## Layer Descriptions
+## Descrição das camadas
 
-### API Layer
-- **Technology**: FastAPI
-- **Responsibility**: HTTP request/response handling, validation, routing
-- **Components**:
-  - Routers (users, shifts, swaps)
-  - Pydantic schemas for validation
-  - Dependency injection for database sessions
-  - Exception handling and error responses
+### Camada de API
+- **Tecnologia**: FastAPI
+- **Responsabilidade**: tratar requisições/respostas HTTP, validação e roteamento
+- **Componentes**: routers (users, shifts, swaps), esquemas Pydantic, injeção de dependências de DB, tratamento de exceções
 
-### Service Layer
-- **Technology**: Python classes
-- **Responsibility**: Business logic, transaction management, validation
-- **Components**:
-  - UserService: User management operations
-  - ShiftService: Shift CRUD and queries
-  - SwapService: Swap workflow and approval logic
-- **Why separate**: Reusable across different interfaces, testable in isolation
+### Camada de Serviço
+- **Tecnologia**: classes Python
+- **Responsabilidade**: regras de negócio, validação e orquestração
+- **Componentes**: UserService (usuários), ShiftService (turnos), SwapService (fluxo de trocas)
+- **Motivo da separação**: reutilizável entre interfaces e testável isoladamente
 
-### Data Layer
-- **Technology**: SQLAlchemy ORM
-- **Responsibility**: Database interaction, relationships, constraints
-- **Components**:
-  - User model (users table)
-  - Shift model (shifts table)
-  - SwapRequest model (swap_requests table)
+### Camada de Dados
+- **Tecnologia**: SQLAlchemy ORM
+- **Responsabilidade**: persistência, relacionamentos e constraints
+- **Componentes**: modelos User, Shift e SwapRequest
 
-### Database
-- **Technology**: PostgreSQL 15
-- **Why PostgreSQL**: ACID compliance, robust, excellent for relational data
+### Banco de dados
+- **Tecnologia**: PostgreSQL 15
+- **Motivação**: ACID, robustez e modelo relacional adequado para escalas/turnos
 
-## Data Model
+## Modelo de dados
 
-### Entity-Relationship Diagram
+### Diagrama ER
 
 ```
 ┌────────────────┐
@@ -113,256 +101,61 @@ AgentEscala is a shift management and swap system built with a modern, scalable 
 │ updated_at     │    │   │ target_agent_id (FK) ─┼──► User
 └────────────────┘    │   │ origin_shift_id (FK) ─┤
                       ├───┤ target_shift_id (FK) ─┘
-                      │   │ status     │
-                      │   │ reason     │
-                      │   │ admin_notes│
-                      │   │ reviewed_by│
-                      │   │ created_at │
-                      │   │ updated_at │
-                      │   └────────────┘
-                      │
-                      └─────────────────────┐
-                                            │
-                                            ▼
-                              (origin_shift & target_shift)
+                      │   │ status/reason/admin_notes
+                      │   │ reviewed_by            │
+                      │   │ timestamps             │
+                      └───┴────────────────────────┘
 ```
 
-### User Entity
-- **Purpose**: Represents agents and admins
-- **Key Fields**:
-  - `role`: ADMIN or AGENT (enum)
-  - `is_active`: Soft delete flag
-- **Relationships**:
-  - Has many Shifts (as agent)
-  - Has many SwapRequests (as requester or target)
+### Entidades principais
+- **User**: e-mail único, nome, papel (admin/agent), estado ativo, timestamps
+- **Shift**: agente, início/fim, título, descrição, local, timestamps
+- **SwapRequest**: solicitante, agente alvo, turno origem/destino, status (pending/approved/rejected/cancelled), motivo, notas do admin, reviewed_by
 
-### Shift Entity
-- **Purpose**: Represents work shifts
-- **Key Fields**:
-  - `start_time`, `end_time`: Shift schedule
-  - `agent_id`: Assigned agent
-- **Relationships**:
-  - Belongs to User (agent)
-  - Referenced by SwapRequests
+## Fluxos principais
 
-### SwapRequest Entity
-- **Purpose**: Manages shift swap workflow
-- **Key Fields**:
-  - `status`: PENDING, APPROVED, REJECTED, CANCELLED
-  - `reviewed_by`: Admin who reviewed
-- **Relationships**:
-  - Belongs to User (requester)
-  - Belongs to User (target_agent)
-  - References two Shifts (origin and target)
+### CRUD de turnos
+1. API recebe requisição, valida schema e abre sessão DB
+2. ShiftService cria/atualiza/exclui após validações básicas
+3. Resposta retorna modelo serializado
 
-## API Design
+### Fluxo de trocas
+1. Solicitante envia turnos de origem/destino e agente alvo
+2. Validação garante que os turnos existem e pertencem aos agentes informados
+3. Admin aprova/rejeita; na aprovação os agent_ids são trocados
+4. Status e reviewed_by são atualizados
 
-### RESTful Principles
-- Resource-based URLs (`/users`, `/shifts`, `/swaps`)
-- HTTP methods for operations (GET, POST, PATCH, DELETE)
-- Proper status codes (201 Created, 404 Not Found, etc.)
-- JSON request/response bodies
+### Exportação
+- **Excel**: openpyxl, cabeçalhos com metadados, inclui dados do agente e duração
+- **ICS**: icalendar, eventos com título/descrição/local, identifica agente na descrição
 
-### Authentication (Future)
-Currently, user_id/admin_id are passed as query parameters.
+## Autenticação e segurança
+- Login JWT (`/auth/login`) com hash de senha via bcrypt (passlib)
+- Dependências FastAPI para extrair e validar token: `get_current_user`, `require_admin`
+- Status atual: endpoints de auth prontos; aplicação de papéis aos endpoints ainda pendente
+- CORS liberado para dev; ajustar origens em produção
 
-**Future Implementation**:
-```
-Authorization: Bearer <JWT_TOKEN>
-```
+## Migrações e dados
+- Alembic configurado em `backend/alembic/`
+- Migração inicial cria tabelas users, shifts, swap_requests
+- Migrações executam automaticamente na subida do container (compose local/homelab)
+- Script `backend/seed.py` cria 1 admin, 5 agentes, 90 turnos e 3 trocas de exemplo
+- Script `backend/validate.py` realiza checagens de conectividade, consultas, exportações e validação do fluxo de trocas
 
-JWT claims will include:
-- user_id
-- role
-- email
+## Infraestrutura e deploy
+- **Dockerfile**: imagem do backend
+- **docker-compose.yml**: ambiente local com PostgreSQL + backend, health checks e migrações automáticas
+- **infra/docker-compose.homelab.yml**: pronto para Traefik/SSL, rede isolada
+- **infra/scripts/couple_to_homelab.sh**: script de deploy homelab
+- Variáveis de ambiente em `.env.example` e `.env.homelab.example`
 
-### Example Request Flow
+## Operação e observabilidade
+- Logs: Uvicorn em STDOUT; planejar logging estruturado
+- Saúde: endpoint `/health`
+- Monitoramento futuro: métricas básicas (contagem de requisições, latência) e dashboards via Traefik
 
-**Creating a Swap Request**:
-```
-Client → POST /swaps → API Router → SwapService → Database
-                                         ↓
-                                    Validation:
-                                    - Shifts exist?
-                                    - Correct owners?
-                                         ↓
-                                    Create record
-                                         ↓
-                                    Return 201
-```
+## Escalabilidade e futuras melhorias
+- Stateless no backend; pode ser replicado horizontalmente com DB compartilhado
+- Necessário endurecimento adicional para nuvem pública: rate limiting, rotação de segredos, TLS gerenciado
+- Roadmap imediato: aplicar auth por papel nos endpoints, adicionar testes automatizados e observabilidade básica
 
-**Approving a Swap**:
-```
-Admin → POST /swaps/1/approve → SwapService → Database
-                                      ↓
-                                 Validation:
-                                 - Is admin?
-                                 - Is pending?
-                                      ↓
-                                 Begin Transaction:
-                                 - Swap agent_ids
-                                 - Update status
-                                 - Set reviewer
-                                      ↓
-                                 Commit
-                                      ↓
-                                 Return 200
-```
-
-## Export Architecture
-
-### Excel Exporter
-```
-Shifts → ExcelExporter → openpyxl → BytesIO → StreamingResponse
-                 ↓
-          - Format headers
-          - Calculate durations
-          - Add metadata sheet
-          - Professional styling
-```
-
-### ICS Exporter
-```
-Shifts → ICSExporter → icalendar → BytesIO → StreamingResponse
-              ↓
-       - Create calendar
-       - Add events
-       - Include agent info
-       - Standard format (RFC 5545)
-```
-
-## Deployment Architecture
-
-### Local Development
-```
-Docker Compose
-  ├── PostgreSQL Container (port 5432)
-  └── Backend Container (port 8000)
-       └── Volume mount for hot reload
-```
-
-### Homelab Production
-```
-Docker Network: traefik-public
-  │
-  ├── Traefik (reverse proxy, SSL termination)
-  │     │
-  │     └── Routes to Backend
-  │
-Docker Network: agentescala_internal
-  │
-  ├── Backend Container
-  │     └── Connects to Database
-  │
-  └── PostgreSQL Container
-        └── Isolated from external access
-```
-
-## Scalability Considerations
-
-### Current Design
-- Stateless API (easy to scale horizontally)
-- Database connection pooling
-- In-memory export generation (no shared filesystem)
-
-### Future Optimizations
-- **Caching**: Redis for frequently accessed data
-- **Job Queue**: Celery for long-running exports
-- **Read Replicas**: PostgreSQL replicas for read-heavy loads
-- **CDN**: For static assets (frontend)
-
-## Security Architecture
-
-### Current (MVP)
-- PostgreSQL connection over internal network
-- No public database access
-- Input validation via Pydantic
-- CORS configured (adjust for production)
-
-### Future
-- **Authentication**: JWT with refresh tokens
-- **Authorization**: Role-based access control
-- **Rate Limiting**: Prevent abuse
-- **Encryption**: Encrypt sensitive data at rest
-- **Audit Logging**: Track all sensitive operations
-
-## Monitoring and Observability (Future)
-
-### Planned Integration
-- **Metrics**: Prometheus
-  - Request rate, latency
-  - Database query performance
-  - Export generation time
-- **Logging**: Structured JSON logs
-  - Request/response logging
-  - Error tracking
-  - Audit trail
-- **Tracing**: OpenTelemetry (if needed)
-- **Alerts**: Based on error rate, response time
-
-## Performance Characteristics
-
-### Expected Performance
-- API Response Time: < 100ms (CRUD operations)
-- Excel Export: < 2s (for 1000 shifts)
-- ICS Export: < 1s (for 1000 shifts)
-- Database Queries: < 50ms (simple), < 200ms (complex joins)
-
-### Bottlenecks to Watch
-- Large exports (thousands of shifts)
-- Complex queries with many joins
-- High concurrent swap approvals (database locks)
-
-## Technology Choices Summary
-
-| Component | Technology | Why |
-|-----------|-----------|-----|
-| API Framework | FastAPI | Fast, modern, automatic docs, type hints |
-| Language | Python 3.11 | Easy to develop, great ecosystem, fast enough |
-| Database | PostgreSQL 15 | Reliable, ACID, great for relational data |
-| ORM | SQLAlchemy | Mature, powerful, standard for Python |
-| Validation | Pydantic | Type-safe, automatic validation, works with FastAPI |
-| Excel | openpyxl | Mature, full-featured, good formatting support |
-| ICS | icalendar | Standard RFC 5545 implementation |
-| Container | Docker | Standard, portable, easy deployment |
-| Orchestration | Docker Compose | Simple, good for single-host deployment |
-| Reverse Proxy | Traefik | Dynamic config, Let's Encrypt, homelab standard |
-
-## Design Patterns Used
-
-- **Layered Architecture**: API → Service → Data
-- **Repository Pattern**: Services abstract database access
-- **Dependency Injection**: Database sessions via FastAPI Depends
-- **DTO Pattern**: Pydantic schemas separate from models
-- **Factory Pattern**: Database session factory
-- **Strategy Pattern**: Different exporters (Excel, ICS)
-
-## Testing Strategy (Future)
-
-```
-Unit Tests (70%)
-  └── Services, utilities, business logic
-
-Integration Tests (20%)
-  └── API endpoints with test database
-
-End-to-End Tests (10%)
-  └── Full workflows (create shift, swap, approve)
-```
-
-## Conclusion
-
-AgentEscala follows modern architectural principles:
-- Separation of concerns
-- Single responsibility
-- Dependency injection
-- Stateless design
-- RESTful API
-- Clean code practices
-
-The architecture is designed to be:
-- **Maintainable**: Clear structure, documented
-- **Testable**: Layered, dependency injection
-- **Scalable**: Stateless, horizontal scaling ready
-- **Secure**: Network isolation, validation
-- **Observable**: Logging, health checks (future: metrics)

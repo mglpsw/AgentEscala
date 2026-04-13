@@ -1,182 +1,182 @@
 # AgentEscala
 
-**AgentEscala** is a professional shift management and swap system designed for teams that need to efficiently manage work schedules and handle shift exchange requests.
+**AgentEscala** é um sistema profissional de gestão e troca de turnos criado para equipes que precisam organizar escalas de trabalho e administrar solicitações de troca com eficiência.
 
-## Features
+## Funcionalidades
 
-- **Shift Management**: Create, update, and manage work shifts for agents
-- **Swap Workflow**: Request and manage shift swaps with mandatory admin approval
-- **Excel Export**: Professional Excel export with formatting and metadata
-- **ICS Export**: Simple iCalendar export for calendar integration
-- **REST API**: Complete RESTful API built with FastAPI
-- **Role-Based Access**: Admin and Agent roles (JWT login available; enforcement planned)
+- **Gestão de Turnos**: criar, atualizar e gerenciar turnos de trabalho para agentes
+- **Fluxo de Trocas**: solicitar e administrar trocas de turnos com aprovação obrigatória do administrador
+- **Exportação para Excel**: planilhas profissionais com formatação e metadados
+- **Exportação para ICS**: exportação iCalendar simples para integração com calendários
+- **API REST**: API RESTful completa construída com FastAPI
+- **Acesso por Papéis**: papéis de Admin e Agente (login JWT disponível; aplicação completa das regras planejada)
 
-## Quick Start
+## Guia Rápido
 
-### Prerequisites
+### Pré-requisitos
 
-- Docker and Docker Compose
+- Docker e Docker Compose
 - Git
 
-### Local Development
+### Desenvolvimento local
 
-1. Clone the repository:
+1. Clone o repositório:
 ```bash
 git clone https://github.com/mglpsw/AgentEscala.git
 cd AgentEscala
 ```
 
-2. Start the application:
+2. Suba a aplicação:
 ```bash
 docker-compose up -d
 ```
 
-This will apply database migrations automatically before starting the API.
+As migrações do banco são aplicadas automaticamente antes de o backend iniciar.
 
-3. Seed the database with sample data (password for all sample users: `password123`):
+3. Popule o banco com dados de exemplo (senha padrão: `password123`):
 ```bash
 docker-compose exec backend python -m backend.seed
 ```
 
-4. Access the application:
+4. Acesse a aplicação:
    - API: http://localhost:8000
-   - API Documentation: http://localhost:8000/docs
+   - Documentação da API: http://localhost:8000/docs
    - Health Check: http://localhost:8000/health
 
-See [QUICKSTART.md](QUICKSTART.md) for detailed instructions.
+Consulte [QUICKSTART.md](QUICKSTART.md) para instruções detalhadas.
 
-## Architecture
+## Arquitetura
 
-AgentEscala is built with:
+AgentEscala é construído com:
 
 - **Backend**: FastAPI (Python 3.11)
-- **Database**: PostgreSQL 15
+- **Banco de Dados**: PostgreSQL 15
 - **ORM**: SQLAlchemy
-- **Export**: openpyxl (Excel), icalendar (ICS)
+- **Exportação**: openpyxl (Excel), icalendar (ICS)
 
-### Project Structure
+### Estrutura do projeto
 
 ```
 AgentEscala/
 ├── backend/
-│   ├── api/           # REST API endpoints
-│   ├── config/        # Configuration and database
-│   ├── models/        # SQLAlchemy models
-│   ├── services/      # Business logic
-│   ├── utils/         # Exporters and utilities
-│   ├── main.py        # FastAPI application
-│   └── seed.py        # Database seeding
-├── docs/              # Documentation
-├── infra/             # Homelab deployment
-│   ├── scripts/       # Deployment scripts
+│   ├── api/           # Endpoints REST
+│   ├── config/        # Configuração e banco de dados
+│   ├── models/        # Modelos SQLAlchemy
+│   ├── services/      # Regras de negócio
+│   ├── utils/         # Exportadores e utilidades
+│   ├── main.py        # Aplicação FastAPI
+│   └── seed.py        # Seed do banco
+├── docs/              # Documentação
+├── infra/             # Implantação homelab
+│   ├── scripts/       # Scripts de deploy
 │   └── docker-compose.homelab.yml
-├── tests/             # Tests (future)
-├── docker-compose.yml # Local development
-└── Dockerfile         # Container image
+├── tests/             # Testes (futuro)
+├── docker-compose.yml # Ambiente local
+└── Dockerfile         # Imagem do container
 ```
 
-## Core Functionality
+## Funcionalidades principais
 
-### Shift Management
+### Gestão de turnos
 
-- Create shifts with start/end times, titles, descriptions, and locations
-- Assign shifts to specific agents
-- Update and delete shifts
-- Query shifts by agent or date range
-- Export shifts to Excel or ICS formats
+- Criação de turnos com horário de início/fim, título, descrição e local
+- Atribuição de turnos a agentes específicos
+- Atualização e exclusão de turnos
+- Consulta por agente ou intervalo de datas
+- Exportação de turnos para Excel ou ICS
 
-### Swap Workflow
+### Fluxo de trocas
 
-1. **Request**: Agent initiates swap request specifying origin and target shifts
-2. **Pending**: Request awaits admin review
-3. **Admin Review**: Admin approves or rejects with notes
-4. **Execution**: Upon approval, shifts are automatically swapped
-5. **Status Tracking**: All requests tracked with full history
+1. **Solicitação**: o agente inicia a troca informando turnos de origem e destino
+2. **Pendente**: a solicitação aguarda revisão do admin
+3. **Revisão do Admin**: administrador aprova ou rejeita com observações
+4. **Execução**: ao aprovar, os turnos são trocados automaticamente
+5. **Rastreamento**: todo histórico fica registrado
 
-### Export Capabilities
+### Exportações
 
-**Excel Export**:
-- Professional formatting with headers
-- Agent information included
-- Duration calculations
-- Metadata sheet
-- Available for both shifts and swap requests
+**Excel**:
+- Formatação profissional com cabeçalhos
+- Informações do agente incluídas
+- Cálculo de duração
+- Aba de metadados
+- Disponível para turnos e solicitações de troca
 
-**ICS Export**:
-- Standard iCalendar format
-- Single or bulk export
-- Compatible with Google Calendar, Outlook, etc.
-- Includes agent information in descriptions
+**ICS**:
+- Formato iCalendar padrão
+- Exportação individual ou em lote
+- Compatível com Google Calendar, Outlook etc.
+- Inclui informações do agente na descrição
 
-## API Endpoints
+## Endpoints da API
 
-### Users
-- `POST /users` - Create user
-- `GET /users` - List all users
-- `GET /users/agents` - List agents
-- `GET /users/admins` - List admins
-- `GET /users/{id}` - Get user details
+### Usuários
+- `POST /users` - Criar usuário
+- `GET /users` - Listar usuários
+- `GET /users/agents` - Listar agentes
+- `GET /users/admins` - Listar administradores
+- `GET /users/{id}` - Detalhar usuário
 
-### Shifts
-- `POST /shifts` - Create shift
-- `GET /shifts` - List all shifts
-- `GET /shifts/agent/{id}` - List agent's shifts
-- `GET /shifts/{id}` - Get shift details
-- `PATCH /shifts/{id}` - Update shift
-- `DELETE /shifts/{id}` - Delete shift
-- `GET /shifts/export/excel` - Export to Excel
-- `GET /shifts/export/ics` - Export to ICS
+### Turnos
+- `POST /shifts` - Criar turno
+- `GET /shifts` - Listar turnos
+- `GET /shifts/agent/{id}` - Listar turnos de um agente
+- `GET /shifts/{id}` - Detalhar turno
+- `PATCH /shifts/{id}` - Atualizar turno
+- `DELETE /shifts/{id}` - Excluir turno
+- `GET /shifts/export/excel` - Exportar para Excel
+- `GET /shifts/export/ics` - Exportar para ICS
 
-### Swaps
-- `POST /swaps` - Create swap request
-- `GET /swaps` - List all swaps
-- `GET /swaps/pending` - List pending swaps
-- `GET /swaps/agent/{id}` - List agent's swaps
-- `GET /swaps/{id}` - Get swap details
-- `POST /swaps/{id}/approve` - Approve swap (admin)
-- `POST /swaps/{id}/reject` - Reject swap (admin)
-- `POST /swaps/{id}/cancel` - Cancel swap (requester)
-- `GET /swaps/export/excel` - Export to Excel
+### Trocas
+- `POST /swaps` - Criar solicitação de troca
+- `GET /swaps` - Listar trocas
+- `GET /swaps/pending` - Listar trocas pendentes
+- `GET /swaps/agent/{id}` - Listar trocas de um agente
+- `GET /swaps/{id}` - Detalhar troca
+- `POST /swaps/{id}/approve` - Aprovar troca (admin)
+- `POST /swaps/{id}/reject` - Rejeitar troca (admin)
+- `POST /swaps/{id}/cancel` - Cancelar troca (solicitante)
+- `GET /swaps/export/excel` - Exportar para Excel
 
-## Deployment
+## Implantação
 
-### Local Development
+### Desenvolvimento local
 ```bash
 docker-compose up -d
 ```
 
-### Homelab Deployment
+### Implantação em homelab
 
-1. Copy and configure environment:
+1. Copie e configure o ambiente:
 ```bash
 cp infra/.env.homelab.example infra/.env.homelab
-# Edit infra/.env.homelab with your settings
+# Edite infra/.env.homelab com seus valores
 ```
 
-2. Run deployment script:
+2. Execute o script de deploy:
 ```bash
 ./infra/scripts/couple_to_homelab.sh
 ```
 
-See [docs/homelab_deploy.md](docs/homelab_deploy.md) for detailed deployment instructions.
+Veja [docs/homelab_deploy.md](docs/homelab_deploy.md) para instruções detalhadas.
 
-## Development
+## Desenvolvimento
 
-### Running without Docker
+### Rodando sem Docker
 ```bash
-# Install dependencies
+# Instale dependências
 pip install -r backend/requirements.txt
 
-# Set environment variables
+# Defina variáveis de ambiente
 export DATABASE_URL="postgresql://user:password@localhost:5432/agentescala"
 
-# Run the application
+# Inicie a aplicação
 uvicorn backend.main:app --reload
 ```
 
-### Database Migrations
+### Migrações de banco
 
-Alembic migrations run automatically when the container starts (see docker-compose commands). You can also run them manually:
+As migrações do Alembic rodam automaticamente quando o container inicia (ver docker-compose). Você também pode executá-las manualmente:
 
 ```bash
 cd backend
@@ -185,17 +185,17 @@ alembic upgrade head
 
 ## Status
 
-See [PROJECT_STATUS.md](PROJECT_STATUS.md) for current implementation status and roadmap.
+Consulte [PROJECT_STATUS.md](PROJECT_STATUS.md) para o estado atual e o roadmap.
 
-## Documentation
+## Documentação
 
-- [QUICKSTART.md](QUICKSTART.md) - Quick start guide
-- [PROJECT_STATUS.md](PROJECT_STATUS.md) - Current status and roadmap
-- [docs/architecture.md](docs/architecture.md) - Architecture details
-- [docs/homelab_deploy.md](docs/homelab_deploy.md) - Homelab deployment guide
-- [docs/assumptions.md](docs/assumptions.md) - Technical decisions and assumptions
+- [QUICKSTART.md](QUICKSTART.md) - Guia de início rápido
+- [PROJECT_STATUS.md](PROJECT_STATUS.md) - Status atual e roadmap
+- [docs/architecture.md](docs/architecture.md) - Detalhes de arquitetura
+- [docs/homelab_deploy.md](docs/homelab_deploy.md) - Guia de implantação homelab
+- [docs/assumptions.md](docs/assumptions.md) - Decisões técnicas e premissas
 
-## License
+## Licença
 
 MIT License
 

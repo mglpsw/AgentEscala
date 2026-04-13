@@ -1,5 +1,5 @@
 """
-Authentication API endpoints.
+Endpoints de autenticação da API.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -11,14 +11,14 @@ from ..models.models import User
 from ..utils.auth import verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from ..utils.dependencies import get_current_user
 
-router = APIRouter(prefix="/auth", tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 # HTTP Basic auth for login endpoint
 security = HTTPBasic()
 
 
 class TokenResponse(BaseModel):
-    """Response model for successful authentication"""
+    """Modelo de resposta para autenticação bem-sucedida"""
     access_token: str
     token_type: str
     expires_in: int
@@ -28,7 +28,7 @@ class TokenResponse(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    """Request model for login"""
+    """Modelo de requisição de login"""
     email: str
     password: str
 
@@ -39,44 +39,44 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """
-    Authenticate user and return JWT access token.
+    Autentica o usuário e retorna um token JWT de acesso.
 
     Args:
-        login_data: User email and password
-        db: Database session
+        login_data: E-mail e senha do usuário
+        db: Sessão de banco de dados
 
     Returns:
-        Access token and user information
+        Token de acesso e informações do usuário
 
     Raises:
-        HTTPException: If authentication fails
+        HTTPException: Se a autenticação falhar
     """
-    # Find user by email
+    # Busca o usuário pelo e-mail
     user = db.query(User).filter(User.email == login_data.email).first()
 
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="E-mail ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Verify password
+    # Verifica a senha
     if not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="E-mail ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Check if user is active
+    # Verifica se o usuário está ativo
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
+            detail="A conta do usuário está inativa"
         )
 
-    # Create access token
+    # Cria o token de acesso
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": str(user.id)},
@@ -98,13 +98,13 @@ async def get_current_user_info(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get current authenticated user information.
+    Obter as informações do usuário autenticado.
 
     Args:
-        current_user: Current authenticated user
+        current_user: Usuário autenticado atual
 
     Returns:
-        User information
+        Informações do usuário
     """
     return {
         "id": current_user.id,

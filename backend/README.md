@@ -1,17 +1,17 @@
-# AgentEscala Backend
+# Backend do AgentEscala
 
-This is the backend service for AgentEscala shift management system.
+Este é o serviço backend do sistema de gestão e trocas de turnos AgentEscala.
 
-## Structure
+## Estrutura
 
-- `main.py` - FastAPI application entry point
-- `config/` - Configuration and database setup
-- `models/` - SQLAlchemy database models
-- `services/` - Business logic layer
-- `api/` - REST API endpoints
-- `utils/` - Utility functions (Excel, ICS exporters)
+- `main.py` - Ponto de entrada da aplicação FastAPI
+- `config/` - Configurações e conexão com o banco
+- `models/` - Modelos de banco de dados em SQLAlchemy
+- `services/` - Camada de regras de negócio
+- `api/` - Endpoints REST da aplicação
+- `utils/` - Utilitários (exportadores Excel e ICS)
 
-## Running
+## Execução
 
 ```bash
 uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000

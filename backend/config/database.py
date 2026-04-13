@@ -10,7 +10,7 @@ Base = declarative_base()
 
 
 def get_db():
-    """Dependency for database sessions"""
+    """Dependência para sessões de banco de dados"""
     db = SessionLocal()
     try:
         yield db
@@ -19,8 +19,8 @@ def get_db():
 
 
 def init_db():
-    """Initialize database tables"""
-    # Ensure models are registered before creating tables
+    """Inicializar tabelas do banco de dados"""
+    # Garante que os modelos estejam registrados antes de criar as tabelas
     from .. import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

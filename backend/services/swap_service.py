@@ -4,7 +4,7 @@ from ..models import SwapRequest, SwapStatus, User, Shift, UserRole
 
 
 class SwapService:
-    """Service for managing shift swap requests"""
+    """Serviço para gerenciar solicitações de troca de turnos"""
 
     @staticmethod
     def create_swap_request(
@@ -15,19 +15,19 @@ class SwapService:
         target_shift_id: int,
         reason: Optional[str] = None
     ) -> SwapRequest:
-        """Create a new swap request"""
-        # Validate that shifts exist and belong to correct agents
+        """Criar uma nova solicitação de troca"""
+        # Valida se os turnos existem e pertencem aos agentes corretos
         origin_shift = db.query(Shift).filter(Shift.id == origin_shift_id).first()
         target_shift = db.query(Shift).filter(Shift.id == target_shift_id).first()
 
         if not origin_shift or not target_shift:
-            raise ValueError("One or both shifts not found")
+            raise ValueError("Um ou ambos os turnos não foram encontrados")
 
         if origin_shift.agent_id != requester_id:
-            raise ValueError("Origin shift does not belong to requester")
+            raise ValueError("O turno de origem não pertence ao solicitante")
 
         if target_shift.agent_id != target_agent_id:
-            raise ValueError("Target shift does not belong to target agent")
+            raise ValueError("O turno de destino não pertence ao agente alvo")
 
         swap_request = SwapRequest(
             requester_id=requester_id,
@@ -44,17 +44,17 @@ class SwapService:
 
     @staticmethod
     def get_swap_request(db: Session, swap_id: int) -> Optional[SwapRequest]:
-        """Get a swap request by ID"""
+        """Obter uma solicitação de troca pelo ID"""
         return db.query(SwapRequest).filter(SwapRequest.id == swap_id).first()
 
     @staticmethod
     def get_pending_swaps(db: Session) -> List[SwapRequest]:
-        """Get all pending swap requests"""
+        """Listar todas as solicitações de troca pendentes"""
         return db.query(SwapRequest).filter(SwapRequest.status == SwapStatus.PENDING).all()
 
     @staticmethod
     def get_all_swaps(db: Session, skip: int = 0, limit: int = 100) -> List[SwapRequest]:
-        """Get all swap requests with pagination"""
+        """Listar todas as solicitações de troca com paginação"""
         return (
             db.query(SwapRequest)
             .order_by(SwapRequest.created_at.desc())
@@ -65,7 +65,7 @@ class SwapService:
 
     @staticmethod
     def get_swaps_by_agent(db: Session, agent_id: int) -> List[SwapRequest]:
-        """Get all swap requests involving an agent"""
+        """Listar todas as solicitações de troca que envolvem um agente"""
         return db.query(SwapRequest).filter(
             (SwapRequest.requester_id == agent_id) |
             (SwapRequest.target_agent_id == agent_id)
@@ -78,20 +78,20 @@ class SwapService:
         admin_id: int,
         admin_notes: Optional[str] = None
     ) -> Optional[SwapRequest]:
-        """Approve a swap request (admin only) and execute the swap"""
+        """Aprovar uma solicitação de troca (somente administrador) e executar a troca"""
         swap = db.query(SwapRequest).filter(SwapRequest.id == swap_id).first()
         if not swap:
             return None
 
         if swap.status != SwapStatus.PENDING:
-            raise ValueError("Only pending swap requests can be approved")
+            raise ValueError("Apenas solicitações pendentes podem ser aprovadas")
 
-        # Verify admin role
+        # Verifica papel de administrador
         admin = db.query(User).filter(User.id == admin_id).first()
         if not admin or admin.role != UserRole.ADMIN:
-            raise ValueError("Only admins can approve swap requests")
+            raise ValueError("Somente administradores podem aprovar solicitações de troca")
 
-        # Execute the swap by swapping agent_ids
+        # Executa a troca invertendo os agent_ids
         origin_shift = swap.origin_shift
         target_shift = swap.target_shift
 
@@ -115,18 +115,18 @@ class SwapService:
         admin_id: int,
         admin_notes: Optional[str] = None
     ) -> Optional[SwapRequest]:
-        """Reject a swap request (admin only)"""
+        """Rejeitar uma solicitação de troca (somente administrador)"""
         swap = db.query(SwapRequest).filter(SwapRequest.id == swap_id).first()
         if not swap:
             return None
 
         if swap.status != SwapStatus.PENDING:
-            raise ValueError("Only pending swap requests can be rejected")
+            raise ValueError("Apenas solicitações pendentes podem ser rejeitadas")
 
-        # Verify admin role
+        # Verifica papel de administrador
         admin = db.query(User).filter(User.id == admin_id).first()
         if not admin or admin.role != UserRole.ADMIN:
-            raise ValueError("Only admins can reject swap requests")
+            raise ValueError("Somente administradores podem rejeitar solicitações de troca")
 
         swap.status = SwapStatus.REJECTED
         swap.reviewed_by = admin_id
@@ -138,16 +138,16 @@ class SwapService:
 
     @staticmethod
     def cancel_swap(db: Session, swap_id: int, user_id: int) -> Optional[SwapRequest]:
-        """Cancel a swap request (requester only)"""
+        """Cancelar uma solicitação de troca (somente o solicitante)"""
         swap = db.query(SwapRequest).filter(SwapRequest.id == swap_id).first()
         if not swap:
             return None
 
         if swap.requester_id != user_id:
-            raise ValueError("Only the requester can cancel a swap request")
+            raise ValueError("Apenas o solicitante pode cancelar uma solicitação de troca")
 
         if swap.status != SwapStatus.PENDING:
-            raise ValueError("Only pending swap requests can be cancelled")
+            raise ValueError("Apenas solicitações pendentes podem ser canceladas")
 
         swap.status = SwapStatus.CANCELLED
 

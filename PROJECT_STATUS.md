@@ -1,123 +1,123 @@
-# Project Status
+# Status do Projeto
 
-**Last Updated**: 2026-04-13
+**Última atualização**: 2026-04-13
 
-## Overview
+## Visão geral
 
-AgentEscala is a shift management and swap system that allows teams to manage work schedules efficiently with a mandatory admin approval workflow for shift swaps.
+AgentEscala é um sistema de gestão e troca de turnos que permite às equipes administrar escalas com um fluxo de aprovação obrigatória por administrador.
 
-## Current Status: Backend MVP running (auth enforcement + tests pending) ⚠️
+## Status atual: Backend do MVP rodando (aplicação de auth + testes pendentes) ⚠️
 
-The backend runs end-to-end with automatic migrations, seeding, exports, and swap workflow. Authentication endpoints exist, but role enforcement and automated tests are still pending.
+O backend roda fim a fim com migrações automáticas, seed, exportações e fluxo de trocas. Endpoints de autenticação existem, mas a aplicação de papéis e a suíte de testes ainda estão pendentes.
 
-### Latest Validation (2026-04-13)
-- Docker compose build/up runs Alembic migrations automatically and starts successfully
-- Seed script completes (6 users, 90 shifts, 3 swap requests)
-- Validation script passes (health, queries, exports, swap validation)
-- Swap list and Excel export return all requests (not only pending)
+### Última validação (2026-04-13)
+- Build/up do docker-compose aplica migrações Alembic automaticamente e inicia com sucesso
+- Script de seed conclui (6 usuários, 90 turnos, 3 trocas)
+- Script de validação passa (health, consultas, exports, validação de trocas)
+- Listagem e exportação de trocas retornam todas as solicitações (não apenas pendentes)
 
-## Implemented Features
+## Funcionalidades implementadas
 
-### ✅ Core Backend (100%)
-- [x] FastAPI application structure
-- [x] Database models (User, Shift, SwapRequest)
-- [x] SQLAlchemy ORM with PostgreSQL
-- [x] Service layer (business logic)
-- [x] REST API endpoints
-- [x] Health check endpoint
-- [x] CORS middleware
-- [x] Environment configuration
+### ✅ Backend principal (100%)
+- [x] Estrutura FastAPI
+- [x] Modelos de banco (User, Shift, SwapRequest)
+- [x] SQLAlchemy com PostgreSQL
+- [x] Camada de serviços (regras de negócio)
+- [x] Endpoints REST
+- [x] Endpoint de health check
+- [x] Middleware de CORS
+- [x] Configuração por ambiente
 
-### ✅ User Management (100%)
-- [x] User model with roles (Admin, Agent)
-- [x] CRUD operations for users
-- [x] User service layer
-- [x] API endpoints for user management
-- [x] Active/inactive user states
+### ✅ Gestão de Usuários (100%)
+- [x] Modelo de usuário com papéis (Admin, Agent)
+- [x] CRUD de usuários
+- [x] Camada de serviço de usuário
+- [x] Endpoints de gestão de usuários
+- [x] Estados ativo/inativo
 
-### ✅ Shift Management (100%)
-- [x] Shift model with scheduling information
-- [x] CRUD operations for shifts
-- [x] Shift service layer
-- [x] API endpoints for shift management
-- [x] Query by agent
-- [x] Shift validation
+### ✅ Gestão de Turnos (100%)
+- [x] Modelo de turno com informações de agenda
+- [x] CRUD de turnos
+- [x] Camada de serviço de turnos
+- [x] Endpoints de turnos
+- [x] Consulta por agente
+- [x] Validação de turnos
 
-### ✅ Swap Workflow (100%)
-- [x] SwapRequest model with status tracking
-- [x] Swap creation with validation
-- [x] Admin approval workflow
-- [x] Admin rejection workflow
-- [x] Requester cancellation
-- [x] Automatic shift swap on approval
-- [x] Status tracking (pending, approved, rejected, cancelled)
-- [x] Admin notes and reason tracking
+### ✅ Fluxo de Trocas (100%)
+- [x] Modelo SwapRequest com rastreamento de status
+- [x] Criação de trocas com validação
+- [x] Fluxo de aprovação do admin
+- [x] Fluxo de rejeição do admin
+- [x] Cancelamento pelo solicitante
+- [x] Troca automática dos turnos na aprovação
+- [x] Status (pending, approved, rejected, cancelled)
+- [x] Registro de motivo e notas do admin
 
-### ✅ Export Functionality (100%)
-- [x] Excel exporter with professional formatting
-- [x] Excel export for shifts
-- [x] Excel export for swap requests
-- [x] Metadata sheets in Excel
-- [x] ICS (iCalendar) exporter
-- [x] ICS export for shifts (single and bulk)
-- [x] Calendar integration support
+### ✅ Exportações (100%)
+- [x] Exportador Excel com formatação profissional
+- [x] Exportação para turnos
+- [x] Exportação para solicitações de troca
+- [x] Abas de metadados
+- [x] Exportador ICS (iCalendar)
+- [x] Exportação ICS de turnos (individual e em lote)
+- [x] Suporte à integração com calendários
 
-### 🟡 Authentication (partial)
-- [x] Password hashing and login endpoint with JWT issuance
-- [x] User model uses hashed_password
-- [ ] Endpoint protection with role checks
-- [ ] Token refresh/revocation
+### 🟡 Autenticação (parcial)
+- [x] Hash de senha e endpoint de login com JWT
+- [x] Modelo de usuário usa hashed_password
+- [ ] Proteção de endpoints com checagem de papéis
+- [ ] Refresh/revogação de token
 
-### ✅ Development Environment (100%)
-- [x] Dockerfile for containerization
-- [x] docker-compose.yml for local development
-- [x] PostgreSQL database container
-- [x] Environment configuration (.env.example)
-- [x] Database seeding script
-- [x] Alembic migrations executed automatically on container startup
-- [x] Development-ready setup
+### ✅ Ambiente de desenvolvimento (100%)
+- [x] Dockerfile para containerização
+- [x] docker-compose.yml para uso local
+- [x] Container PostgreSQL
+- [x] Configuração de ambiente (.env.example)
+- [x] Script de seed
+- [x] Migrações Alembic executadas automaticamente na subida do container
+- [x] Setup pronto para dev
 
-### ✅ Homelab Deployment (100%)
-- [x] Homelab-specific docker-compose
-- [x] Traefik integration labels
-- [x] SSL/TLS configuration
-- [x] Health check configuration
-- [x] Environment configuration (.env.homelab.example)
-- [x] Deployment script (couple_to_homelab.sh)
-- [x] Network isolation
-- [x] Alembic migrations run automatically before app start
+### ✅ Implantação homelab (100%)
+- [x] docker-compose específico de homelab
+- [x] Labels de integração com Traefik
+- [x] Configuração SSL/TLS
+- [x] Configuração de health check
+- [x] Configuração de ambiente (.env.homelab.example)
+- [x] Script de deploy (couple_to_homelab.sh)
+- [x] Isolamento de rede
+- [x] Migrações Alembic rodando antes de iniciar o app
 
-### ✅ Documentation (100%)
-- [x] Comprehensive README
-- [x] Quick start guide (QUICKSTART.md)
-- [x] Project status (this file)
-- [x] Architecture documentation
-- [x] Homelab deployment guide
-- [x] Assumptions and decisions documentation
-- [x] API documentation (auto-generated by FastAPI)
+### ✅ Documentação (100%)
+- [x] README abrangente
+- [x] Guia rápido (QUICKSTART.md)
+- [x] Status do projeto (este arquivo)
+- [x] Documentação de arquitetura
+- [x] Guia de deploy homelab
+- [x] Documentação de premissas e decisões
+- [x] Documentação da API (gerada pelo FastAPI)
 
-## Functional Validation Status
+## Status de validação funcional
 
-### ✅ Can Be Validated Immediately
-- [x] Backend starts with Docker Compose
-- [x] Database starts and connects
-- [x] Health check endpoint responds
-- [x] API documentation accessible at /docs
-- [x] Database seeding works
-- [x] Basic CRUD operations work
-- [x] Excel export generates valid files
-- [x] ICS export generates valid files
-- [x] Swap workflow with approval works
+### ✅ Pode ser validado imediatamente
+- [x] Backend inicia com Docker Compose
+- [x] Banco inicia e conecta
+- [x] Endpoint de health responde
+- [x] Documentação da API acessível em /docs
+- [x] Seed do banco funciona
+- [x] CRUD básico funciona
+- [x] Exportação Excel gera arquivos válidos
+- [x] Exportação ICS gera arquivos válidos
+- [x] Fluxo de trocas com aprovação funciona
 
-### 🟡 Requires Homelab Environment
-- [ ] Traefik integration (requires homelab)
-- [ ] SSL/TLS certificates (requires homelab)
-- [ ] Production database persistence (requires homelab)
-- [ ] Full end-to-end in production environment
+### 🟡 Requer ambiente homelab
+- [ ] Integração Traefik (requer homelab)
+- [ ] Certificados SSL/TLS (requer homelab)
+- [ ] Persistência de banco em produção (requer homelab)
+- [ ] E2E completo em produção
 
-## Not Yet Implemented
+## Ainda não implementado
 
-### Frontend (Future)
+### Frontend (futuro)
 - [ ] Web UI for agents
 - [ ] Web UI for admins
 - [ ] Dashboard with statistics
@@ -197,33 +197,33 @@ The backend runs end-to-end with automatic migrations, seeding, exports, and swa
 ### Homelab Production: ✅ Ready
 - Deployment script available
 - Traefik configuration ready
-- SSL/TLS labels configured
-- Health checks configured
-- Can be deployed immediately to homelab
+- Labels SSL/TLS configuradas
+- Health checks configurados
+- Pronto para deploy imediato em homelab
 
-### Public Cloud: 🟡 Needs Work
-- Would need authentication first
-- Would need rate limiting
-- Would need additional security hardening
+### Nuvem pública: 🟡 Requer trabalho
+- Necessita aplicar autenticação primeiro
+- Necessita rate limiting
+- Necessita hardening adicional de segurança
 
-## Architecture Decisions
+## Decisões de arquitetura
 
-See [docs/assumptions.md](docs/assumptions.md) for detailed technical decisions and rationale.
+Veja [docs/assumptions.md](docs/assumptions.md) para decisões técnicas detalhadas e racional.
 
-## Repository Organization
+## Organização do repositório
 
-- **Main Branch**: Stable releases
-- **Development**: Active development
-- **Feature Branches**: Individual features
-- **No Mixing**: AgentEscala code stays in AgentEscala repo
-- **Homelab Separate**: Homelab infrastructure in separate repo
+- **Main Branch**: releases estáveis
+- **Development**: desenvolvimento ativo
+- **Feature Branches**: features individuais
+- **Sem mistura**: código do AgentEscala fica no repositório AgentEscala
+- **Homelab separado**: infraestrutura homelab em repositório próprio
 
-## Conclusion
+## Conclusão
 
-The backend MVP is **operational and validated** (migrations, seed, validation script, exports, swap workflow). Remaining gaps are authentication enforcement and automated tests. The system can be:
-- Run locally with Docker Compose (Alembic runs automatically)
-- Seeded with sample data
-- Tested via API/validation script
-- Deployed to homelab (Traefik-ready)
+O backend do MVP está **operacional e validado** (migrações, seed, script de validação, exports, fluxo de trocas). Faltam aplicar autenticação nos endpoints e automatizar testes. O sistema pode ser:
+- Executado localmente com Docker Compose (Alembic roda automaticamente)
+- Seedado com dados de exemplo
+- Testado via API/script de validação
+- Implantado em homelab (pronto para Traefik)
 
-Next steps should focus on locking down endpoints with JWT/roles and adding test coverage before broader deployment.
+Os próximos passos devem focar em proteger endpoints com JWT/papéis e adicionar cobertura de testes antes de uma implantação mais ampla.

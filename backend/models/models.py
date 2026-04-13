@@ -6,13 +6,13 @@ from ..config.database import Base
 
 
 class UserRole(str, enum.Enum):
-    """User roles in the system"""
+    """Papéis de usuário no sistema"""
     ADMIN = "admin"
     AGENT = "agent"
 
 
 class SwapStatus(str, enum.Enum):
-    """Status of a swap request"""
+    """Status de uma solicitação de troca"""
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -20,7 +20,7 @@ class SwapStatus(str, enum.Enum):
 
 
 class User(Base):
-    """User model representing agents and admins"""
+    """Modelo de usuário que representa agentes e administradores"""
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -32,7 +32,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    # Relationships
+    # Relacionamentos
     shifts = relationship("Shift", back_populates="agent", foreign_keys="Shift.agent_id")
     swap_requests_initiated = relationship(
         "SwapRequest",
@@ -47,20 +47,20 @@ class User(Base):
 
 
 class Shift(Base):
-    """Shift model representing work shifts"""
+    """Modelo de turno que representa períodos de trabalho"""
     __tablename__ = "shifts"
 
     id = Column(Integer, primary_key=True, index=True)
     agent_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
-    title = Column(String, default="Work Shift")
+    title = Column(String, default="Turno de trabalho")
     description = Column(String, nullable=True)
     location = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    # Relationships
+    # Relacionamentos
     agent = relationship("User", back_populates="shifts", foreign_keys=[agent_id])
     swap_requests_origin = relationship(
         "SwapRequest",
@@ -75,7 +75,7 @@ class Shift(Base):
 
 
 class SwapRequest(Base):
-    """SwapRequest model for shift swap workflow"""
+    """Modelo SwapRequest para o fluxo de troca de turnos"""
     __tablename__ = "swap_requests"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -90,7 +90,7 @@ class SwapRequest(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    # Relationships
+    # Relacionamentos
     requester = relationship("User", back_populates="swap_requests_initiated", foreign_keys=[requester_id])
     target_agent = relationship("User", back_populates="swap_requests_received", foreign_keys=[target_agent_id])
     origin_shift = relationship("Shift", back_populates="swap_requests_origin", foreign_keys=[origin_shift_id])
