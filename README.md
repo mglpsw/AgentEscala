@@ -9,7 +9,7 @@
 - **Excel Export**: Professional Excel export with formatting and metadata
 - **ICS Export**: Simple iCalendar export for calendar integration
 - **REST API**: Complete RESTful API built with FastAPI
-- **Role-Based Access**: Admin and Agent roles with appropriate permissions
+- **Role-Based Access**: Admin and Agent roles (JWT login available; enforcement planned)
 
 ## Quick Start
 
@@ -31,7 +31,9 @@ cd AgentEscala
 docker-compose up -d
 ```
 
-3. Seed the database with sample data:
+This will apply database migrations automatically before starting the API.
+
+3. Seed the database with sample data (password for all sample users: `password123`):
 ```bash
 docker-compose exec backend python -m backend.seed
 ```
@@ -174,7 +176,12 @@ uvicorn backend.main:app --reload
 
 ### Database Migrations
 
-The application automatically creates tables on startup. For production, consider using Alembic migrations.
+Alembic migrations run automatically when the container starts (see docker-compose commands). You can also run them manually:
+
+```bash
+cd backend
+alembic upgrade head
+```
 
 ## Status
 

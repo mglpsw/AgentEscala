@@ -26,9 +26,9 @@ This will start:
 - PostgreSQL database on port 5432
 - FastAPI backend on port 8000
 
-Wait for services to be healthy (about 10-20 seconds).
+Migrations are applied automatically before the API starts. Wait for services to be healthy (about 10-20 seconds).
 
-### 3. Seed Sample Data
+### 3. Seed Sample Data (password: `password123`)
 
 ```bash
 docker-compose exec backend python -m backend.seed
@@ -86,6 +86,7 @@ After seeding, you'll have:
 **Admin**:
 - Email: admin@agentescala.com
 - Name: Admin User
+- Password: password123
 
 **Agents**:
 - alice@agentescala.com (Alice Silva)
@@ -93,6 +94,7 @@ After seeding, you'll have:
 - carol@agentescala.com (Carol Oliveira)
 - david@agentescala.com (David Costa)
 - eve@agentescala.com (Eve Martins)
+- Password for all sample users: password123
 
 ## Common Commands
 

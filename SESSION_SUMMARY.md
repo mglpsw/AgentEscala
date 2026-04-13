@@ -4,6 +4,8 @@
 **Branch:** claude/validate-backend-functionality
 **Session Focus:** Hardening, validation, authentication, and production readiness
 
+> Note (codex/finalizar-validar-corrigir): Latest work added automatic Alembic migrations on startup, pinned bcrypt for seeding/validation, and fixed swap listing/export. Authentication endpoints remain but enforcement and tests are still pending.
+
 ## Objectives
 
 Transform the AgentEscala MVP into a production-ready, validated, and hardened system with:
