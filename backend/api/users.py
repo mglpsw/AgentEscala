@@ -18,7 +18,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User with this email already exists"
         )
-    return UserService.create_user(db, user.email, user.name, user.role)
+    return UserService.create_user(db, user.email, user.name, user.password, user.role)
 
 
 @router.get("/", response_model=List[UserResponse])
