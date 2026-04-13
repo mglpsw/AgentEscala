@@ -5,7 +5,7 @@ Este guia explica como implantar o AgentEscala em um ambiente homelab com Docker
 ## Pré-requisitos
 - Docker e Docker Compose instalados no host
 - Rede do Traefik disponível (ex.: `traefik-public`)
-- Domínio configurado apontando para o host
+- Domínio configurado apontando para o host (usando porta externa 9443)
 - Certificados gerenciados pelo Traefik (Let's Encrypt ou importados)
 
 ## Arquivos relevantes
@@ -20,7 +20,7 @@ Este guia explica como implantar o AgentEscala em um ambiente homelab com Docker
 cd infra
 cp .env.homelab.example .env.homelab
 nano .env.homelab
-# Ajuste: DOMAIN, POSTGRES_PASSWORD, SECRET_KEY, ADMIN_EMAIL, TRAEFIK_NETWORK, certificados
+# Ajuste: DOMAIN (ks-sm.net), POSTGRES_PASSWORD, SECRET_KEY, ADMIN_EMAIL, TRAEFIK_NETWORK, certificados
 ```
 
 2. **Executar script de deploy**
@@ -36,9 +36,9 @@ docker-compose -f docker-compose.homelab.yml ps
 Containers devem estar `Up` e backend com healthcheck `healthy`.
 
 4. **Acessar**
-- API: `https://$DOMAIN`
-- Health: `https://$DOMAIN/health`
-- Traefik dashboard (se habilitado): `https://traefik.$DOMAIN/dashboard/`
+- API: `https://ks-sm.net:9443`
+- Health: `https://ks-sm.net:9443/health`
+- Traefik dashboard (se habilitado): `https://traefik.ks-sm.net:9443/dashboard/`
 
 ## Migrações e seed
 - Migrações Alembic rodam automaticamente na inicialização do container backend.
