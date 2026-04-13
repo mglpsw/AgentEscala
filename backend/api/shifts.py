@@ -36,6 +36,32 @@ def list_agent_shifts(agent_id: int, db: Session = Depends(get_db)):
     return ShiftService.get_shifts_by_agent(db, agent_id)
 
 
+@router.get("/export/excel", response_class=StreamingResponse)
+def export_shifts_excel(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
+    """Exportar turnos para Excel"""
+    shifts = ShiftService.get_all_shifts(db, skip, limit)
+    excel_file = ExcelExporter.export_shifts(shifts, include_agent_info=True)
+
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=shifts.xlsx"}
+    )
+
+
+@router.get("/export/ics", response_class=StreamingResponse)
+def export_shifts_ics(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
+    """Exportar turnos para o formato ICS (iCalendar)"""
+    shifts = ShiftService.get_all_shifts(db, skip, limit)
+    ics_file = ICSExporter.export_shifts(shifts)
+
+    return StreamingResponse(
+        ics_file,
+        media_type="text/calendar",
+        headers={"Content-Disposition": "attachment; filename=shifts.ics"}
+    )
+
+
 @router.get("/{shift_id}", response_model=ShiftWithAgent)
 def get_shift(shift_id: int, db: Session = Depends(get_db)):
     """Obter um turno pelo ID"""
@@ -62,32 +88,6 @@ def delete_shift(shift_id: int, db: Session = Depends(get_db)):
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Turno não encontrado")
     return None
-
-
-@router.get("/export/excel", response_class=StreamingResponse)
-def export_shifts_excel(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
-    """Exportar turnos para Excel"""
-    shifts = ShiftService.get_all_shifts(db, skip, limit)
-    excel_file = ExcelExporter.export_shifts(shifts, include_agent_info=True)
-
-    return StreamingResponse(
-        excel_file,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=shifts.xlsx"}
-    )
-
-
-@router.get("/export/ics", response_class=StreamingResponse)
-def export_shifts_ics(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
-    """Exportar turnos para o formato ICS (iCalendar)"""
-    shifts = ShiftService.get_all_shifts(db, skip, limit)
-    ics_file = ICSExporter.export_shifts(shifts)
-
-    return StreamingResponse(
-        ics_file,
-        media_type="text/calendar",
-        headers={"Content-Disposition": "attachment; filename=shifts.ics"}
-    )
 
 
 @router.get("/{shift_id}/export/ics", response_class=StreamingResponse)

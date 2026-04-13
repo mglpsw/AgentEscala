@@ -59,6 +59,19 @@ def list_agent_swaps(agent_id: int, db: Session = Depends(get_db)):
     return SwapService.get_swaps_by_agent(db, agent_id)
 
 
+@router.get("/export/excel", response_class=StreamingResponse)
+def export_swaps_excel(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
+    """Exportar todas as solicitações de troca para Excel"""
+    swaps = SwapService.get_all_swaps(db, skip, limit)
+    excel_file = ExcelExporter.export_swap_requests(swaps)
+
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=swap_requests.xlsx"}
+    )
+
+
 @router.get("/{swap_id}", response_model=SwapRequestDetail)
 def get_swap_request(swap_id: int, db: Session = Depends(get_db)):
     """Obter uma solicitação de troca pelo ID"""
@@ -128,16 +141,3 @@ def cancel_swap_request(
         return swap
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-
-@router.get("/export/excel", response_class=StreamingResponse)
-def export_swaps_excel(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
-    """Exportar todas as solicitações de troca para Excel"""
-    swaps = SwapService.get_all_swaps(db, skip, limit)
-    excel_file = ExcelExporter.export_swap_requests(swaps)
-
-    return StreamingResponse(
-        excel_file,
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=swap_requests.xlsx"}
-    )
