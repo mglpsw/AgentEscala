@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - agentescala_postgres_data:/var/lib/postgresql/data
+    networks:
+      - agentescala_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/mglpsw/agentescala:latest
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: ${DEBUG}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - agentescala_internal
+      - ${TRAEFIK_NETWORK}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK}"
+      - "traefik.http.routers.agentescala.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.agentescala.entrypoints=websecure"
+      - "traefik.http.routers.agentescala.tls=true"
+      - "traefik.http.routers.agentescala.tls.certresolver=letsencrypt"
+      - "traefik.http.services.agentescala.loadbalancer.server.port=8000"
+      # Health check
+      - "traefik.http.services.agentescala.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.agentescala.loadbalancer.healthcheck.interval=30s"
+    restart: unless-stopped
+
+volumes:
+  agentescala_postgres_data:
+    driver: local
+
+networks:
+  agentescala_internal:
+    driver: bridge
+  traefik-public:
+    external: true
