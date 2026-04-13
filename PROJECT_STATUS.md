@@ -16,6 +16,10 @@ O backend roda fim a fim com migrações automáticas, seed, exportações, flux
 - Auth JWT aplicada em usuários, turnos e trocas sensíveis; `requester_id` e `admin_id` removidos das rotas críticas
 - `docker-compose.yml` e `infra/docker-compose.homelab.yml` endurecidos com portas configuráveis, healthcheck do backend e suporte a bind seguro
 - `infra/docker-compose.homelab.yml` e script de deploy ajustados para NPM/manual proxy em `escalas.ks-sm.net:9443`, sem tocar em proxies existentes
+- Scripts de backup/restore adicionados com restore destrutivo protegido por confirmação explícita
+- Exemplo de scrape Prometheus e runbook operacional adicionados ao projeto
+- Backup real gerado e restore real validado em stack isolado do AgentEscala
+- Smoke local do modelo de reverse proxy validado com container efêmero Nginx, sem tocar no NPM real
 - Dependências atualizadas: `email-validator==2.2.0`, `python-multipart==0.0.24`, `prometheus-client==0.21.1`
 
 ## Funcionalidades implementadas
@@ -84,6 +88,8 @@ O backend roda fim a fim com migrações automáticas, seed, exportações, flux
 - [x] Isolamento de rede e volume configurável por ambiente
 - [x] Bind local do backend configurável para integração segura com NPM
 - [x] Dry-run do script de deploy
+- [x] Backup/restore básico do PostgreSQL
+- [x] Exemplo de scrape Prometheus do lado do projeto
 - [x] Configuração de health check
 - [x] Configuração de ambiente (.env.homelab.example)
 - [x] Script de deploy (couple_to_homelab.sh)
@@ -113,11 +119,13 @@ O backend roda fim a fim com migrações automáticas, seed, exportações, flux
 - [x] Endpoints sensíveis exigem JWT/papel correto
 - [x] Métricas simples expostas em /metrics
 - [x] Testes mínimos automatizados passam
+- [x] Backup e restore mínimo do banco podem ser executados
+- [x] Modelo de reverse proxy validado localmente sem alterar o NPM
 
 ### 🟡 Requer ambiente homelab
 - [ ] Publicação final no NPM com certificado local/custom
 - [ ] Validação do host público `escalas.ks-sm.net:9443`
-- [ ] Persistência de banco em produção com backup recorrente
+- [ ] Automação externa de retenção/rotação de backups
 
 ## Ainda não implementado
 

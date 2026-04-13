@@ -176,7 +176,7 @@ Veja [docs/homelab_deploy.md](docs/homelab_deploy.md) para instruções detalhad
 
 ### Runtime validado no CT 102
 
-O backend foi validado em runtime real no CT 102 como stack isolado, sem tocar em serviços existentes, usando projeto Compose dedicado, rede interna dedicada, volume Postgres dedicado, bind local em `127.0.0.1:18000`, seed e validação HTTP end-to-end.
+O backend foi validado em runtime real no CT 102 como stack isolado, sem tocar em serviços existentes, usando projeto Compose dedicado, rede interna dedicada, volume Postgres dedicado, bind local em `127.0.0.1:18000`, seed, validação HTTP end-to-end, backup/restore do PostgreSQL e smoke local do modelo de reverse proxy.
 
 ## Desenvolvimento
 
@@ -211,6 +211,8 @@ Consulte [PROJECT_STATUS.md](PROJECT_STATUS.md) para o estado atual e o roadmap.
 - [PROJECT_STATUS.md](PROJECT_STATUS.md) - Status atual e roadmap
 - [docs/architecture.md](docs/architecture.md) - Detalhes de arquitetura
 - [docs/homelab_deploy.md](docs/homelab_deploy.md) - Guia de implantação homelab
+- [docs/operations.md](docs/operations.md) - Runbook operacional curto do CT 102
+- [docs/backup_restore.md](docs/backup_restore.md) - Backup e restore do PostgreSQL do AgentEscala
 - [docs/assumptions.md](docs/assumptions.md) - Decisões técnicas e premissas
 
 ## Licença

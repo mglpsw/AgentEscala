@@ -11,8 +11,12 @@
 - `docker-compose.yml` endurecido com bind configurável, healthcheck do backend e compatibilidade com host compartilhado
 - `infra/docker-compose.homelab.yml` ajustado para CT 102 sem Traefik, com bind local, rede e volume configuráveis
 - `infra/scripts/couple_to_homelab.sh` ganhou `--dry-run`, validação de conflito de porta e rollback do stack do AgentEscala
+- Scripts de backup e restore do PostgreSQL adicionados com foco no stack isolado do AgentEscala
+- Exemplo de job Prometheus e runbook operacional adicionados ao repositório
 - Testes mínimos adicionados e executados com sucesso em container efêmero (`4 passed`)
 - Runtime real validado no CT 102 com stack isolado (`health`, `auth`, exports, swap, `/metrics`)
+- Backup real e restore real validados em stack isolado do AgentEscala
+- Smoke local do modelo de reverse proxy validado com Nginx efêmero, sem tocar no NPM real
 - Publicação preparada para `escalas.ks-sm.net:9443` via NPM/manual proxy, sem tocar em proxies existentes
 
 **Correções anteriores (2026-04-13)**:

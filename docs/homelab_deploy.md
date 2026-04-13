@@ -13,6 +13,10 @@ Este guia explica como implantar o AgentEscala no CT 102 como stack Docker isola
 - `infra/docker-compose.homelab.yml`: stack do backend + banco com rede e volume isoláveis por ambiente
 - `infra/.env.homelab.example`: template de variáveis de ambiente
 - `infra/scripts/couple_to_homelab.sh`: script para validar e subir apenas o stack do AgentEscala
+- `infra/scripts/backup_postgres.sh`: backup manual do banco do AgentEscala
+- `infra/scripts/restore_postgres.sh`: restore destrutivo com confirmação explícita
+- `infra/scripts/plan_npm_publish.sh`: helper para planejar a publicação no NPM
+- `infra/examples/prometheus/agentescala-scrape.yml`: exemplo de scrape Prometheus
 
 ## Princípios operacionais
 - Não editar compose files de outros serviços do CT 102
@@ -70,6 +74,8 @@ docker-compose -p agentescala -f docker-compose.homelab.yml exec backend \
 - Logs: `docker-compose -p agentescala -f docker-compose.homelab.yml logs -f backend`
 - Reiniciar backend: `docker-compose -p agentescala -f docker-compose.homelab.yml restart backend`
 - Atualizar imagem: reexecutar o script com `--build`
+- Runbook resumido: `docs/operations.md`
+- Backup e restore: `docs/backup_restore.md`
 
 ## Publicação segura em `escalas.ks-sm.net:9443`
 
@@ -79,6 +85,8 @@ docker-compose -p agentescala -f docker-compose.homelab.yml exec backend \
 - Use certificado local/custom/self-signed
 - Não habilite Force SSL
 - Aponte o upstream para `http://IP_DO_CT102:BACKEND_HOST_PORT`
+
+O modelo de proxy reverso foi validado localmente com um container Nginx efêmero apontando para o bind do AgentEscala. O NPM real não foi alterado nesta rodada.
 
 ### Observação importante
 Se o NPM estiver em container separado, `127.0.0.1` não será acessível como upstream a partir dele. Nesse caso, ajuste `BACKEND_BIND_ADDRESS` para o IP LAN do CT 102 ou `0.0.0.0` após revisar o risco.
