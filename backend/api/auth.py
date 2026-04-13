@@ -2,7 +2,6 @@
 Endpoints de autenticação da API.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import timedelta
@@ -12,9 +11,6 @@ from ..utils.auth import verify_password, create_access_token, ACCESS_TOKEN_EXPI
 from ..utils.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
-
-# HTTP Basic auth for login endpoint
-security = HTTPBasic()
 
 
 class TokenResponse(BaseModel):
@@ -58,7 +54,6 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha incorretos",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     # Verifica a senha
@@ -66,7 +61,6 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="E-mail ou senha incorretos",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     # Verifica se o usuário está ativo

@@ -1,71 +1,72 @@
 #!/bin/bash
 set -e
 
-# AgentEscala Homelab Coupling Script
-# This script deploys AgentEscala to your homelab infrastructure
+# Script de acoplamento do AgentEscala ao homelab
+# Este script faz o deploy do AgentEscala na sua infraestrutura homelab
 
-echo "=== AgentEscala Homelab Deployment ==="
+echo "=== Deploy do AgentEscala no Homelab ==="
 echo ""
 
-# Configuration
+# Configuração
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INFRA_DIR="$(dirname "$SCRIPT_DIR")"
 PROJECT_ROOT="$(dirname "$INFRA_DIR")"
 ENV_FILE="$INFRA_DIR/.env.homelab"
 COMPOSE_FILE="$INFRA_DIR/docker-compose.homelab.yml"
+EXTERNAL_PORT="9443"
 
-# Check if .env.homelab exists
+# Verifica se .env.homelab existe
 if [ ! -f "$ENV_FILE" ]; then
-    echo "Error: .env.homelab not found!"
-    echo "Please copy .env.homelab.example to .env.homelab and configure it."
+    echo "Erro: .env.homelab não encontrado!"
+    echo "Copie .env.homelab.example para .env.homelab e configure seus valores."
     exit 1
 fi
 
-# Load environment variables
+# Carrega variáveis de ambiente
 source "$ENV_FILE"
 
-echo "Configuration loaded:"
-echo "  - Domain: $DOMAIN"
-echo "  - Traefik Network: $TRAEFIK_NETWORK"
-echo "  - Database: $POSTGRES_DB"
+echo "Configuração carregada:"
+echo "  - Domínio: $DOMAIN (porta externa $EXTERNAL_PORT)"
+echo "  - Rede do Traefik: $TRAEFIK_NETWORK"
+echo "  - Banco de dados: $POSTGRES_DB"
 echo ""
 
-# Verify Traefik network exists
+# Verifica se a rede do Traefik existe
 if ! docker network inspect "$TRAEFIK_NETWORK" >/dev/null 2>&1; then
-    echo "Error: Traefik network '$TRAEFIK_NETWORK' does not exist!"
-    echo "Please create it first or check your homelab setup."
+    echo "Erro: a rede Traefik '$TRAEFIK_NETWORK' não existe!"
+    echo "Crie-a antes ou revise sua configuração de homelab."
     exit 1
 fi
 
-# Build or pull image
-echo "Building/pulling AgentEscala image..."
+# Constrói ou baixa a imagem
+echo "Construindo/baixando imagem do AgentEscala..."
 if [ "$1" == "--build" ]; then
-    echo "Building local image..."
+    echo "Construindo imagem local..."
     docker build -t ghcr.io/mglpsw/agentescala:latest "$PROJECT_ROOT"
 else
-    echo "Pulling image from registry..."
+    echo "Baixando imagem do registry..."
     docker pull ghcr.io/mglpsw/agentescala:latest || {
-        echo "Warning: Could not pull image. Building locally instead..."
+        echo "Aviso: não foi possível baixar a imagem. Construindo localmente..."
         docker build -t ghcr.io/mglpsw/agentescala:latest "$PROJECT_ROOT"
     }
 fi
 
-# Deploy with docker-compose
+# Faz deploy com docker-compose
 echo ""
-echo "Deploying AgentEscala..."
+echo "Fazendo deploy do AgentEscala..."
 cd "$INFRA_DIR"
 docker-compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
 
 echo ""
-echo "=== Deployment Complete ==="
+echo "=== Deploy concluído ==="
 echo ""
-echo "AgentEscala is now running!"
-echo "  - URL: https://$DOMAIN"
-echo "  - Health check: https://$DOMAIN/health"
+echo "AgentEscala está em execução!"
+echo "  - URL: https://$DOMAIN:$EXTERNAL_PORT"
+echo "  - Health check: https://$DOMAIN:$EXTERNAL_PORT/health"
 echo ""
-echo "To view logs:"
+echo "Para ver os logs:"
 echo "  docker-compose -f $COMPOSE_FILE logs -f"
 echo ""
-echo "To stop:"
+echo "Para parar:"
 echo "  docker-compose -f $COMPOSE_FILE down"
 echo ""
