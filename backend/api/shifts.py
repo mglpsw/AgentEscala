@@ -3,15 +3,21 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List
 from ..config.database import get_db
+from ..models import User
 from ..services import ShiftService
 from ..utils import ExcelExporter, ICSExporter
+from ..utils.dependencies import get_current_user, require_admin
 from .schemas import ShiftCreate, ShiftUpdate, ShiftResponse, ShiftWithAgent
 
 router = APIRouter(prefix="/shifts", tags=["Turnos"])
 
 
 @router.post("/", response_model=ShiftResponse, status_code=status.HTTP_201_CREATED)
-def create_shift(shift: ShiftCreate, db: Session = Depends(get_db)):
+def create_shift(
+    shift: ShiftCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin)
+):
     """Criar um novo turno"""
     return ShiftService.create_shift(
         db,
@@ -25,19 +31,33 @@ def create_shift(shift: ShiftCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/", response_model=List[ShiftWithAgent])
-def list_shifts(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def list_shifts(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
     """Listar todos os turnos"""
     return ShiftService.get_all_shifts(db, skip, limit)
 
 
 @router.get("/agent/{agent_id}", response_model=List[ShiftResponse])
-def list_agent_shifts(agent_id: int, db: Session = Depends(get_db)):
+def list_agent_shifts(
+    agent_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
     """Listar todos os turnos de um agente específico"""
     return ShiftService.get_shifts_by_agent(db, agent_id)
 
 
 @router.get("/export/excel", response_class=StreamingResponse)
-def export_shifts_excel(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
+def export_shifts_excel(
+    skip: int = 0,
+    limit: int = 1000,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
     """Exportar turnos para Excel"""
     shifts = ShiftService.get_all_shifts(db, skip, limit)
     excel_file = ExcelExporter.export_shifts(shifts, include_agent_info=True)
@@ -50,7 +70,12 @@ def export_shifts_excel(skip: int = 0, limit: int = 1000, db: Session = Depends(
 
 
 @router.get("/export/ics", response_class=StreamingResponse)
-def export_shifts_ics(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
+def export_shifts_ics(
+    skip: int = 0,
+    limit: int = 1000,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
     """Exportar turnos para o formato ICS (iCalendar)"""
     shifts = ShiftService.get_all_shifts(db, skip, limit)
     ics_file = ICSExporter.export_shifts(shifts)
@@ -63,7 +88,11 @@ def export_shifts_ics(skip: int = 0, limit: int = 1000, db: Session = Depends(ge
 
 
 @router.get("/{shift_id}", response_model=ShiftWithAgent)
-def get_shift(shift_id: int, db: Session = Depends(get_db)):
+def get_shift(
+    shift_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
     """Obter um turno pelo ID"""
     shift = ShiftService.get_shift(db, shift_id)
     if not shift:
@@ -72,7 +101,12 @@ def get_shift(shift_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/{shift_id}", response_model=ShiftResponse)
-def update_shift(shift_id: int, shift_update: ShiftUpdate, db: Session = Depends(get_db)):
+def update_shift(
+    shift_id: int,
+    shift_update: ShiftUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin)
+):
     """Atualizar um turno"""
     update_data = shift_update.model_dump(exclude_unset=True)
     shift = ShiftService.update_shift(db, shift_id, **update_data)
@@ -82,7 +116,11 @@ def update_shift(shift_id: int, shift_update: ShiftUpdate, db: Session = Depends
 
 
 @router.delete("/{shift_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_shift(shift_id: int, db: Session = Depends(get_db)):
+def delete_shift(
+    shift_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin)
+):
     """Excluir um turno"""
     success = ShiftService.delete_shift(db, shift_id)
     if not success:
@@ -91,7 +129,11 @@ def delete_shift(shift_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{shift_id}/export/ics", response_class=StreamingResponse)
-def export_single_shift_ics(shift_id: int, db: Session = Depends(get_db)):
+def export_single_shift_ics(
+    shift_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
     """Exportar um turno para o formato ICS"""
     shift = ShiftService.get_shift(db, shift_id)
     if not shift:
