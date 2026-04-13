@@ -3,6 +3,7 @@ Seed script for AgentEscala - Creates sample data for testing
 """
 from datetime import datetime, timedelta
 from backend.config.database import SessionLocal
+from backend.config.database import init_db
 from backend.models import User, Shift, SwapRequest, UserRole, SwapStatus
 from backend.utils.auth import get_password_hash
 
@@ -10,8 +11,7 @@ from backend.utils.auth import get_password_hash
 def seed_database():
     """Seed the database with sample data"""
     print("Initializing database...")
-    # Database is managed by Alembic migrations
-    # Run: alembic upgrade head
+    init_db()
 
     db = SessionLocal()
 
