@@ -1,0 +1,11 @@
+scrape_configs:
+  - job_name: agentescala
+    metrics_path: /metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - 192.168.3.155:18000
+        labels:
+          service: agentescala
+          stack: ct102
+          environment: homelab

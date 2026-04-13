@@ -11,7 +11,7 @@ echo ""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INFRA_DIR="$(dirname "$SCRIPT_DIR")"
 PROJECT_ROOT="$(dirname "$INFRA_DIR")"
-ENV_FILE="$INFRA_DIR/.env.homelab"
+ENV_FILE="${ENV_FILE:-$INFRA_DIR/.env.homelab}"
 COMPOSE_FILE="$INFRA_DIR/docker-compose.homelab.yml"
 DRY_RUN=false
 BUILD_IMAGE=false
