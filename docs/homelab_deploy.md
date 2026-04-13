@@ -1,17 +1,24 @@
 # Guia de Deploy em Homelab
 
-Este guia explica como implantar o AgentEscala em um ambiente homelab com Docker, Traefik e TLS.
+Este guia explica como implantar o AgentEscala no CT 102 como stack Docker isolado, sem alterar serviços existentes do host e sem depender de Traefik.
 
 ## Pré-requisitos
 - Docker e Docker Compose instalados no host
-- Rede do Traefik disponível (ex.: `traefik-public`)
-- Domínio configurado apontando para o host (usando porta externa 9443)
-- Certificados gerenciados pelo Traefik (Let's Encrypt ou importados)
+- Host CT 102 com acesso ao daemon Docker
+- Porta local livre para o backend do AgentEscala (ex.: `18000`)
+- Domínio `escalas.ks-sm.net` apontando para o proxy reverso/NPM existente na porta `9443`
+- Certificado local/custom/self-signed já preparado no NPM, se a publicação externa for habilitada
 
 ## Arquivos relevantes
-- `infra/docker-compose.homelab.yml`: stack do backend + banco com labels Traefik
+- `infra/docker-compose.homelab.yml`: stack do backend + banco com rede e volume isoláveis por ambiente
 - `infra/.env.homelab.example`: template de variáveis de ambiente
-- `infra/scripts/couple_to_homelab.sh`: script para acoplar o stack ao homelab
+- `infra/scripts/couple_to_homelab.sh`: script para validar e subir apenas o stack do AgentEscala
+
+## Princípios operacionais
+- Não editar compose files de outros serviços do CT 102
+- Não reiniciar NPM, Nextcloud, OpenWebUI, AIOps ou qualquer outro stack
+- Não reaproveitar redes/volumes existentes sem confirmação explícita
+- Publicar o AgentEscala por bind local dedicado e proxy reverso manual, não por mudança global no host
 
 ## Passo a passo
 
@@ -20,41 +27,69 @@ Este guia explica como implantar o AgentEscala em um ambiente homelab com Docker
 cd infra
 cp .env.homelab.example .env.homelab
 nano .env.homelab
-# Ajuste: DOMAIN (ks-sm.net), POSTGRES_PASSWORD, SECRET_KEY, ADMIN_EMAIL, TRAEFIK_NETWORK, certificados
+# Ajuste: POSTGRES_PASSWORD, SECRET_KEY, BACKEND_HOST_PORT, PUBLIC_DOMAIN,
+# BACKEND_BIND_ADDRESS, POSTGRES_VOLUME_NAME e INTERNAL_NETWORK_NAME
 ```
 
-2. **Executar script de deploy**
+2. **Executar dry-run antes de qualquer deploy**
+```bash
+./scripts/couple_to_homelab.sh --dry-run
+```
+
+3. **Executar script de deploy**
 ```bash
 ./scripts/couple_to_homelab.sh --build
 ```
-O script valida variáveis, constrói a imagem e sobe o compose homelab.
+O script valida variáveis, verifica conflito de porta, valida o compose e sobe apenas o stack do AgentEscala. Se o `up` falhar, o rollback é restrito ao próprio stack do AgentEscala.
 
-3. **Verificar status**
+4. **Verificar status**
 ```bash
-docker-compose -f docker-compose.homelab.yml ps
+docker-compose -p agentescala -f docker-compose.homelab.yml ps
 ```
 Containers devem estar `Up` e backend com healthcheck `healthy`.
 
-4. **Acessar**
-- API: `https://ks-sm.net:9443`
-- Health: `https://ks-sm.net:9443/health`
-- Traefik dashboard (se habilitado): `https://traefik.ks-sm.net:9443/dashboard/`
+5. **Validar localmente antes do proxy**
+- API local: `http://127.0.0.1:18000`
+- Health local: `http://127.0.0.1:18000/health`
+- Métricas locais: `http://127.0.0.1:18000/metrics`
 
-## Migrações e seed
+## Migrações, seed e validação
 - Migrações Alembic rodam automaticamente na inicialização do container backend.
 - Para rodar seed:
 ```bash
-docker-compose -f docker-compose.homelab.yml exec backend python -m backend.seed
+docker-compose -p agentescala -f docker-compose.homelab.yml exec backend python -m backend.seed
+```
+
+- Para validar o runtime HTTP fim a fim:
+```bash
+docker-compose -p agentescala -f docker-compose.homelab.yml exec backend \
+	env AGENTESCALA_BASE_URL=http://127.0.0.1:8000 python -m backend.validate
 ```
 
 ## Operação
-- Logs: `docker-compose -f docker-compose.homelab.yml logs -f backend`
-- Reiniciar backend: `docker-compose -f docker-compose.homelab.yml restart backend`
+- Logs: `docker-compose -p agentescala -f docker-compose.homelab.yml logs -f backend`
+- Reiniciar backend: `docker-compose -p agentescala -f docker-compose.homelab.yml restart backend`
 - Atualizar imagem: reexecutar o script com `--build`
+
+## Publicação segura em `escalas.ks-sm.net:9443`
+
+### Opção recomendada nesta fase
+- Suba o AgentEscala no CT 102 com `BACKEND_BIND_ADDRESS` local ou IP interno controlado e `BACKEND_HOST_PORT` dedicado
+- No NPM, crie um novo Proxy Host para `escalas.ks-sm.net`
+- Use certificado local/custom/self-signed
+- Não habilite Force SSL
+- Aponte o upstream para `http://IP_DO_CT102:BACKEND_HOST_PORT`
+
+### Observação importante
+Se o NPM estiver em container separado, `127.0.0.1` não será acessível como upstream a partir dele. Nesse caso, ajuste `BACKEND_BIND_ADDRESS` para o IP LAN do CT 102 ou `0.0.0.0` após revisar o risco.
+
+### Caminho `/api` para futuro frontend
+Nesta rodada o escopo é apenas backend. A publicação mais simples e segura é expor o backend no host inteiro `escalas.ks-sm.net:9443`. Se um frontend separado for adicionado depois, mantenha o mesmo host e crie uma location `/api/` no NPM com rewrite para o backend, sem alterar a aplicação nesta etapa.
 
 ## Boas práticas
 - Usar senhas fortes e SECRET_KEY única
-- Restringir `allow_origins` em produção
+- Restringir `CORS_ALLOW_ORIGINS` ao host publicado
 - Configurar backups do volume do PostgreSQL
-- Habilitar rate limiting no Traefik para exposição pública
-- Manter certificados TLS renovados
+- Não reutilizar volume ou rede sem intenção explícita
+- Validar sempre com `--dry-run` antes do deploy real
+- Manter a mudança reversível: `docker-compose ... down` deve afetar apenas o stack do AgentEscala

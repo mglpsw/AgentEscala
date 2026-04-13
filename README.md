@@ -9,7 +9,8 @@
 - **Exportação para Excel**: planilhas profissionais com formatação e metadados
 - **Exportação para ICS**: exportação iCalendar simples para integração com calendários
 - **API REST**: API RESTful completa construída com FastAPI
-- **Acesso por Papéis**: papéis de Admin e Agente (login JWT disponível; aplicação completa das regras planejada)
+- **Acesso por Papéis**: JWT aplicado nos endpoints sensíveis, com aprovação admin protegida
+- **Observabilidade mínima**: healthcheck confiável, logs de requisição e endpoint `/metrics`
 
 ## Guia Rápido
 
@@ -31,6 +32,11 @@ cd AgentEscala
 docker-compose up -d
 ```
 
+Em um host Docker compartilhado, prefira portas isoladas:
+```bash
+AGENTESCALA_BACKEND_HOST_PORT=18000 AGENTESCALA_DB_HOST_PORT=15432 docker-compose up -d
+```
+
 As migrações do banco são aplicadas automaticamente antes de o backend iniciar.
 
 3. Popule o banco com dados de exemplo (senha padrão: `password123`):
@@ -42,6 +48,7 @@ docker-compose exec backend python -m backend.seed
    - API: http://localhost:8000
    - Documentação da API: http://localhost:8000/docs
    - Health Check: http://localhost:8000/health
+   - Métricas: http://localhost:8000/metrics
 
 Consulte [QUICKSTART.md](QUICKSTART.md) para instruções detalhadas.
 
@@ -110,33 +117,39 @@ AgentEscala/
 ## Endpoints da API
 
 ### Usuários
-- `POST /users/` - Criar usuário
-- `GET /users/` - Listar usuários
-- `GET /users/agents` - Listar agentes
-- `GET /users/admins` - Listar administradores
-- `GET /users/{id}` - Detalhar usuário
+- `POST /users/` - Criar usuário (admin)
+- `GET /users/` - Listar usuários (admin)
+- `GET /users/agents` - Listar agentes (autenticado)
+- `GET /users/admins` - Listar administradores (admin)
+- `GET /users/{id}` - Detalhar usuário (admin ou próprio usuário)
 
 ### Turnos
-- `POST /shifts/` - Criar turno
-- `GET /shifts/` - Listar turnos
-- `GET /shifts/agent/{id}` - Listar turnos de um agente
-- `GET /shifts/export/excel` - Exportar para Excel
-- `GET /shifts/export/ics` - Exportar para ICS
-- `GET /shifts/{id}` - Detalhar turno
-- `PATCH /shifts/{id}` - Atualizar turno
-- `DELETE /shifts/{id}` - Excluir turno
-- `GET /shifts/{id}/export/ics` - Exportar turno individual para ICS
+- `POST /shifts/` - Criar turno (admin)
+- `GET /shifts/` - Listar turnos (autenticado)
+- `GET /shifts/agent/{id}` - Listar turnos de um agente (autenticado)
+- `GET /shifts/export/excel` - Exportar para Excel (autenticado)
+- `GET /shifts/export/ics` - Exportar para ICS (autenticado)
+- `GET /shifts/{id}` - Detalhar turno (autenticado)
+- `PATCH /shifts/{id}` - Atualizar turno (admin)
+- `DELETE /shifts/{id}` - Excluir turno (admin)
+- `GET /shifts/{id}/export/ics` - Exportar turno individual para ICS (autenticado)
 
 ### Trocas
-- `POST /swaps/` - Criar solicitação de troca
-- `GET /swaps/` - Listar trocas
-- `GET /swaps/pending` - Listar trocas pendentes
-- `GET /swaps/agent/{id}` - Listar trocas de um agente
-- `GET /swaps/export/excel` - Exportar para Excel
-- `GET /swaps/{id}` - Detalhar troca
+- `POST /swaps/` - Criar solicitação de troca (usuário autenticado)
+- `GET /swaps/` - Listar trocas do usuário autenticado ou todas (admin)
+- `GET /swaps/pending` - Listar trocas pendentes (admin)
+- `GET /swaps/agent/{id}` - Listar trocas de um agente (admin ou próprio agente)
+- `GET /swaps/export/excel` - Exportar para Excel (admin)
+- `GET /swaps/{id}` - Detalhar troca (admin ou participantes)
 - `POST /swaps/{id}/approve` - Aprovar troca (admin)
 - `POST /swaps/{id}/reject` - Rejeitar troca (admin)
-- `POST /swaps/{id}/cancel` - Cancelar troca (solicitante)
+- `POST /swaps/{id}/cancel` - Cancelar troca (solicitante autenticado)
+
+### Autenticação e observabilidade
+- `POST /auth/login` - Obter JWT
+- `GET /auth/me` - Obter usuário autenticado
+- `GET /health` - Verificação de saúde
+- `GET /metrics` - Métricas Prometheus básicas
 
 ## Implantação
 
@@ -155,10 +168,15 @@ cp infra/.env.homelab.example infra/.env.homelab
 
 2. Execute o script de deploy:
 ```bash
-./infra/scripts/couple_to_homelab.sh
+./infra/scripts/couple_to_homelab.sh --dry-run
+./infra/scripts/couple_to_homelab.sh --build
 ```
 
 Veja [docs/homelab_deploy.md](docs/homelab_deploy.md) para instruções detalhadas.
+
+### Runtime validado no CT 102
+
+O backend foi validado em runtime real no CT 102 como stack isolado, sem tocar em serviços existentes, usando projeto Compose dedicado, rede interna dedicada, volume Postgres dedicado, bind local em `127.0.0.1:18000`, seed e validação HTTP end-to-end.
 
 ## Desenvolvimento
 

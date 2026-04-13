@@ -6,18 +6,17 @@
 
 AgentEscala é um sistema de gestão e troca de turnos que permite às equipes administrar escalas com um fluxo de aprovação obrigatória por administrador.
 
-## Status atual: Backend do MVP validado e corrigido (aplicação de auth + testes pendentes) ⚠️
+## Status atual: Backend endurecido e validado em runtime real no CT 102 ✅
 
-O backend roda fim a fim com migrações automáticas, seed, exportações e fluxo de trocas. Endpoints de autenticação existem, mas a aplicação de papéis e a suíte de testes ainda estão pendentes.
+O backend roda fim a fim com migrações automáticas, seed, exportações, fluxo de trocas, auth JWT mínima aplicada nos endpoints sensíveis, métricas simples e suíte mínima de testes. O deploy homelab foi ajustado para operar como stack isolado no CT 102, sem dependência de Traefik e sem impacto nos demais serviços Docker do host.
 
 ### Última validação (2026-04-13)
-- Todos os imports Python validados com sucesso (sem erros de runtime estático)
-- Auth JWT (hash de senha, geração/decodificação de token): testado e OK
-- Exportadores Excel e ICS: testados com objetos mock e funcionando
-- Rotas de exportação movidas para antes das rotas parametrizadas (corretude explícita)
-- Dependências atualizadas: `email-validator==2.2.0`, `python-multipart==0.0.24`
-- `docker-compose.homelab.yml`: variável `${TRAEFIK_NETWORK}` agora consistente em toda a configuração
-- **Nota**: validação de runtime completa (docker-compose up + seed + API) requer ambiente Docker operacional e não foi executada nesta sessão
+- Suite mínima de regressão executada em container efêmero: `4 passed`
+- Runtime real validado no CT 102 com stack isolado: compose dedicado, seed, healthcheck, login, exports, swap e métricas OK
+- Auth JWT aplicada em usuários, turnos e trocas sensíveis; `requester_id` e `admin_id` removidos das rotas críticas
+- `docker-compose.yml` e `infra/docker-compose.homelab.yml` endurecidos com portas configuráveis, healthcheck do backend e suporte a bind seguro
+- `infra/docker-compose.homelab.yml` e script de deploy ajustados para NPM/manual proxy em `escalas.ks-sm.net:9443`, sem tocar em proxies existentes
+- Dependências atualizadas: `email-validator==2.2.0`, `python-multipart==0.0.24`, `prometheus-client==0.21.1`
 
 ## Funcionalidades implementadas
 
@@ -65,10 +64,10 @@ O backend roda fim a fim com migrações automáticas, seed, exportações e flu
 - [x] Exportação ICS de turnos (individual e em lote)
 - [x] Suporte à integração com calendários
 
-### 🟡 Autenticação (parcial)
+### ✅ Autenticação (mínimo operacional)
 - [x] Hash de senha e endpoint de login com JWT
 - [x] Modelo de usuário usa hashed_password
-- [ ] Proteção de endpoints com checagem de papéis
+- [x] Proteção de endpoints sensíveis com JWT e checagem de papéis
 - [ ] Refresh/revogação de token
 
 ### ✅ Ambiente de desenvolvimento (100%)
@@ -82,12 +81,12 @@ O backend roda fim a fim com migrações automáticas, seed, exportações e flu
 
 ### ✅ Implantação homelab (100%)
 - [x] docker-compose específico de homelab
-- [x] Labels de integração com Traefik
-- [x] Configuração SSL/TLS
+- [x] Isolamento de rede e volume configurável por ambiente
+- [x] Bind local do backend configurável para integração segura com NPM
+- [x] Dry-run do script de deploy
 - [x] Configuração de health check
 - [x] Configuração de ambiente (.env.homelab.example)
 - [x] Script de deploy (couple_to_homelab.sh)
-- [x] Isolamento de rede
 - [x] Migrações Alembic rodando antes de iniciar o app
 
 ### ✅ Documentação (100%)
@@ -111,12 +110,14 @@ O backend roda fim a fim com migrações automáticas, seed, exportações e flu
 - [x] Exportação Excel gera arquivos válidos
 - [x] Exportação ICS gera arquivos válidos
 - [x] Fluxo de trocas com aprovação funciona
+- [x] Endpoints sensíveis exigem JWT/papel correto
+- [x] Métricas simples expostas em /metrics
+- [x] Testes mínimos automatizados passam
 
 ### 🟡 Requer ambiente homelab
-- [ ] Integração Traefik (requer homelab)
-- [ ] Certificados SSL/TLS (requer homelab)
-- [ ] Persistência de banco em produção (requer homelab)
-- [ ] E2E completo em produção
+- [ ] Publicação final no NPM com certificado local/custom
+- [ ] Validação do host público `escalas.ks-sm.net:9443`
+- [ ] Persistência de banco em produção com backup recorrente
 
 ## Ainda não implementado
 
@@ -133,10 +134,9 @@ O backend roda fim a fim com migrações automáticas, seed, exportações e flu
 - [ ] Bot commands for common operations
 
 ### Authentication & Authorization (Remaining)
-- [ ] Protect existing endpoints with JWT and role checks
 - [ ] Session management / token refresh
 - [ ] Password management (reset/rotation)
-- [ ] Admin/agent authorization rules enforced end-to-end
+- [ ] Regras adicionais de autorização refinadas por domínio de negócio
 
 ### Advanced Features (Future)
 - [ ] Email notifications
@@ -149,28 +149,28 @@ O backend roda fim a fim com migrações automáticas, seed, exportações e flu
 
 ### DevOps (Future)
 - [ ] CI/CD pipeline
-- [ ] Automated tests
+- [x] Testes mínimos automatizados
+- [ ] Cobertura expandida de testes
 - [ ] Container registry automation
 - [ ] Monitoring and observability integration
 - [ ] Backup automation
 
 ## Technical Debt
 
-- Automated test coverage is absent
-- Authentication exists but endpoints are still public
-- API error handling is basic and lacks structured logging
+- Cobertura de testes ainda é intencionalmente enxuta
+- Ainda faltam refresh token e regras mais granulares de autorização
+- Eventos de startup usam `on_event` e podem migrar para lifespan futuramente
 
 ## Next Sprint Priorities
 
 1. **Authentication & Authorization**
-   - Enforce JWT authentication on critical endpoints
    - Add logout/refresh/token expiry handling
-   - Enforce role-based access control
+   - Refinar regras por recurso (ex.: autoatendimento vs administração)
 
 2. **Testing**
-   - Unit tests for services
-   - Integration tests for API
-   - End-to-end tests
+   - Expandir testes de serviço
+   - Expandir integração HTTP
+   - Adicionar validação de deploy em pipeline
 
 3. **Frontend Development**
    - Basic web UI for agents
@@ -183,7 +183,7 @@ O backend roda fim a fim com migrações automáticas, seed, exportações e flu
 
 ## Known Limitations
 
-1. **Authentication not enforced**: Login works and issues JWTs, but most endpoints still accept user_id/admin_id parameters instead of requiring tokens.
+1. **Auth mínima, não completa**: endpoints sensíveis já exigem JWT, mas refresh token/logout e políticas mais finas ainda não existem.
 2. **No Frontend**: This is a backend-only MVP. UI will be developed in future sprints.
 3. **Basic Validation**: Input validation is basic. More comprehensive validation can be added.
 4. **No Audit Trail**: Changes are tracked via updated_at timestamps but full audit logging is not implemented.
@@ -199,10 +199,10 @@ O backend roda fim a fim com migrações automáticas, seed, exportações e flu
 
 ### Homelab Production: ✅ Ready
 - Deployment script available
-- Traefik configuration ready
-- Labels SSL/TLS configuradas
+- Stack isolado e seguro no CT 102
+- Publicação via NPM preparada de forma manual e reversível
 - Health checks configurados
-- Pronto para deploy imediato em homelab
+- Runtime real já validado no host alvo sem impactar outros serviços
 
 ### Nuvem pública: 🟡 Requer trabalho
 - Necessita aplicar autenticação primeiro
@@ -223,10 +223,10 @@ Veja [docs/assumptions.md](docs/assumptions.md) para decisões técnicas detalha
 
 ## Conclusão
 
-O backend do MVP está **operacional e validado** (migrações, seed, script de validação, exports, fluxo de trocas). Faltam aplicar autenticação nos endpoints e automatizar testes. O sistema pode ser:
+O backend do MVP está **operacional, endurecido e validado em runtime real** (migrações, seed, script de validação HTTP, exports, fluxo de trocas, auth mínima, métricas e testes). O sistema pode ser:
 - Executado localmente com Docker Compose (Alembic roda automaticamente)
 - Seedado com dados de exemplo
-- Testado via API/script de validação
-- Implantado em homelab (pronto para Traefik)
+- Testado via `pytest` e `backend.validate`
+- Implantado em homelab no CT 102 como stack isolado
 
-Os próximos passos devem focar em proteger endpoints com JWT/papéis e adicionar cobertura de testes antes de uma implantação mais ampla.
+Os próximos passos devem focar em refinar autorização, ampliar cobertura de testes e publicar o host final no NPM com certificado local/custom, sem expandir escopo além do backend nesta etapa.

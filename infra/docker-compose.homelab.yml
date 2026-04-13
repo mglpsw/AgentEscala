@@ -19,41 +19,38 @@ services:
     restart: unless-stopped
 
   backend:
-    image: ghcr.io/mglpsw/agentescala:latest
+    image: ${AGENTESCALA_IMAGE}
+    ports:
+      - "${BACKEND_BIND_ADDRESS}:${BACKEND_HOST_PORT}:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${DEBUG}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
+      LOG_LEVEL: ${LOG_LEVEL}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      METRICS_ENABLED: ${METRICS_ENABLED}
     depends_on:
       db:
         condition: service_healthy
     networks:
       - agentescala_internal
-      - ${TRAEFIK_NETWORK}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=${TRAEFIK_NETWORK}"
-      - "traefik.http.routers.agentescala.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.agentescala.entrypoints=websecure"
-      - "traefik.http.routers.agentescala.tls=true"
-      - "traefik.http.routers.agentescala.tls.certresolver=letsencrypt"
-      - "traefik.http.services.agentescala.loadbalancer.server.port=8000"
-      # Health check
-      - "traefik.http.services.agentescala.loadbalancer.healthcheck.path=/health"
-      - "traefik.http.services.agentescala.loadbalancer.healthcheck.interval=30s"
     command: >
       /bin/sh -c "cd /app/backend && alembic upgrade head &&
-      cd /app && uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+      cd /app && uvicorn backend.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:
   agentescala_postgres_data:
     driver: local
+    name: ${POSTGRES_VOLUME_NAME}
 
 networks:
   agentescala_internal:
     driver: bridge
-  # Nome da rede deve ser igual ao valor de TRAEFIK_NETWORK no .env.homelab
-  ${TRAEFIK_NETWORK}:
-    external: true
+    name: ${INTERNAL_NETWORK_NAME}
