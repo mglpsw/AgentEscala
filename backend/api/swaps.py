@@ -44,7 +44,7 @@ def create_swap_request(
 def list_swap_requests(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """List all swap requests"""
     # In a real implementation, this would be filtered by user role/permissions
-    return db.query(db.query(SwapService.get_pending_swaps(db))).offset(skip).limit(limit).all()
+    return SwapService.get_all_swaps(db, skip, limit)
 
 
 @router.get("/pending", response_model=List[SwapRequestDetail])
@@ -131,9 +131,9 @@ def cancel_swap_request(
 
 
 @router.get("/export/excel", response_class=StreamingResponse)
-def export_swaps_excel(db: Session = Depends(get_db)):
+def export_swaps_excel(skip: int = 0, limit: int = 1000, db: Session = Depends(get_db)):
     """Export all swap requests to Excel"""
-    swaps = SwapService.get_pending_swaps(db)
+    swaps = SwapService.get_all_swaps(db, skip, limit)
     excel_file = ExcelExporter.export_swap_requests(swaps)
 
     return StreamingResponse(

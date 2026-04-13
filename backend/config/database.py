@@ -20,4 +20,7 @@ def get_db():
 
 def init_db():
     """Initialize database tables"""
+    # Ensure models are registered before creating tables
+    from .. import models  # noqa: F401
+
     Base.metadata.create_all(bind=engine)

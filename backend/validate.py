@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from backend.models import User, Shift, SwapRequest, UserRole, SwapStatus
 from backend.services import UserService, ShiftService, SwapService
 from backend.utils import ExcelExporter, ICSExporter
+from backend.config.database import init_db
 
 def validate_mvp():
     """Validate core MVP functionality"""
@@ -23,6 +24,9 @@ def validate_mvp():
     print("=== AgentEscala MVP Validation ===\n")
 
     try:
+        # Ensure tables exist before running checks
+        init_db()
+
         # Connect to database
         print("1. Connecting to database...")
         engine = create_engine(database_url)

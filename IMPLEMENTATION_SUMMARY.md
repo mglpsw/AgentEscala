@@ -1,8 +1,14 @@
 # Implementation Summary
 
 **Last Consolidation Audit**: 2026-04-13
-**Branch**: claude/consolidate-agentescala-mvp-again
-**Status**: Consolidation Complete ✅
+**Branch**: codex/finalizar-validar-corrigir
+**Status**: Backend validated; auth enforcement/tests pending ⚠️
+
+**Latest Corrections (2026-04-13)**:
+- Alembic migrations now run automatically before the app starts (local and homelab compose)
+- Seed/validation scripts run cleanly after pinning `bcrypt==3.2.2`
+- Swap listing and Excel export return all requests (not only pending)
+- Documentation updated to reflect actual validation and remaining gaps
 
 This document summarizes what has been implemented in the AgentEscala MVP and the results of the consolidation audit performed on 2026-04-13.
 
@@ -208,11 +214,10 @@ All required elements present and functional:
 - ✅ Validation script
 
 **What Still Needs Work** (Future Sprints):
-- ❌ Authentication/Authorization (JWT)
+- ❌ Authentication/Authorization enforcement (JWT applied to endpoints)
 - ❌ Frontend (web UI)
 - ❌ Telegram bot
 - ❌ Automated tests
-- ❌ Database migrations (Alembic)
 - ❌ Email notifications
 - ❌ Monitoring/observability integration
 
@@ -224,7 +229,7 @@ All required elements present and functional:
 - ✅ Export functionality code reviewed
 - ✅ Swap workflow logic verified
 - ✅ Docker configurations reviewed
-- ⚠️ Runtime validation requires Docker (not available in audit environment)
+- ✅ Runtime validated with docker compose + alembic + seed + validation script
 
 **What Depends on Future Work**:
 - Authentication layer before public deployment
@@ -432,12 +437,11 @@ This document summarizes what has been implemented in the AgentEscala MVP.
 
 ## What's Not Implemented (Future Work)
 
-❌ Authentication (JWT, login/logout)
+❌ Authentication enforcement (JWT-required endpoints, role checks)
 ❌ Frontend (web UI)
 ❌ Telegram bot
 ❌ Automated tests
 ❌ Email notifications
-❌ Database migrations (Alembic)
 ❌ Monitoring/metrics
 ❌ Recurring shifts
 ❌ Multi-timezone support
@@ -568,25 +572,18 @@ All operations should:
 - Would need rate limiting
 - Would need security hardening
 
-## Success Criteria Met
+## Current Readiness
 
 ✅ **Backend functional** - FastAPI running, all endpoints work
 ✅ **Excel Exporter** - Professional formatting, works
 ✅ **ICS Exporter** - Valid calendar files, works
 ✅ **Swap workflow** - Approval required, works
-✅ **Docker Compose local** - One command startup, works
+✅ **Docker Compose local** - One command startup with automatic migrations
 ✅ **Homelab deployment** - Scripts and configs ready, works
-✅ **Documentation** - Comprehensive and current
-✅ **Branch ready** - No manual intervention needed
+✅ **Documentation** - Updated with latest validation notes
+⚠️ **Authentication enforcement** - Endpoints still mostly public (JWT issued but not required)
+⚠️ **Automated tests** - Not yet implemented
 
 ## Summary
 
-The AgentEscala MVP is **complete and functional**. It includes:
-- Full backend with REST API
-- Professional Excel and ICS exporters
-- Complete swap workflow with admin approval
-- Docker infrastructure for dev and homelab
-- Comprehensive documentation
-- Ready for immediate use
-
-The implementation follows best practices, is well-documented, and is ready for the next phase of development (authentication, frontend, testing).
+The AgentEscala backend is **operational and validated** (migrations, seed, validation script, exports, swap workflow). Remaining work centers on enforcing authentication/authorization and adding automated tests before broader deployment. The system can be run locally or in homelab with the provided compose files and scripts.

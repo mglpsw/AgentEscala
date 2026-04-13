@@ -21,6 +21,7 @@ docker-compose up -d
 **Expected:**
 - PostgreSQL container starts
 - Backend container starts after DB is healthy
+- Alembic migrations run automatically before the API starts
 - No error messages
 
 **Validation:**
@@ -77,6 +78,7 @@ docker-compose exec backend python -m backend.seed
 - "Creating sample swap requests..."
 - "Seed Complete"
 - No errors
+- Default password for all seeded users: `password123`
 
 **Validation:**
 ```bash
@@ -331,7 +333,7 @@ tree -L 2 -I '__pycache__|*.pyc|.git'
 
 ## Known Limitations (Expected)
 
-- [ ] No authentication (expected - future work)
+- [ ] Authentication not enforced (JWT login available; endpoints still accept ids)
 - [ ] No frontend (expected - future work)
 - [ ] No tests (expected - future work)
 - [ ] No email notifications (expected - future work)

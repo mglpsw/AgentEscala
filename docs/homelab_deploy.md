@@ -95,6 +95,8 @@ cd infra
 docker-compose -f docker-compose.homelab.yml --env-file .env.homelab up -d
 ```
 
+> Migrations are applied automatically before the backend starts; you only need to run the seed script if you want sample data.
+
 ### 4. Verify Deployment
 
 ```bash
@@ -117,7 +119,7 @@ Expected response:
 }
 ```
 
-### 5. Initialize Database
+### 5. Seed Sample Data (optional)
 
 ```bash
 # Seed with sample data (optional)

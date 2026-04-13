@@ -53,6 +53,17 @@ class SwapService:
         return db.query(SwapRequest).filter(SwapRequest.status == SwapStatus.PENDING).all()
 
     @staticmethod
+    def get_all_swaps(db: Session, skip: int = 0, limit: int = 100) -> List[SwapRequest]:
+        """Get all swap requests with pagination"""
+        return (
+            db.query(SwapRequest)
+            .order_by(SwapRequest.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    @staticmethod
     def get_swaps_by_agent(db: Session, agent_id: int) -> List[SwapRequest]:
         """Get all swap requests involving an agent"""
         return db.query(SwapRequest).filter(

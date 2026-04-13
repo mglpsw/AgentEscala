@@ -100,18 +100,17 @@ This document records technical decisions made during the MVP implementation of 
 - Clear error messages
 - Follows FastAPI best practices
 
-### 4. No Authentication in MVP
-**Decision**: Defer authentication to post-MVP.
+### 4. Authentication present but not enforced
+**Decision**: Provide login/JWT issuance now, defer endpoint protection and role enforcement to the next iteration.
 
-**Assumption**: MVP will run in trusted environment (local dev or private homelab).
+**Assumption**: Current deployments run in trusted environments (local dev or private homelab).
 
 **Rationale**:
-- Faster MVP delivery
-- Authentication adds significant complexity
-- Can validate core logic first
-- Easy to add later as middleware
+- Keep MVP delivery fast while enabling real credentials and hashed passwords
+- Auth middleware/guards can be added incrementally
+- Allows testing login/token flow without blocking other features
 
-**Note**: user_id and admin_id are currently passed as query parameters. In production, these will come from authenticated sessions.
+**Note**: user_id and admin_id are still accepted as parameters on most endpoints. In production they must come from authenticated sessions with role checks.
 
 ## Service Layer Decisions
 

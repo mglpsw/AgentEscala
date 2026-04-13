@@ -6,9 +6,15 @@
 
 AgentEscala is a shift management and swap system that allows teams to manage work schedules efficiently with a mandatory admin approval workflow for shift swaps.
 
-## Current Status: MVP Complete ✅
+## Current Status: Backend MVP running (auth enforcement + tests pending) ⚠️
 
-The minimum viable product (MVP) is fully implemented and ready for use.
+The backend runs end-to-end with automatic migrations, seeding, exports, and swap workflow. Authentication endpoints exist, but role enforcement and automated tests are still pending.
+
+### Latest Validation (2026-04-13)
+- Docker compose build/up runs Alembic migrations automatically and starts successfully
+- Seed script completes (6 users, 90 shifts, 3 swap requests)
+- Validation script passes (health, queries, exports, swap validation)
+- Swap list and Excel export return all requests (not only pending)
 
 ## Implemented Features
 
@@ -56,12 +62,19 @@ The minimum viable product (MVP) is fully implemented and ready for use.
 - [x] ICS export for shifts (single and bulk)
 - [x] Calendar integration support
 
+### 🟡 Authentication (partial)
+- [x] Password hashing and login endpoint with JWT issuance
+- [x] User model uses hashed_password
+- [ ] Endpoint protection with role checks
+- [ ] Token refresh/revocation
+
 ### ✅ Development Environment (100%)
 - [x] Dockerfile for containerization
 - [x] docker-compose.yml for local development
 - [x] PostgreSQL database container
 - [x] Environment configuration (.env.example)
 - [x] Database seeding script
+- [x] Alembic migrations executed automatically on container startup
 - [x] Development-ready setup
 
 ### ✅ Homelab Deployment (100%)
@@ -72,6 +85,7 @@ The minimum viable product (MVP) is fully implemented and ready for use.
 - [x] Environment configuration (.env.homelab.example)
 - [x] Deployment script (couple_to_homelab.sh)
 - [x] Network isolation
+- [x] Alembic migrations run automatically before app start
 
 ### ✅ Documentation (100%)
 - [x] Comprehensive README
@@ -115,11 +129,11 @@ The minimum viable product (MVP) is fully implemented and ready for use.
 - [ ] Swap request notifications
 - [ ] Bot commands for common operations
 
-### Authentication (Future)
-- [ ] JWT authentication
-- [ ] Password management
-- [ ] Session management
-- [ ] Role-based access control enforcement
+### Authentication & Authorization (Remaining)
+- [ ] Protect existing endpoints with JWT and role checks
+- [ ] Session management / token refresh
+- [ ] Password management (reset/rotation)
+- [ ] Admin/agent authorization rules enforced end-to-end
 
 ### Advanced Features (Future)
 - [ ] Email notifications
@@ -133,20 +147,21 @@ The minimum viable product (MVP) is fully implemented and ready for use.
 ### DevOps (Future)
 - [ ] CI/CD pipeline
 - [ ] Automated tests
-- [ ] Database migrations with Alembic
 - [ ] Container registry automation
 - [ ] Monitoring and observability integration
 - [ ] Backup automation
 
 ## Technical Debt
 
-None - This is a clean MVP implementation.
+- Automated test coverage is absent
+- Authentication exists but endpoints are still public
+- API error handling is basic and lacks structured logging
 
 ## Next Sprint Priorities
 
 1. **Authentication & Authorization**
-   - Implement JWT authentication
-   - Add login/logout endpoints
+   - Enforce JWT authentication on critical endpoints
+   - Add logout/refresh/token expiry handling
    - Enforce role-based access control
 
 2. **Testing**
@@ -165,14 +180,10 @@ None - This is a clean MVP implementation.
 
 ## Known Limitations
 
-1. **No Authentication**: Currently, API endpoints accept user_id/admin_id as parameters. In production, these should come from authenticated sessions.
-
+1. **Authentication not enforced**: Login works and issues JWTs, but most endpoints still accept user_id/admin_id parameters instead of requiring tokens.
 2. **No Frontend**: This is a backend-only MVP. UI will be developed in future sprints.
-
 3. **Basic Validation**: Input validation is basic. More comprehensive validation can be added.
-
 4. **No Audit Trail**: Changes are tracked via updated_at timestamps but full audit logging is not implemented.
-
 5. **Single Timezone**: Currently assumes UTC. Multi-timezone support planned for future.
 
 ## Deployment Readiness
@@ -209,11 +220,10 @@ See [docs/assumptions.md](docs/assumptions.md) for detailed technical decisions 
 
 ## Conclusion
 
-The MVP is **complete and functional**. All core features are implemented and validated. The system can be:
-- Run locally with Docker Compose
+The backend MVP is **operational and validated** (migrations, seed, validation script, exports, swap workflow). Remaining gaps are authentication enforcement and automated tests. The system can be:
+- Run locally with Docker Compose (Alembic runs automatically)
 - Seeded with sample data
-- Tested via API
-- Deployed to homelab
-- Extended with additional features in future sprints
+- Tested via API/validation script
+- Deployed to homelab (Traefik-ready)
 
-The codebase is clean, documented, and ready for the next phase of development.
+Next steps should focus on locking down endpoints with JWT/roles and adding test coverage before broader deployment.

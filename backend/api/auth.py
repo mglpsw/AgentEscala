@@ -9,6 +9,7 @@ from datetime import timedelta
 from ..config.database import get_db
 from ..models.models import User
 from ..utils.auth import verify_password, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from ..utils.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -94,26 +95,21 @@ async def login(
 
 @router.get("/me", response_model=dict)
 async def get_current_user_info(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_db)  # This will be updated to use auth dependency
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get current authenticated user information.
 
     Args:
-        db: Database session
         current_user: Current authenticated user
 
     Returns:
         User information
     """
-    from ..utils.dependencies import get_current_user
-    user = await get_current_user(db=db)
-
     return {
-        "id": user.id,
-        "email": user.email,
-        "name": user.name,
-        "role": user.role.value,
-        "is_active": user.is_active
+        "id": current_user.id,
+        "email": current_user.email,
+        "name": current_user.name,
+        "role": current_user.role.value,
+        "is_active": current_user.is_active
     }
