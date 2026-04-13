@@ -33,7 +33,9 @@ app.include_router(swaps.router)
 @app.on_event("startup")
 async def startup_event():
     """Initialize database on startup"""
-    init_db()
+    # Database tables are now managed by Alembic migrations
+    # Run: alembic upgrade head
+    pass
 
 
 @app.get("/", response_model=HealthResponse)

@@ -2,14 +2,16 @@
 Seed script for AgentEscala - Creates sample data for testing
 """
 from datetime import datetime, timedelta
-from backend.config.database import SessionLocal, init_db
+from backend.config.database import SessionLocal
 from backend.models import User, Shift, SwapRequest, UserRole, SwapStatus
+from backend.utils.auth import get_password_hash
 
 
 def seed_database():
     """Seed the database with sample data"""
     print("Initializing database...")
-    init_db()
+    # Database is managed by Alembic migrations
+    # Run: alembic upgrade head
 
     db = SessionLocal()
 
@@ -22,10 +24,14 @@ def seed_database():
 
         print("Creating users...")
 
+        # Default password for all users: "password123"
+        default_password = get_password_hash("password123")
+
         # Create admin
         admin = User(
             email="admin@agentescala.com",
             name="Admin User",
+            hashed_password=default_password,
             role=UserRole.ADMIN,
             is_active=True
         )
@@ -33,11 +39,11 @@ def seed_database():
 
         # Create agents
         agents = [
-            User(email="alice@agentescala.com", name="Alice Silva", role=UserRole.AGENT),
-            User(email="bob@agentescala.com", name="Bob Santos", role=UserRole.AGENT),
-            User(email="carol@agentescala.com", name="Carol Oliveira", role=UserRole.AGENT),
-            User(email="david@agentescala.com", name="David Costa", role=UserRole.AGENT),
-            User(email="eve@agentescala.com", name="Eve Martins", role=UserRole.AGENT),
+            User(email="alice@agentescala.com", name="Alice Silva", hashed_password=default_password, role=UserRole.AGENT),
+            User(email="bob@agentescala.com", name="Bob Santos", hashed_password=default_password, role=UserRole.AGENT),
+            User(email="carol@agentescala.com", name="Carol Oliveira", hashed_password=default_password, role=UserRole.AGENT),
+            User(email="david@agentescala.com", name="David Costa", hashed_password=default_password, role=UserRole.AGENT),
+            User(email="eve@agentescala.com", name="Eve Martins", hashed_password=default_password, role=UserRole.AGENT),
         ]
 
         for agent in agents:
