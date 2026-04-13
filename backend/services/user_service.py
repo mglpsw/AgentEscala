@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from ..models import User, UserRole
+from ..utils.auth import get_password_hash
 
 
 class UserService:
@@ -11,10 +12,12 @@ class UserService:
         db: Session,
         email: str,
         name: str,
+        password: str,
         role: UserRole = UserRole.AGENT
     ) -> User:
         """Create a new user"""
-        user = User(email=email, name=name, role=role)
+        hashed_password = get_password_hash(password)
+        user = User(email=email, name=name, hashed_password=hashed_password, role=role)
         db.add(user)
         db.commit()
         db.refresh(user)
