@@ -1,17 +1,23 @@
 # Resumo de Implementação
 
-**Última auditoria de consolidação**: 2026-04-13  
-**Branch**: main  
-**Status**: Backend validado e corrigido; aplicação de auth/testes pendentes ⚠️
+**Última auditoria de consolidação**: 2026-04-13
+**Branch**: copilot/ct102-runtime-hardening
+**Status**: Backend endurecido, testado e validado em runtime real no CT 102 ✅
 
 **Correções desta sessão (2026-04-13)**:
-- `email-validator` atualizado de `2.1.0` (yanked) para `2.2.0`
-- `python-multipart` atualizado de `0.0.22` para `0.0.24` (correção de segurança)
-- Rotas de exportação (`/export/excel`, `/export/ics`) movidas para antes das rotas parametrizadas (`/{id}`) em `shifts.py` e `swaps.py`
-- `docker-compose.homelab.yml`: rede hardcoded `traefik-public` substituída por `${TRAEFIK_NETWORK}` para consistência com o restante do arquivo
-- `VALIDATION_CHECKLIST.md`: exemplos de `curl` corrigidos para usar trailing slash (ex: `/users/`, `/shifts/`)
-- `README.md`: endpoints documentados com trailing slash correto; referência a `tests/` (diretório inexistente) removida
-- Todos os imports e utilitários validados em venv local (auth JWT, exportadores Excel/ICS)
+- Auth mínima aplicada em endpoints sensíveis de usuários, turnos e trocas
+- `requester_id` e `admin_id` removidos das rotas críticas em favor do JWT autenticado
+- Logging de requisição e endpoint `/metrics` adicionados
+- `docker-compose.yml` endurecido com bind configurável, healthcheck do backend e compatibilidade com host compartilhado
+- `infra/docker-compose.homelab.yml` ajustado para CT 102 sem Traefik, com bind local, rede e volume configuráveis
+- `infra/scripts/couple_to_homelab.sh` ganhou `--dry-run`, validação de conflito de porta e rollback do stack do AgentEscala
+- Scripts de backup e restore do PostgreSQL adicionados com foco no stack isolado do AgentEscala
+- Exemplo de job Prometheus e runbook operacional adicionados ao repositório
+- Testes mínimos adicionados e executados com sucesso em container efêmero (`4 passed`)
+- Runtime real validado no CT 102 com stack isolado (`health`, `auth`, exports, swap, `/metrics`)
+- Backup real e restore real validados em stack isolado do AgentEscala
+- Smoke local do modelo de reverse proxy validado com Nginx efêmero, sem tocar no NPM real
+- Publicação preparada para `escalas.ks-sm.net:9443` via NPM/manual proxy, sem tocar em proxies existentes
 
 **Correções anteriores (2026-04-13)**:
 - Migrações Alembic agora rodam automaticamente antes do app iniciar (compose local e homelab)

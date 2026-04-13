@@ -20,6 +20,7 @@ Documentar as principais premissas, decisões e trade-offs usados no MVP do Agen
 ## Segurança
 - Hash de senha com bcrypt via passlib
 - Tokens JWT com expiração de 24h; sem refresh token no MVP
+- Endpoints sensíveis protegidos com `get_current_user` e `require_admin`
 - CORS liberado em dev; restringir em produção
 - Sem armazenamento de sessão (stateless)
 - Dependências atualizadas para versões com patches de segurança
@@ -32,18 +33,20 @@ Documentar as principais premissas, decisões e trade-offs usados no MVP do Agen
 
 ## Deploy
 - Docker Compose para ambiente local
-- Compose homelab com Traefik, SSL/TLS e rede isolada
-- Script `infra/scripts/couple_to_homelab.sh` para acoplar ao homelab
+- Compose homelab isolado para CT 102, com bind local configurável, rede dedicada e volume dedicado
+- Publicação externa preparada via NPM/manual proxy em `escalas.ks-sm.net:9443`, sem automação destrutiva sobre proxies existentes
+- Script `infra/scripts/couple_to_homelab.sh` com `--dry-run`, validação de conflitos e rollback do stack do AgentEscala
 - Variáveis de ambiente em `.env.example` e `.env.homelab.example`
 
 ## Operação
 - Endpoint `/health` para verificação básica
-- Logs via Uvicorn em STDOUT
+- Logs de requisição em STDOUT
+- Endpoint `/metrics` para métricas Prometheus básicas
 - Validação manual via `backend/validate.py`
 
 ## Limitações conhecidas
-- Endpoints ainda não protegidos por papel (auth aplicada só no login)
-- Sem suíte de testes automatizados
+- Autorização ainda é mínima; faltam refresh token e regras mais refinadas
+- Suíte de testes ainda é enxuta
 - Sem rate limiting, refresh token ou recuperação de senha
 - Sem frontend ou notificações por e-mail
 

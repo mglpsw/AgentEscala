@@ -22,6 +22,12 @@ cd AgentEscala
 docker-compose up -d
 ```
 
+Em um host Docker compartilhado, use portas isoladas para evitar colisão:
+
+```bash
+AGENTESCALA_BACKEND_HOST_PORT=18000 AGENTESCALA_DB_HOST_PORT=15432 docker-compose up -d
+```
+
 Isso inicia:
 - Banco PostgreSQL na porta 5432
 - Backend FastAPI na porta 8000
@@ -48,31 +54,50 @@ Isso cria:
 
 ### 5. Teste rapidamente
 
+#### Obter token JWT
+```bash
+TOKEN=$(curl -s http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@agentescala.com","password":"password123"}' | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+```
+
 #### Ver todos os turnos
 ```bash
-curl http://localhost:8000/shifts/
+curl http://localhost:8000/shifts/ \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Exportar turnos para Excel
 ```bash
-curl http://localhost:8000/shifts/export/excel -o shifts.xlsx
+curl http://localhost:8000/shifts/export/excel \
+  -H "Authorization: Bearer $TOKEN" \
+  -o shifts.xlsx
 ```
 
 #### Exportar turnos para ICS
 ```bash
-curl http://localhost:8000/shifts/export/ics -o shifts.ics
+curl http://localhost:8000/shifts/export/ics \
+  -H "Authorization: Bearer $TOKEN" \
+  -o shifts.ics
 ```
 
 #### Ver trocas pendentes
 ```bash
-curl http://localhost:8000/swaps/pending
+curl http://localhost:8000/swaps/pending \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
-#### Aprovar uma troca (como admin, user_id=1)
+#### Aprovar uma troca (como admin autenticado)
 ```bash
-curl -X POST "http://localhost:8000/swaps/1/approve?admin_id=1" \
+curl -X POST "http://localhost:8000/swaps/1/approve" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"admin_notes": "Aprovado"}'
+```
+
+#### Ver métricas simples
+```bash
+curl http://localhost:8000/metrics
 ```
 
 ### 6. Explore a API
@@ -140,7 +165,10 @@ docker-compose up -d db
 ```
 
 ### Porta em uso
-Se a porta 8000 ou 5432 já estiver ocupada, ajuste `docker-compose.yml` para usar outras portas.
+Use overrides de ambiente sem editar o compose:
+```bash
+AGENTESCALA_BACKEND_HOST_PORT=18000 AGENTESCALA_DB_HOST_PORT=15432 docker-compose up -d
+```
 
 ## Próximos passos
 

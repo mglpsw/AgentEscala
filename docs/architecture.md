@@ -4,6 +4,8 @@
 
 AgentEscala é um sistema de gestão e troca de turnos construído com uma arquitetura moderna e escalável. Este documento descreve a estrutura técnica, os componentes e as decisões principais.
 
+Na validação mais recente, o backend foi executado em runtime real no CT 102 como stack Docker isolado, sem reutilizar serviços de outros projetos e sem alteração destrutiva na infraestrutura existente.
+
 ## Arquitetura do sistema
 
 ```
@@ -132,7 +134,7 @@ AgentEscala é um sistema de gestão e troca de turnos construído com uma arqui
 ## Autenticação e segurança
 - Login JWT (`/auth/login`) com hash de senha via bcrypt (passlib)
 - Dependências FastAPI para extrair e validar token: `get_current_user`, `require_admin`
-- Status atual: endpoints de auth prontos; aplicação de papéis aos endpoints ainda pendente
+- Status atual: endpoints sensíveis já exigem JWT e papel adequado; refresh token/logout ainda não implementados
 - CORS liberado para dev; ajustar origens em produção
 
 ## Migrações e dados
@@ -144,18 +146,19 @@ AgentEscala é um sistema de gestão e troca de turnos construído com uma arqui
 
 ## Infraestrutura e deploy
 - **Dockerfile**: imagem do backend
-- **docker-compose.yml**: ambiente local com PostgreSQL + backend, health checks e migrações automáticas
-- **infra/docker-compose.homelab.yml**: pronto para Traefik/SSL, rede isolada
-- **infra/scripts/couple_to_homelab.sh**: script de deploy homelab
+- **docker-compose.yml**: ambiente local com PostgreSQL + backend, portas configuráveis para host compartilhado, health checks e migrações automáticas
+- **infra/docker-compose.homelab.yml**: stack isolado para CT 102, com bind local configurável, rede interna dedicada e volume dedicado
+- **infra/scripts/couple_to_homelab.sh**: script de deploy homelab com dry-run, validação de porta e rollback do stack do AgentEscala
 - Variáveis de ambiente em `.env.example` e `.env.homelab.example`
 
 ## Operação e observabilidade
-- Logs: Uvicorn em STDOUT; planejar logging estruturado
+- Logs: requisições HTTP registradas em STDOUT com método, path, status e latência
 - Saúde: endpoint `/health`
-- Monitoramento futuro: métricas básicas (contagem de requisições, latência) e dashboards via Traefik
+- Métricas: endpoint `/metrics` com contadores e histogramas Prometheus básicos
+- Integração futura: scraping pelo stack de monitoramento do CT 200, sem nova stack local no CT 102
 
 ## Escalabilidade e futuras melhorias
 - Stateless no backend; pode ser replicado horizontalmente com DB compartilhado
 - Necessário endurecimento adicional para nuvem pública: rate limiting, rotação de segredos, TLS gerenciado
-- Roadmap imediato: aplicar auth por papel nos endpoints, adicionar testes automatizados e observabilidade básica
+- Roadmap imediato: refinar autorização, ampliar testes automatizados e endurecer a publicação final via NPM
 

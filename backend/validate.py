@@ -1,118 +1,139 @@
-"""
-Script simples de validação para verificar a funcionalidade do MVP do AgentEscala
-Execute-o após semear o banco de dados para validar as operações principais
-"""
-import sys
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 import os
+import sys
 
-# Add backend to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import httpx
 
-from backend.models import User, Shift, SwapRequest, UserRole, SwapStatus
-from backend.services import UserService, ShiftService, SwapService
-from backend.utils import ExcelExporter, ICSExporter
-from backend.config.database import init_db
+DEFAULT_BASE_URL = os.getenv("AGENTESCALA_BASE_URL", "http://127.0.0.1:18000")
+ADMIN_EMAIL = os.getenv("AGENTESCALA_ADMIN_EMAIL", "admin@agentescala.com")
+ADMIN_PASSWORD = os.getenv("AGENTESCALA_ADMIN_PASSWORD", "password123")
+AGENT_EMAIL = os.getenv("AGENTESCALA_AGENT_EMAIL", "alice@agentescala.com")
+AGENT_PASSWORD = os.getenv("AGENTESCALA_AGENT_PASSWORD", "password123")
 
-def validate_mvp():
-    """Validar a funcionalidade principal do MVP"""
 
-    # Usa variável de ambiente ou padrão
-    database_url = os.getenv("DATABASE_URL", "postgresql://agentescala:agentescala_dev@db:5432/agentescala")
+def login(client: httpx.Client, email: str, password: str) -> str:
+    response = client.post(
+        "/auth/login",
+        json={"email": email, "password": password},
+    )
+    response.raise_for_status()
+    return response.json()["access_token"]
 
-    print("=== Validação do MVP AgentEscala ===\n")
+
+def validate_runtime() -> bool:
+    """Validar o runtime HTTP do AgentEscala contra uma instância real em execução."""
+
+    print("=== Validação HTTP do AgentEscala ===\n")
 
     try:
-        # Garante que as tabelas existam antes de executar as verificações
-        init_db()
+        with httpx.Client(base_url=DEFAULT_BASE_URL, timeout=20.0, follow_redirects=True) as client:
+            print(f"1. Verificando healthcheck em {DEFAULT_BASE_URL}/health ...")
+            health_response = client.get("/health")
+            health_response.raise_for_status()
+            health_payload = health_response.json()
+            assert health_payload["status"] == "healthy"
+            print("   ✓ Healthcheck respondeu corretamente\n")
 
-        # Conecta ao banco de dados
-        print("1. Conectando ao banco de dados...")
-        engine = create_engine(database_url)
-        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        db = SessionLocal()
-        print("   ✓ Conexão com o banco realizada\n")
+            print("2. Autenticando admin e agente seed...")
+            admin_token = login(client, ADMIN_EMAIL, ADMIN_PASSWORD)
+            agent_token = login(client, AGENT_EMAIL, AGENT_PASSWORD)
+            admin_headers = {"Authorization": f"Bearer {admin_token}"}
+            agent_headers = {"Authorization": f"Bearer {agent_token}"}
+            print("   ✓ Login admin e agente funcionando\n")
 
-        # Teste 1: verificar se existem usuários
-        print("2. Testando consultas de usuários...")
-        users = UserService.get_all_users(db)
-        admins = UserService.get_admins(db)
-        agents = UserService.get_agents(db)
-        print(f"   ✓ Encontrados {len(users)} usuários ({len(admins)} admins, {len(agents)} agentes)\n")
+            print("3. Validando rota protegida /auth/me ...")
+            me_response = client.get("/auth/me", headers=agent_headers)
+            me_response.raise_for_status()
+            me_payload = me_response.json()
+            assert me_payload["email"] == AGENT_EMAIL
+            print("   ✓ JWT e resolução de usuário autenticado OK\n")
 
-        # Teste 2: verificar se existem turnos
-        print("3. Testando consultas de turnos...")
-        shifts = ShiftService.get_all_shifts(db)
-        if agents:
-            agent_shifts = ShiftService.get_shifts_by_agent(db, agents[0].id)
-            print(f"   ✓ Encontrados {len(shifts)} turnos (agente 1 tem {len(agent_shifts)} turnos)\n")
-        else:
-            print(f"   ✓ Encontrados {len(shifts)} turnos\n")
+            print("4. Validando exportações de turnos...")
+            excel_response = client.get("/shifts/export/excel", headers=agent_headers)
+            excel_response.raise_for_status()
+            assert "spreadsheetml" in excel_response.headers["content-type"]
 
-        # Teste 3: verificar se existem solicitações de troca
-        print("4. Testando consultas de trocas...")
-        pending_swaps = SwapService.get_pending_swaps(db)
-        print(f"   ✓ Encontradas {len(pending_swaps)} solicitações pendentes\n")
+            ics_response = client.get("/shifts/export/ics", headers=agent_headers)
+            ics_response.raise_for_status()
+            assert "text/calendar" in ics_response.headers["content-type"]
+            print("   ✓ Exportações Excel e ICS OK\n")
 
-        # Teste 4: exportação Excel
-        print("5. Testando exportação Excel...")
-        if shifts:
-            excel_file = ExcelExporter.export_shifts(shifts[:10], include_agent_info=True)
-            excel_size = len(excel_file.getvalue())
-            print(f"   ✓ Exportação Excel bem-sucedida ({excel_size} bytes)\n")
-        else:
-            print("   ⚠ Não há turnos para exportar\n")
+            print("5. Validando fluxo real de swap com approve admin...")
+            shifts_response = client.get("/shifts/", headers=agent_headers)
+            shifts_response.raise_for_status()
+            shifts = shifts_response.json()
 
-        # Teste 5: exportação ICS
-        print("6. Testando exportação ICS...")
-        if shifts:
-            ics_file = ICSExporter.export_shifts(shifts[:10])
-            ics_size = len(ics_file.getvalue())
-            print(f"   ✓ Exportação ICS bem-sucedida ({ics_size} bytes)\n")
-        else:
-            print("   ⚠ Não há turnos para exportar\n")
+            origin_shift = next(
+                shift for shift in shifts
+                if shift["agent"]["email"] == AGENT_EMAIL
+            )
+            target_shift = next(
+                shift for shift in shifts
+                if shift["agent"]["email"] != AGENT_EMAIL
+            )
 
-        # Teste 6: validação do fluxo de trocas
-        print("7. Testando validação do fluxo de trocas...")
-        if admins and agents and shifts:
-            # Tenta criar uma troca inválida (deve falhar)
-            try:
-                SwapService.create_swap_request(
-                    db,
-                    requester_id=agents[0].id,
-                    target_agent_id=agents[1].id,
-                    origin_shift_id=999999,  # Turno inválido
-                    target_shift_id=shifts[0].id,
-                    reason="Test"
-                )
-                print("   ✗ Validação falhou - turno inválido foi aceito\n")
-            except ValueError:
-                print("   ✓ Validação funcionando - troca inválida rejeitada\n")
-        else:
-            print("   ⚠ Dados insuficientes para testar validação de troca\n")
+            create_swap_response = client.post(
+                "/swaps/",
+                headers=agent_headers,
+                json={
+                    "target_agent_id": target_shift["agent_id"],
+                    "origin_shift_id": origin_shift["id"],
+                    "target_shift_id": target_shift["id"],
+                    "reason": "Validação runtime CT102",
+                },
+            )
+            create_swap_response.raise_for_status()
+            swap_payload = create_swap_response.json()
 
-        # Resumo
+            forbidden_approve = client.post(
+                f"/swaps/{swap_payload['id']}/approve",
+                headers=agent_headers,
+                json={"admin_notes": "não deveria aprovar"},
+            )
+            assert forbidden_approve.status_code == 403
+
+            approve_response = client.post(
+                f"/swaps/{swap_payload['id']}/approve",
+                headers=admin_headers,
+                json={"admin_notes": "Aprovado na validação runtime"},
+            )
+            approve_response.raise_for_status()
+            approved_payload = approve_response.json()
+            assert approved_payload["status"] == "approved"
+
+            updated_origin_shift = client.get(
+                f"/shifts/{origin_shift['id']}",
+                headers=agent_headers,
+            )
+            updated_origin_shift.raise_for_status()
+            assert updated_origin_shift.json()["agent_id"] == target_shift["agent_id"]
+            print("   ✓ Fluxo de swap com restrição admin OK\n")
+
+            print("6. Validando exportação administrativa de swaps...")
+            swap_export_response = client.get("/swaps/export/excel", headers=admin_headers)
+            swap_export_response.raise_for_status()
+            assert "spreadsheetml" in swap_export_response.headers["content-type"]
+            print("   ✓ Exportação de swaps OK\n")
+
+            print("7. Validando endpoint de métricas simples...")
+            metrics_response = client.get("/metrics")
+            metrics_response.raise_for_status()
+            assert "agentescala_http_requests_total" in metrics_response.text
+            print("   ✓ Endpoint de métricas OK\n")
+
         print("=== Validação Concluída ===\n")
-        print("✓ Conectividade com o banco: OK")
-        print(f"✓ Usuários: {len(users)} encontrados")
-        print(f"✓ Turnos: {len(shifts)} encontrados")
-        print(f"✓ Solicitações de troca: {len(pending_swaps)} pendentes")
-        print("✓ Exportação Excel: Funcionando")
-        print("✓ Exportação ICS: Funcionando")
-        print("✓ Validação de trocas: Funcionando")
-        print("\nO MVP está funcional e pronto para uso!")
-
-        db.close()
+        print("✓ Healthcheck: OK")
+        print("✓ Login JWT: OK")
+        print("✓ Rotas protegidas: OK")
+        print("✓ Exportações Excel/ICS: OK")
+        print("✓ Fluxo de swap: OK")
+        print("✓ Métricas simples: OK")
         return True
 
-    except Exception as e:
-        print(f"\n✗ Falha na validação: {e}")
-        import traceback
-        traceback.print_exc()
+    except Exception as exc:
+        print(f"\n✗ Falha na validação runtime: {exc}")
         return False
 
 
 if __name__ == "__main__":
-    success = validate_mvp()
+    success = validate_runtime()
     sys.exit(0 if success else 1)

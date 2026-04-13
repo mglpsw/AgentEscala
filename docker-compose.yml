@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: agentescala_dev
       POSTGRES_DB: agentescala
     ports:
-      - "5432:5432"
+      - "${AGENTESCALA_DB_BIND_ADDRESS:-127.0.0.1}:${AGENTESCALA_DB_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -16,18 +16,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   backend:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "${AGENTESCALA_BACKEND_BIND_ADDRESS:-127.0.0.1}:${AGENTESCALA_BACKEND_HOST_PORT:-8000}:8000"
     environment:
       DATABASE_URL: postgresql://agentescala:agentescala_dev@db:5432/agentescala
       SECRET_KEY: dev-secret-key-change-in-production
       DEBUG: "true"
       ADMIN_EMAIL: admin@example.com
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      METRICS_ENABLED: ${METRICS_ENABLED:-true}
     depends_on:
       db:
         condition: service_healthy
@@ -35,7 +39,13 @@ services:
       - ./backend:/app/backend
     command: >
       /bin/sh -c "cd /app/backend && alembic upgrade head &&
-      cd /app && uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+      cd /app && uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers --forwarded-allow-ips='*'"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
 volumes:
   postgres_data:
