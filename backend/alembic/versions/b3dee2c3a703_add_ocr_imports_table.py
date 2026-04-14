@@ -23,8 +23,9 @@ def upgrade() -> None:
     is_pg = op.get_bind().dialect.name == 'postgresql'
 
     id_type   = postgresql.UUID(as_uuid=True) if is_pg else sa.String(36)
-    json_type = lambda: postgresql.JSONB(astext_type=sa.Text()) if is_pg else sa.JSON()  # noqa: E731
 
+    def json_type():
+        return postgresql.JSONB(astext_type=sa.Text()) if is_pg else sa.JSON()
     op.create_table(
         'ocr_imports',
         sa.Column('id', id_type, nullable=False),
@@ -37,7 +38,7 @@ def upgrade() -> None:
         sa.Column('action_log', json_type(), nullable=True),
         sa.Column('created_by', sa.Integer(), nullable=True),
         sa.Column('confirmed_by', sa.Integer(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=False),
+        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('confirmed_at', sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(['confirmed_by'], ['users.id']),
         sa.ForeignKeyConstraint(['created_by'], ['users.id']),
