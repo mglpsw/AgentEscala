@@ -98,6 +98,26 @@ class SwapRequest(Base):
     reviewer = relationship("User", foreign_keys=[reviewed_by])
 
 
+# ─── Blacklist de Refresh Tokens ───────────────────────
+
+from sqlalchemy import UniqueConstraint
+import hashlib
+
+class RevokedRefreshToken(Base):
+    """Tokens de refresh revogados (hash SHA-256 do JWT)"""
+    __tablename__ = "revoked_refresh_tokens"
+    id = Column(Integer, primary_key=True, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    revoked_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint('token_hash', name='uq_revoked_refresh_token_hash'),
+    )
+
+    @staticmethod
+    def hash_token(token: str) -> str:
+        return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
 # ─── Import Schedule ────────────────────────────────────
 
 class ImportStatus(str, enum.Enum):
