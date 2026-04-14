@@ -30,7 +30,7 @@ services:
       DEBUG: "true"
       ADMIN_EMAIL: admin@example.com
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:8000}
       METRICS_ENABLED: ${METRICS_ENABLED:-true}
     depends_on:
       db:

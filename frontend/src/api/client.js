@@ -3,6 +3,7 @@ import axios from 'axios'
 // Chaves padronizadas para o localStorage
 const KEY_ACCESS = 'ae_access_token'
 const KEY_REFRESH = 'ae_refresh_token'
+const DEFAULT_API_PORT = '8000'
 
 export const getAccessToken = () => localStorage.getItem(KEY_ACCESS)
 export const getRefreshToken = () => localStorage.getItem(KEY_REFRESH)
@@ -15,9 +16,25 @@ export const clearTokens = () => {
   localStorage.removeItem(KEY_REFRESH)
 }
 
+function getDefaultApiBaseUrl() {
+  if (typeof window === 'undefined') {
+    return `http://localhost:${DEFAULT_API_PORT}`
+  }
+
+  return `${window.location.protocol}//${window.location.hostname}:${DEFAULT_API_PORT}`
+}
+
+function getApiBaseUrl() {
+  if (import.meta.env.DEV) {
+    return '/api'
+  }
+
+  return import.meta.env.VITE_API_BASE_URL || getDefaultApiBaseUrl()
+}
+
 // Cliente Axios base para o backend AgentEscala
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json',
   },
