@@ -1,0 +1,11 @@
+profissional,data,dia_semana,hora_inicio,hora_fim,total_horas,observacoes,origem
+Alice Silva,01/03/2026,Domingo,08:00,20:00,12,Turno diurno padrão,Escala Mar/2026
+Bob Santos,01/03/2026,Domingo,20:00,08:00,12,Turno noturno padrão,Escala Mar/2026
+Alice Silva,02/03/2026,Segunda,08:00,20:00,12,,Escala Mar/2026
+Bob Santos,02/03/2026,Segunda,20:00,08:00,12,,Escala Mar/2026
+Alice Silva,03/03/2026,Terça,10:00,22:00,12,Turno alternativo,Escala Mar/2026
+Bob Santos,03/03/2026,Terça,20:00,08:00,12,,Escala Mar/2026
+Alice Silva,04/03/2026,Quarta,11:00,22:00,11,Exceção real,Escala Mar/2026
+Bob Santos,04/03/2026,Quarta,10:00,17:30,7.5,Exceção curta,Escala Mar/2026
+Alice Silva,05/03/2026,Quinta,13:30,22:00,8.5,Exceção entrada tarde,Escala Mar/2026
+Bob Santos,05/03/2026,Quinta,08:00,20:00,12,,Escala Mar/2026
