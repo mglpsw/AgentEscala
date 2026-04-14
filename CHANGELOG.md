@@ -1,5 +1,32 @@
 # Changelog
+
+## [1.0.0] - 2026-04-14 — Release 01
+
+### Features entregues
+
+- Autenticação JWT completa: login, refresh token automático e logout
+- Calendário real do médico com FullCalendar (mensal/semanal, locale pt-BR)
+- Lista de turnos com filtros por data e texto (tabela paginável)
+- Trocas de plantão: solicitação, listagem e cancelamento pelo médico
+- Painel admin de trocas pendentes: aprovação e rejeição com notas
+- UI de importação de escala: upload CSV/XLSX, revisão do staging linha a linha e confirmação criando turnos reais
+- Frontend React/Vite/Tailwind servido via FastAPI StaticFiles com fallback SPA
+- Pipeline de importação com staging, detecção de duplicatas e overlaps, confirmação atômica
+- Endpoint `/health` com status, timestamp e versão
+- Endpoint `/metrics` com métricas Prometheus (configurável por env)
+- 70 testes automatizados cobrindo auth, users, shifts, swaps e importação
+
+### Limitações conhecidas
+
+- Importação suporta apenas CSV e XLSX; PDF e OCR não estão no escopo desta versão
+- Revogação de refresh tokens é in-memory (limpa ao reiniciar o servidor)
+- Sem rate limiting no endpoint de login
+- Sem testes de frontend automatizados (E2E)
+
+---
+
 ## [1.2.0] - 2026-04-14
+
 ### Adicionado
 - Página /swaps implementada no frontend React:
 	- Listagem real de trocas do usuário logado
