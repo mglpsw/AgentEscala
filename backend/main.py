@@ -1,9 +1,12 @@
 import logging
 import time
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from .config.database import init_db
@@ -95,16 +98,6 @@ async def startup_event():
     init_db()
 
 
-@app.get("/", response_model=HealthResponse)
-async def root():
-    """Endpoint raiz"""
-    return {
-        "status": "ok",
-        "timestamp": datetime.utcnow(),
-        "version": settings.APP_VERSION
-    }
-
-
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Endpoint de verificação de saúde"""
@@ -136,3 +129,65 @@ async def api_info():
             "schedule_imports": "/schedule-imports",
         }
     }
+
+
+# ─── Frontend estático ───────────────────────────────────────────────────────
+# Serve o build do Vite quando frontend/dist existir.
+# Rotas da API já registradas acima têm precedência sobre o catch-all.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_frontend_logger = logging.getLogger("agentescala.frontend")
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
+if _FRONTEND_DIST.is_dir():
+    _frontend_logger.info("Servindo frontend buildado em %s", _FRONTEND_DIST)
+
+    # Assets Vite (JS/CSS com hash de conteúdo)
+    app.mount(
+        "/assets",
+        StaticFiles(directory=str(_FRONTEND_DIST / "assets")),
+        name="frontend_assets",
+    )
+
+    # Prefixos exclusivos da API — 404s nesses caminhos voltam como JSON normal.
+    # Qualquer outro caminho não-encontrado é tratado como rota SPA → index.html.
+    _API_PATH_PREFIXES = (
+        "/auth", "/users", "/shifts", "/swaps", "/schedule-imports",
+        "/health", "/metrics", "/docs", "/redoc", "/openapi", "/api",
+        "/assets",
+    )
+
+    @app.exception_handler(404)
+    async def spa_404_handler(request: Request, exc: Exception):
+        """Fallback SPA: serve index.html para rotas do React Router.
+
+        Rotas da API (ex.: /users/999 → "não encontrado") e assets estáticos
+        continuam retornando 404 JSON sem servir o frontend por engano.
+        """
+        from fastapi.responses import JSONResponse
+
+        path = request.url.path
+
+        # Caminhos de API ou assets — preserva o 404 no formato JSON padrão
+        if any(path.startswith(p) for p in _API_PATH_PREFIXES):
+            detail = getattr(exc, "detail", "Not found")
+            return JSONResponse({"detail": detail}, status_code=404)
+
+        # Arquivos estáticos na raiz do dist (favicon.ico, vite.svg, …)
+        candidate = _FRONTEND_DIST / path.lstrip("/")
+        try:
+            candidate.resolve().relative_to(_FRONTEND_DIST.resolve())
+            if candidate.is_file() and candidate.suffix != ".html":
+                return FileResponse(str(candidate))
+        except ValueError:
+            pass  # tentativa de path traversal — cai no fallback SPA
+
+        # Rota do React Router — entrega index.html para o cliente resolver
+        return FileResponse(str(_FRONTEND_DIST / "index.html"))
+
+else:
+    _frontend_logger.warning(
+        "Frontend não buildado: %s não encontrado. "
+        "Execute 'npm run build' dentro de frontend/ antes do deploy.",
+        _FRONTEND_DIST,
+    )

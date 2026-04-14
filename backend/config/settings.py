@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        # Ignora variáveis de infra do .env (ex.: portas Docker) não declaradas no Settings
+        extra = "ignore"
 
 
 settings = Settings()
