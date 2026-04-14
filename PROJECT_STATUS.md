@@ -1,28 +1,41 @@
 # Status do Projeto
 
-**Última atualização**: 2026-04-13
+**Última atualização**: 2026-04-14
 
 ## Visão geral
 
-AgentEscala é um sistema de gestão e troca de turnos que permite às equipes administrar escalas com um fluxo de aprovação obrigatória por administrador.
+AgentEscala é um sistema de gestão e troca de turnos que permite às equipes administrar escalas com um fluxo de aprovação obrigatória por administrador. Inclui importação estruturada de escala anterior via arquivo tabular.
 
-## Status atual: Backend endurecido e validado em runtime real no CT 102 ✅
+## Status atual: Importação de escala base implementada e validada em runtime real no CT 102 ✅
 
-O backend roda fim a fim com migrações automáticas, seed, exportações, fluxo de trocas, auth JWT mínima aplicada nos endpoints sensíveis, métricas simples e suíte mínima de testes. O deploy homelab foi ajustado para operar como stack isolado no CT 102, sem dependência de Traefik e sem impacto nos demais serviços Docker do host.
+O backend roda fim a fim com migrações automáticas, seed, exportações, fluxo de trocas, auth JWT mínima, métricas simples, backup/restore básicos e — nesta rodada — importação estruturada de escala anterior via CSV/XLSX com staging, normalização, validações de consistência e confirmação controlada.
 
-### Última validação (2026-04-13)
-- Suite mínima de regressão executada em container efêmero: `4 passed`
-- Runtime real validado no CT 102 com stack isolado: compose dedicado, seed, healthcheck, login, exports, swap e métricas OK
-- Auth JWT aplicada em usuários, turnos e trocas sensíveis; `requester_id` e `admin_id` removidos das rotas críticas
-- `docker-compose.yml` e `infra/docker-compose.homelab.yml` endurecidos com portas configuráveis, healthcheck do backend e suporte a bind seguro
-- `infra/docker-compose.homelab.yml` e script de deploy ajustados para NPM/manual proxy em `escalas.ks-sm.net:9443`, sem tocar em proxies existentes
-- Scripts de backup/restore adicionados com restore destrutivo protegido por confirmação explícita
-- Exemplo de scrape Prometheus e runbook operacional adicionados ao projeto
-- Backup real gerado e restore real validado em stack isolado do AgentEscala
-- Smoke local do modelo de reverse proxy validado com container efêmero Nginx, sem tocar no NPM real
-- Dependências atualizadas: `email-validator==2.2.0`, `python-multipart==0.0.24`, `prometheus-client==0.21.1`
+### Última validação (2026-04-14)
+- **29 testes** passando (25 novos de importação + 4 de regressão)
+- Runtime real validado no CT 102: stack subiu, migração `b3f1a2e4c8d0` rodou, importação e confirmação validadas via HTTP
+- Turnos noturnos (virada de dia), exceções reais e detecção de sobreposição funcionando corretamente
+- Relatório de inconsistências exportável via CSV
+- Rotas existentes (health, metrics, shifts, exports, swaps) intactas após a adição
 
 ## Funcionalidades implementadas
+
+### ✅ Importação de Escala Base (100%)
+- [x] Modelos de staging: ScheduleImport + ScheduleImportRow
+- [x] Migração Alembic para as novas tabelas
+- [x] Importação CSV (separadores , e ;) e XLSX via openpyxl
+- [x] Mapeamento flexível de colunas com aliases PT-BR e EN
+- [x] Normalização de turnos: padrões 08-20, 20-08 (overnight), 10-22
+- [x] Suporte a exceções reais: 11-22, 10-17:30, 13:30-22, etc.
+- [x] Detecção automática de virada de dia (end <= start)
+- [x] Matching de profissional por nome (exato e parcial, case-insensitive)
+- [x] Validações de consistência: data obrigatória, horas obrigatórias, duração coerente
+- [x] Detecção de duplicatas e sobreposições intra-lote
+- [x] Detecção de sobreposição com turnos existentes no DB (ao confirmar)
+- [x] Distinção entre erros fatais (INVALID) e não-fatais (WARNING)
+- [x] Endpoint de confirmação: staging → Shifts reais, idempotente (409 na segunda confirmação)
+- [x] Exportação de relatório de inconsistências em CSV
+- [x] Todos os endpoints protegidos com require_admin
+- [x] 25 testes automatizados cobrindo parsing, normalização e API
 
 ### ✅ Backend principal (100%)
 - [x] Estrutura FastAPI
@@ -118,9 +131,10 @@ O backend roda fim a fim com migrações automáticas, seed, exportações, flux
 - [x] Fluxo de trocas com aprovação funciona
 - [x] Endpoints sensíveis exigem JWT/papel correto
 - [x] Métricas simples expostas em /metrics
-- [x] Testes mínimos automatizados passam
+- [x] Testes mínimos automatizados passam (29 testes: 25 de importação + 4 de regressão)
 - [x] Backup e restore mínimo do banco podem ser executados
 - [x] Modelo de reverse proxy validado localmente sem alterar o NPM
+- [x] Importação de escala base via CSV/XLSX validada em runtime real
 
 ### 🟡 Requer ambiente homelab
 - [ ] Publicação final no NPM com certificado local/custom

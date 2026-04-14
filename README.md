@@ -5,6 +5,7 @@
 ## Funcionalidades
 
 - **Gestão de Turnos**: criar, atualizar e gerenciar turnos de trabalho para agentes
+- **Importação de Escala Base**: importar escala do mês anterior via CSV ou XLSX com normalização e validação automáticas
 - **Fluxo de Trocas**: solicitar e administrar trocas de turnos com aprovação obrigatória do administrador
 - **Exportação para Excel**: planilhas profissionais com formatação e metadados
 - **Exportação para ICS**: exportação iCalendar simples para integração com calendários
@@ -144,6 +145,32 @@ AgentEscala/
 - `POST /swaps/{id}/approve` - Aprovar troca (admin)
 - `POST /swaps/{id}/reject` - Rejeitar troca (admin)
 - `POST /swaps/{id}/cancel` - Cancelar troca (solicitante autenticado)
+
+### Importação de Escala Base (admin)
+- `POST /schedule-imports/` - Upload de arquivo CSV ou XLSX e processamento em staging
+- `GET /schedule-imports/` - Listar lotes de importação
+- `GET /schedule-imports/{id}` - Detalhe do lote com todas as linhas
+- `GET /schedule-imports/{id}/summary` - Resumo de contadores (válidas, alertas, inválidas, duplicatas)
+- `GET /schedule-imports/{id}/rows` - Listar linhas; filtrar por `?row_status=invalid|warning|valid`
+- `POST /schedule-imports/{id}/confirm` - Confirmar importação: converter linhas válidas em Shifts reais
+- `GET /schedule-imports/{id}/report` - Baixar CSV com inconsistências detectadas
+
+**Formato aceito no arquivo de importação:**
+
+| Campo | Obrigatório | Aliases aceitos |
+|-------|-------------|-----------------|
+| profissional | ✅ | professional, nome, agente |
+| data | ✅ | date, data_turno, shift_date |
+| hora_inicio | ✅ | start_time, inicio, start_hour |
+| hora_fim | ✅ | end_time, fim, end_hour |
+| total_horas | ❌ | horas, hours, duration |
+| observacoes | ❌ | obs, notes, observations |
+| origem | ❌ | source, fonte |
+| dia_semana | ❌ | ignorado, aceito para compatibilidade |
+
+Formatos de data aceitos: `DD/MM/YYYY`, `YYYY-MM-DD`, `DD-MM-YYYY`
+Formatos de hora aceitos: `HH:MM`, `HH:MM:SS`
+Separadores CSV aceitos: `,` e `;`
 
 ### Autenticação e observabilidade
 - `POST /auth/login` - Obter JWT

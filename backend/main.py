@@ -8,7 +8,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 
 from .config.database import init_db
 from .config.settings import settings
-from .api import users, shifts, swaps, auth
+from .api import users, shifts, swaps, auth, schedule_imports
 from .api.schemas import HealthResponse
 
 logging.basicConfig(
@@ -86,6 +86,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(shifts.router)
 app.include_router(swaps.router)
+app.include_router(schedule_imports.router)
 
 
 @app.on_event("startup")
@@ -131,6 +132,7 @@ async def api_info():
             "shifts": "/shifts",
             "swaps": "/swaps",
             "health": "/health",
-            "auth": "/auth"
+            "auth": "/auth",
+            "schedule_imports": "/schedule-imports",
         }
     }

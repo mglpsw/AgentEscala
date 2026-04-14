@@ -1,0 +1,11 @@
+profissional,data,dia_semana,hora_inicio,hora_fim,total_horas,observacoes,origem
+Alice Silva,01/03/2026,Domingo,08:00,20:00,12,Linha válida,Escala Mar/2026
+,01/03/2026,Domingo,08:00,20:00,12,Sem profissional,Escala Mar/2026
+Bob Santos,,Segunda,08:00,20:00,12,Sem data,Escala Mar/2026
+Alice Silva,32/13/2026,Terça,08:00,20:00,12,Data inválida,Escala Mar/2026
+Bob Santos,02/03/2026,Segunda,invalid,20:00,12,Hora inicio invalida,Escala Mar/2026
+Alice Silva,03/03/2026,Terça,20:00,08:00,12,Noturno válido,Escala Mar/2026
+Alice Silva,03/03/2026,Terça,20:00,08:00,12,Duplicata da linha anterior,Escala Mar/2026
+Bob Santos,04/03/2026,Quarta,08:00,20:00,12,Sobreposição inicio,Escala Mar/2026
+Bob Santos,04/03/2026,Quarta,10:00,22:00,12,Sobreposição com linha anterior,Escala Mar/2026
+Alice Silva,05/03/2026,Quinta,08:00,20:00,5,Horas divergentes,Escala Mar/2026

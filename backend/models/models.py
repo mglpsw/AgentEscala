@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -96,3 +96,89 @@ class SwapRequest(Base):
     origin_shift = relationship("Shift", back_populates="swap_requests_origin", foreign_keys=[origin_shift_id])
     target_shift = relationship("Shift", back_populates="swap_requests_target", foreign_keys=[target_shift_id])
     reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+
+# ─── Import Schedule ────────────────────────────────────
+
+class ImportStatus(str, enum.Enum):
+    """Status de um lote de importação de escala"""
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class RowStatus(str, enum.Enum):
+    """Status individual de uma linha importada"""
+    VALID = "valid"
+    WARNING = "warning"    # inconsistência não fatal – importável com ressalva
+    INVALID = "invalid"    # erro fatal – não pode ser importado
+
+
+class ScheduleImport(Base):
+    """Lote de importação de escala anterior"""
+    __tablename__ = "schedule_imports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String, nullable=False)
+    reference_period = Column(String, nullable=True)   # ex.: "2026-03" ou "Março 2026"
+    source_description = Column(String, nullable=True)
+    status = Column(SQLEnum(ImportStatus), default=ImportStatus.PENDING, nullable=False)
+
+    # Contadores de resumo
+    total_rows = Column(Integer, default=0, nullable=False)
+    valid_rows = Column(Integer, default=0, nullable=False)
+    warning_rows = Column(Integer, default=0, nullable=False)
+    invalid_rows = Column(Integer, default=0, nullable=False)
+    duplicate_rows = Column(Integer, default=0, nullable=False)
+
+    imported_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    confirmed_at = Column(DateTime, nullable=True)
+    confirmed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    rows = relationship("ScheduleImportRow", back_populates="schedule_import", cascade="all, delete-orphan")
+    importer = relationship("User", foreign_keys=[imported_by])
+    confirmer = relationship("User", foreign_keys=[confirmed_by])
+
+
+class ScheduleImportRow(Base):
+    """Linha individual de uma importação de escala (staging)"""
+    __tablename__ = "schedule_import_rows"
+
+    id = Column(Integer, primary_key=True, index=True)
+    import_id = Column(Integer, ForeignKey("schedule_imports.id"), nullable=False)
+    row_number = Column(Integer, nullable=False)
+
+    # Dados brutos do arquivo
+    raw_professional = Column(String, nullable=True)
+    raw_date = Column(String, nullable=True)
+    raw_start_time = Column(String, nullable=True)
+    raw_end_time = Column(String, nullable=True)
+    raw_total_hours = Column(String, nullable=True)
+    raw_observations = Column(String, nullable=True)
+    raw_source = Column(String, nullable=True)
+
+    # Dados normalizados
+    agent_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    normalized_start = Column(DateTime, nullable=True)
+    normalized_end = Column(DateTime, nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
+    is_overnight = Column(Boolean, default=False, nullable=False)
+    is_standard_shift = Column(Boolean, default=False, nullable=False)
+
+    # Diagnóstico
+    row_status = Column(SQLEnum(RowStatus), default=RowStatus.VALID, nullable=False)
+    issues = Column(Text, nullable=True)   # JSON: lista de strings descrevendo problemas
+    is_duplicate = Column(Boolean, default=False, nullable=False)
+    has_overlap = Column(Boolean, default=False, nullable=False)
+
+    # Shift criado após confirmação
+    created_shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    schedule_import = relationship("ScheduleImport", back_populates="rows")
+    agent = relationship("User", foreign_keys=[agent_id])
+    created_shift = relationship("Shift", foreign_keys=[created_shift_id])
