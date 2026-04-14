@@ -1,4 +1,4 @@
-# AgentEscala MVP Hardening & Validation - Resumo da Sessão
+# AgentEscala - Resumo da Sessão
 
 **Data:** 2026-04-13
 **Branch:** claude/validate-backend-functionality
@@ -17,7 +17,18 @@ Transformar o MVP do AgentEscala em um sistema pronto para produção, validado 
 - Observabilidade básica
 - Documentação honesta e atualizada
 
+
 ## Trabalho concluído ✅
+
+### 2026-04-14
+- Página /swaps do frontend implementada e validada:
+  - Listagem real de trocas do usuário logado
+  - Formulário funcional para solicitar nova troca
+  - Cancelamento de solicitações pendentes
+  - Estados de loading, erro e vazio
+  - Integração direta com backend FastAPI
+  - Componentes auxiliares: SwapCard, SwapForm
+  - Build e checklist de QA validados
 
 ### 1. Validação em runtime e correções de dependências
 **Status: ✅ Concluído**

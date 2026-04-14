@@ -10,8 +10,14 @@ AgentEscala é um sistema de gestão e troca de turnos que permite às equipes a
 
 O backend roda fim a fim com migrações automáticas, seed, exportações, fluxo de trocas, auth JWT mínima, métricas simples, backup/restore básicos e — nesta rodada — importação estruturada de escala anterior via CSV/XLSX com staging, normalização, validações de consistência e confirmação controlada.
 
+
 ### Última validação (2026-04-14)
-- **29 testes** passando (25 novos de importação + 4 de regressão)
+- **Frontend:** Página /swaps implementada e validada:
+   - Lista trocas reais do usuário logado
+   - Criação e cancelamento de trocas
+   - Estados de loading, erro e vazio
+   - Build e navegação validados
+- **Backend:** 29 testes passando (25 novos de importação + 4 de regressão)
 - Runtime real validado no CT 102: stack subiu, migração `b3f1a2e4c8d0` rodou, importação e confirmação validadas via HTTP
 - Turnos noturnos (virada de dia), exceções reais e detecção de sobreposição funcionando corretamente
 - Relatório de inconsistências exportável via CSV

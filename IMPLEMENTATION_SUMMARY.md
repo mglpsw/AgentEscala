@@ -4,7 +4,16 @@
 **Branch**: copilot/ct102-runtime-hardening
 **Status**: Backend endurecido, testado e validado em runtime real no CT 102 ✅
 
-**Correções desta sessão (2026-04-13)**:
+**Correções desta sessão (2026-04-14)**:
+- Implementada página /swaps no frontend React:
+	- Lista trocas reais do usuário logado
+	- Formulário funcional para solicitar nova troca
+	- Cancelamento de solicitações pendentes
+	- Estados de loading, erro e vazio
+	- Componentes auxiliares: SwapCard, SwapForm
+	- Integração direta com backend FastAPI
+	- Sem dependência da etapa E7
+	- Build validado e checklist de QA seguido
 - Auth mínima aplicada em endpoints sensíveis de usuários, turnos e trocas
 - `requester_id` e `admin_id` removidos das rotas críticas em favor do JWT autenticado
 - Logging de requisição e endpoint `/metrics` adicionados
@@ -19,7 +28,7 @@
 - Smoke local do modelo de reverse proxy validado com Nginx efêmero, sem tocar no NPM real
 - Publicação preparada para `escalas.ks-sm.net:9443` via NPM/manual proxy, sem tocar em proxies existentes
 
-**Correções anteriores (2026-04-13)**:
+**Correções anteriores:**
 - Migrações Alembic agora rodam automaticamente antes do app iniciar (compose local e homelab)
 - Scripts de seed/validação rodam sem erros após fixar `bcrypt==3.2.2`
 - Listagem de trocas e exportação Excel retornam todas as solicitações (não só pendentes)

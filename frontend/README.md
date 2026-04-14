@@ -1,8 +1,38 @@
-# React + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# Frontend AgentEscala (React + Vite)
 
-Currently, two official plugins are available:
+Este frontend implementa a interface web do AgentEscala, sistema de gestão de escalas médicas.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Funcionalidades
+
+- Login protegido por JWT
+- Página de calendário de turnos (/calendar)
+- Página de trocas (/swaps):
+	- Lista trocas reais do usuário logado
+	- Permite criar nova solicitação de troca
+	- Permite cancelar solicitações pendentes
+	- Estados de loading, erro e vazio
+- Integração com backend FastAPI via Axios
+- Layout responsivo com Tailwind CSS
+
+## Instalação e uso
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Acesse http://localhost:5173 (ou porta configurada pelo Vite).
+
+## Estrutura dos principais arquivos
+
+- `src/pages/swaps_page.jsx` — Página de trocas
+- `src/components/swap_card.jsx` — Card de exibição de troca
+- `src/components/swap_form.jsx` — Formulário de nova troca
+
+## Observações
+
+- Não depende da etapa E7 para funcionar
+- Não altera contratos do backend
+- Build validado com `npm run build`
