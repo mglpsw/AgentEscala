@@ -1,7 +1,7 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import PropTypes from 'prop-types'
 import api, { getAccessToken, getRefreshToken, setTokens, clearTokens } from '../api/client.js'
-
-export const AuthContext = createContext(null)
+import { AuthContext } from './auth_context_definition.js'
 
 // Provider de autenticação JWT — gerencia estado do usuário, login, logout e refresh automático
 export function AuthProvider({ children }) {
@@ -137,4 +137,8 @@ export function AuthProvider({ children }) {
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+AuthProvider.propTypes = {
+  children: PropTypes.node.isRequired,
 }

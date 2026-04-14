@@ -1,4 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom'
+import PropTypes from 'prop-types'
 import useAuth from '../hooks/use_auth.js'
 
 // Guarda de rota: verifica autenticação e papel do usuário antes de renderizar filhos
@@ -36,3 +37,7 @@ function ProtectedRoute({ requiredRole }) {
 }
 
 export default ProtectedRoute
+
+ProtectedRoute.propTypes = {
+  requiredRole: PropTypes.string,
+}
