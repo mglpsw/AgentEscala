@@ -47,6 +47,17 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Rejeita refresh tokens usados indevidamente como access tokens.
+    # Tokens emitidos antes desta versão (sem claim token_type) são aceitos
+    # como access tokens para garantir compatibilidade retroativa.
+    token_type = payload.get("token_type")
+    if token_type is not None and token_type != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Tipo de token inválido para autenticação",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     user_id: Optional[int] = payload.get("sub")
     if user_id is None:
         raise HTTPException(
