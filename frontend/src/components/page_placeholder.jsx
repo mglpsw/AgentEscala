@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types'
+
 // Componente reutilizável para páginas ainda não implementadas
 function PagePlaceholder({ title, description }) {
   return (
@@ -12,3 +14,8 @@ function PagePlaceholder({ title, description }) {
 }
 
 export default PagePlaceholder
+
+PagePlaceholder.propTypes = {
+  title: PropTypes.string.isRequired,
+  description: PropTypes.string.isRequired,
+}
