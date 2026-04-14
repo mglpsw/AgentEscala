@@ -1,0 +1,79 @@
+{
+  "hash": "7c09ef20",
+  "configHash": "6392a73e",
+  "lockfileHash": "eb3cb25f",
+  "browserHash": "3e5f1278",
+  "optimized": {
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "4a5f2364",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "0f7828bf",
+      "needsInterop": true
+    },
+    "react-router-dom": {
+      "src": "../../node_modules/react-router-dom/dist/index.mjs",
+      "file": "react-router-dom.js",
+      "fileHash": "c402d47d",
+      "needsInterop": false
+    },
+    "prop-types": {
+      "src": "../../node_modules/prop-types/index.js",
+      "file": "prop-types.js",
+      "fileHash": "b01fef35",
+      "needsInterop": true
+    },
+    "axios": {
+      "src": "../../node_modules/axios/index.js",
+      "file": "axios.js",
+      "fileHash": "11fae3e5",
+      "needsInterop": false
+    },
+    "@fullcalendar/react": {
+      "src": "../../node_modules/@fullcalendar/react/dist/index.js",
+      "file": "@fullcalendar_react.js",
+      "fileHash": "f0424eef",
+      "needsInterop": false
+    },
+    "@fullcalendar/daygrid": {
+      "src": "../../node_modules/@fullcalendar/daygrid/index.js",
+      "file": "@fullcalendar_daygrid.js",
+      "fileHash": "f21f3154",
+      "needsInterop": false
+    },
+    "@fullcalendar/timegrid": {
+      "src": "../../node_modules/@fullcalendar/timegrid/index.js",
+      "file": "@fullcalendar_timegrid.js",
+      "fileHash": "c249cd1d",
+      "needsInterop": false
+    },
+    "@fullcalendar/core/locales/pt-br": {
+      "src": "../../node_modules/@fullcalendar/core/locales/pt-br.js",
+      "file": "@fullcalendar_core_locales_pt-br.js",
+      "fileHash": "1be48c63",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-BNXIF6XT": {
+      "file": "chunk-BNXIF6XT.js"
+    },
+    "chunk-YYRMLG4V": {
+      "file": "chunk-YYRMLG4V.js"
+    },
+    "chunk-TNTPHDQH": {
+      "file": "chunk-TNTPHDQH.js"
+    },
+    "chunk-32E4H3EV": {
+      "file": "chunk-32E4H3EV.js"
+    },
+    "chunk-G3PMV62Z": {
+      "file": "chunk-G3PMV62Z.js"
+    }
+  }
+}

@@ -1,5 +1,22 @@
 # Changelog
+## [1.2.0] - 2026-04-14
+### Adicionado
+- Página /swaps implementada no frontend React:
+	- Listagem real de trocas do usuário logado
+	- Formulário funcional para solicitar nova troca
+	- Cancelamento de solicitações pendentes
+	- Estados de loading, erro e vazio
+	- Integração direta com backend FastAPI
+	- Componentes auxiliares: SwapCard, SwapForm
+- Nenhuma dependência com a etapa E7
+- Build e validação manual realizados com sucesso
 
+### Corrigido
+- Ajustes menores de documentação e validação de build
+
+### Observações
+- Não houve conflito com E7
+- Não houve alteração em backend, Docker ou contratos de API
 Este arquivo registra apenas mudanças relevantes para uso real do AgentEscala.
 
 Objetivo:

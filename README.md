@@ -6,7 +6,19 @@
 
 - **Gestão de Turnos**: criar, atualizar e gerenciar turnos de trabalho para agentes
 - **Importação de Escala Base**: importar escala do mês anterior via CSV ou XLSX com normalização e validação automáticas
-- **Fluxo de Trocas**: solicitar e administrar trocas de turnos com aprovação obrigatória do administrador
+- **Fluxo de Trocas**: solicitar, listar e cancelar trocas de turnos via interface web (/swaps), com aprovação obrigatória do administrador
+## Frontend
+
+O frontend React (Vite + Tailwind) inclui:
+- Login protegido por JWT
+- Página de calendário de turnos (/calendar)
+- Página de trocas (/swaps):
+   - Lista trocas reais do usuário logado
+   - Permite criar nova solicitação de troca
+   - Permite cancelar solicitações pendentes
+   - Estados de loading, erro e vazio
+
+Veja instruções detalhadas em [frontend/README.md](frontend/README.md).
 - **Exportação para Excel**: planilhas profissionais com formatação e metadados
 - **Exportação para ICS**: exportação iCalendar simples para integração com calendários
 - **API REST**: API RESTful completa construída com FastAPI
