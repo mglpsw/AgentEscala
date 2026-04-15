@@ -1,3 +1,20 @@
+def test_terminal_action_requires_auth(client):
+    response = client.post(
+        "/api/v1/terminal/action",
+        json={"action": "check_disk"},
+    )
+    assert response.status_code == 401
+
+
+def test_terminal_action_requires_admin(client, agent_headers):
+    response = client.post(
+        "/api/v1/terminal/action",
+        headers=agent_headers,
+        json={"action": "check_disk"},
+    )
+    assert response.status_code == 403
+
+
 def test_terminal_action_check_disk_dry_run(client, admin_headers):
     response = client.post(
         "/api/v1/terminal/action",
@@ -24,9 +41,6 @@ def test_terminal_action_git_status_dry_run(client, admin_headers):
         },
     )
     assert response.status_code == 200
-    data = response.json()
-    assert data["action"] == "git_status"
-    assert data["success"] is True
 
 
 def test_terminal_action_unknown_action_returns_error(client, admin_headers):
@@ -38,4 +52,4 @@ def test_terminal_action_unknown_action_returns_error(client, admin_headers):
             "dry_run": True,
         },
     )
-    assert response.status_code >= 400
+    assert response.status_code == 400

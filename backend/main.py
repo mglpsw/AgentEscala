@@ -3,7 +3,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi import Depends, FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,7 +14,9 @@ from .config.database import init_db
 from .config.settings import settings
 from .api import users, shifts, swaps, auth, schedule_imports
 from .api.schemas import HealthResponse
+from .models import User
 from .services.terminal_action_service import TerminalActionExecutor
+from .utils.dependencies import require_admin
 
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
@@ -144,7 +146,10 @@ async def api_info():
 
 
 @app.post("/api/v1/terminal/action")
-async def terminal_action(payload: TerminalActionPayload):
+async def terminal_action(
+    payload: TerminalActionPayload,
+    _: User = Depends(require_admin),
+):
     try:
         return action_executor.execute(
             action=payload.action,
