@@ -16,7 +16,7 @@ As próximas frentes são expansões sobre uma base já estável.
 - ORM: SQLAlchemy + Alembic (migrations automáticas no boot)
 - Auth: JWT (access token 24h, sem refresh ainda)
 - Frontend: React + Vite + Tailwind (servido via FastAPI StaticFiles)
-- Deploy: Docker Compose, homelab CT 102, domínio `escalas.ks-sm.net:9443`
+- Deploy: Docker Compose, homelab CT 102, domínio `escala.ks-sm.net:9443`
 
 **Estrutura do repositório:**
 ```
