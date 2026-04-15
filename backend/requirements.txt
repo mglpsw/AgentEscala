@@ -16,3 +16,4 @@ passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
 pytest==8.0.0
 prometheus-client==0.21.1
+slowapi==0.1.9
