@@ -1,9 +1,8 @@
 version: '3.8'
+
 services:
   db:
     image: postgres:15-alpine
-    env_file:
-      - /root/AgentEscala/.env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -20,13 +19,7 @@ services:
     restart: unless-stopped
 
   backend:
-    build:
-      context: /root/AgentEscala
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE_URL: https://api.ks-sm.net:9443
-    env_file:
-      - /root/AgentEscala/.env
+    image: ${AGENTESCALA_IMAGE}
     ports:
       - "${BACKEND_BIND_ADDRESS}:${BACKEND_HOST_PORT}:8030"
     environment:
