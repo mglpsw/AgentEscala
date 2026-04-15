@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_agentescala.db")
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ.setdefault("SECRET_KEY", "test-secret-key-with-32-characters")
-os.environ.setdefault("DEBUG", "false")
+os.environ["DEBUG"] = "false"
 os.environ.setdefault("CORS_ALLOW_ORIGINS", "http://localhost:3000")
 os.environ.setdefault("METRICS_ENABLED", "true")
 
@@ -21,6 +21,8 @@ from backend.config.database import Base, SessionLocal, engine
 from backend.main import app
 from backend.models import Shift, User, UserRole
 from backend.utils.auth import get_password_hash
+from backend.utils.rate_limiter import clear_rate_limits
+
 
 
 @pytest.fixture(autouse=True)
@@ -87,6 +89,9 @@ def reset_database():
         ]
         db.add_all(shifts)
         db.commit()
+
+        # limpa rate limiter entre testes para não interferir
+        clear_rate_limits()
 
         yield
     finally:

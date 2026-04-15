@@ -1,7 +1,7 @@
 """
 Endpoints de autenticação da API.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import timedelta
@@ -17,6 +17,7 @@ from ..utils.auth import (
 )
 from ..utils.dependencies import get_current_user
 from ..utils.token_store import revoke_refresh_token, is_refresh_token_revoked
+from ..utils.rate_limiter import rate_limit_login
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
@@ -63,7 +64,8 @@ class LogoutResponse(BaseModel):
 @router.post("/login", response_model=TokenResponse)
 async def login(
     login_data: LoginRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _rate_limit: None = Depends(rate_limit_login),
 ):
     """
     Autentica o usuário e retorna access token + refresh token.

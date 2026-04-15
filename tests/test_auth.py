@@ -15,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ.setdefault("SECRET_KEY", "test-secret-key-with-32-characters")
-os.environ.setdefault("DEBUG", "false")
+os.environ["DEBUG"] = "false"
 os.environ.setdefault("CORS_ALLOW_ORIGINS", "")
 os.environ.setdefault("METRICS_ENABLED", "true")
 
