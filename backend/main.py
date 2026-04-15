@@ -3,16 +3,20 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 
 from .config.database import init_db
 from .config.settings import settings
 from .api import users, shifts, swaps, auth, schedule_imports
 from .api.schemas import HealthResponse
+from .models import User
+from .services.terminal_action_service import TerminalActionExecutor
+from .utils.dependencies import require_admin
 
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
@@ -38,6 +42,16 @@ app = FastAPI(
     description="AgentEscala - Sistema de gestão e troca de turnos",
     debug=settings.DEBUG
 )
+
+action_executor = TerminalActionExecutor()
+
+
+class TerminalActionPayload(BaseModel):
+    action: str = Field(min_length=2, max_length=64)
+    params: dict = Field(default_factory=dict)
+    dry_run: bool = False
+    timeout_seconds: int = Field(default=20, ge=1, le=120)
+
 
 # Configura CORS
 app.add_middleware(
@@ -129,6 +143,22 @@ async def api_info():
             "schedule_imports": "/schedule-imports",
         }
     }
+
+
+@app.post("/api/v1/terminal/action")
+async def terminal_action(
+    payload: TerminalActionPayload,
+    _: User = Depends(require_admin),
+):
+    try:
+        return action_executor.execute(
+            action=payload.action,
+            params=payload.params,
+            timeout_seconds=payload.timeout_seconds,
+            dry_run=payload.dry_run,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ─── Frontend estático ───────────────────────────────────────────────────────
