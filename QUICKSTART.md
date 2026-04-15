@@ -52,6 +52,14 @@ Isso cria:
 - **Health Check**: http://localhost:8000/health
 - **Raiz da API**: http://localhost:8000
 
+Observação de uso: Atualmente o login e o calendário funcionam e trocas podem ser aceitas, porém algumas operações administrativas e de edição da escala não estão disponíveis na UI:
+
+- Criação/gestão de usuários não funciona pela UI.
+- Edição manual da escala e inclusão de plantões não estão operacionais.
+- Importação de XLSX só aceita formatos esperados; arquivos em formatos diferentes podem falhar.
+
+Use os endpoints da API como alternativa para operações administrativas até que as correções sejam aplicadas.
+
 ### 5. Teste rapidamente
 
 #### Obter token JWT

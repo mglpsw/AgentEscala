@@ -22,6 +22,9 @@
 - Revogação de refresh tokens é in-memory (limpa ao reiniciar o servidor)
 - Sem rate limiting no endpoint de login
 - Sem testes de frontend automatizados (E2E)
+- Operações administrativas limitadas: criação/gestão de usuários pela UI não está funcionando
+- Edição manual da escala e inclusão de plantões via frontend não estão operacionais
+- Importação de XLSX é sensível ao formato: arquivos que não seguem o template podem falhar; recomenda-se CSV ou usar o template fornecido
 
 ---
 

@@ -115,6 +115,16 @@ docker compose exec backend python -m backend.seed
 
 ## Trabalho pendente 🔄
 
+Problemas conhecidos identificados nesta sessão:
+
+- Login e calendário OK; trocas podem ser aceitas (aprovação/rejeição).
+- Impossível criar ou gerenciar usuários via UI.
+- Não é possível editar escalas ou incluir plantões manualmente via frontend.
+- Importação de XLSX falha para formatos não esperados; recomenda-se usar template/CSV.
+
+Prioridade: corrigir gestão de usuários e edição manual de turnos no próximo sprint.
+
+
 ### Alta prioridade
 
 #### 1. Proteção de endpoints

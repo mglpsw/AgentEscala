@@ -4,6 +4,16 @@
 **Branch**: copilot/ct102-runtime-hardening
 **Status**: Backend endurecido, testado e validado em runtime real no CT 102 ✅
 
+Problemas conhecidos:
+
+- Login e calendário funcionam, e aprovações de trocas podem ser realizadas.
+- Não é possível criar nem gerenciar usuários pela UI atualmente.
+- Não há suporte para editar escalas ou incluir plantões manualmente via frontend.
+- Importação de XLSX falha se o arquivo não seguir o formato esperado; recomenda-se usar o template fornecido ou CSV.
+
+Esses pontos estão documentados no PROJECT_STATUS e precisam de prioridade para o próximo sprint.
+
+
 **Correções desta sessão (2026-04-14)**:
 - Implementada página /swaps no frontend React:
 	- Lista trocas reais do usuário logado

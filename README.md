@@ -240,9 +240,16 @@ cd backend
 alembic upgrade head
 ```
 
-## Status
+## Status Atual
 
-Consulte [PROJECT_STATUS.md](PROJECT_STATUS.md) para o estado atual e o roadmap.
+O site está acessível sem erros de certificado; o login funciona e a página de calendário carrega corretamente. É possível aceitar solicitações de troca (aprovar/rejeitar). No entanto, há limitações operacionais atuais:
+
+- Não é possível criar ou gerenciar usuários via interface.
+- Não é possível alterar a escala existente através da UI (edições de turno não aplicadas).
+- Não é possível incluir manualmente plantões pelo frontend.
+- A importação de arquivos XLSX só funciona se o arquivo estiver no formato esperado; XLSX com formato diferente pode falhar.
+
+Consulte [PROJECT_STATUS.md](PROJECT_STATUS.md) para o estado detalhado, roadmap e ações pendentes.
 
 ## Documentação
 

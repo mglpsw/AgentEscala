@@ -334,6 +334,9 @@ tree -L 2 -I '__pycache__|*.pyc|.git'
 ## Limitações conhecidas (esperadas)
 
 - [ ] Autenticação não aplicada (login JWT disponível; endpoints ainda aceitam ids)
+- [ ] Criação/gestão de usuários via UI (não funcional)
+- [ ] Edição manual de escalas/ inclusão de plantões via UI (não funcional)
+- [ ] Importação de XLSX robusta para formatos variados (atualmente restrita ao template esperado)
 - [ ] Sem frontend (futuro)
 - [ ] Sem testes (futuro)
 - [ ] Sem notificações por e-mail (futuro)

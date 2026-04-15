@@ -6,7 +6,22 @@
 
 AgentEscala é um sistema de gestão e troca de turnos que permite às equipes administrar escalas com um fluxo de aprovação obrigatória por administrador. Inclui importação estruturada de escala anterior via arquivo tabular.
 
-## Status atual: Importação de escala base implementada e validada em runtime real no CT 102 ✅
+## Status atual
+
+Importação de escala base implementada e validada em runtime real no CT 102 ✅
+
+Observação operacional atual:
+
+- O site está acessível e o login na página de calendário funciona.
+- É possível aceitar solicitações de troca (admin pode aprovar/rejeitar).
+- Limitações atuais (ações pendentes):
+  - Criação e gestão de usuários via interface não estão funcionando.
+  - Alterações diretas na escala (editar/excluir/atribuir turnos) não estão disponíveis.
+  - Inclusão manual de plantões pelo frontend não está funcional.
+  - Importações de XLSX fora do formato esperado podem falhar; use o template ou CSV como alternativa.
+
+Ações recomendadas: implementar endpoints/UI para gerenciamento de usuários, habilitar edição manual de turnos e robustecer o parser de importação para formatos XLSX variantes.
+
 
 O backend roda fim a fim com migrações automáticas, seed, exportações, fluxo de trocas, auth JWT mínima, métricas simples, backup/restore básicos e — nesta rodada — importação estruturada de escala anterior via CSV/XLSX com staging, normalização, validações de consistência e confirmação controlada.
 
