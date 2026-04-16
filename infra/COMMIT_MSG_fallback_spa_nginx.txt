@@ -1,0 +1,7 @@
+docs: documenta ajuste de fallback SPA no nginx.conf do frontend (CT 102)
+
+- Corrige erro 404 em rotas SPA como /login servindo index.html do React.
+- Remove conflito de location / duplicado causado por include /etc/nginx/conf.d/*.conf.
+- Automatiza reload do Nginx e validação do fallback SPA.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
