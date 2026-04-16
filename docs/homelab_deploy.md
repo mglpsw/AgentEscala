@@ -5,15 +5,15 @@ Este guia explica como implantar o AgentEscala no CT 102 como stack Docker isola
 ## Pré-requisitos
 - Docker e Docker Compose instalados no host
 - Host CT 102 com acesso ao daemon Docker
-- Porta local livre para o backend do AgentEscala (ex.: `18000`)
+- Porta local livre para o backend do AgentEScala (ex.: `18000`)
 - Domínio `escalas.ks-sm.net` apontando para o proxy reverso/NPM existente na porta `9443`
 - Certificado local/custom/self-signed já preparado no NPM, se a publicação externa for habilitada
 
 ## Arquivos relevantes
 - `infra/docker-compose.homelab.yml`: stack do backend + banco com rede e volume isoláveis por ambiente
 - `infra/.env.homelab.example`: template de variáveis de ambiente
-- `infra/scripts/couple_to_homelab.sh`: script para validar e subir apenas o stack do AgentEscala
-- `infra/scripts/backup_postgres.sh`: backup manual do banco do AgentEscala
+- `infra/scripts/couple_to_homelab.sh`: script para validar e subir apenas o stack do AgentEScala
+- `infra/scripts/backup_postgres.sh`: backup manual do banco do AgentEScala
 - `infra/scripts/restore_postgres.sh`: restore destrutivo com confirmação explícita
 - `infra/scripts/plan_npm_publish.sh`: helper para planejar a publicação no NPM
 - `infra/examples/prometheus/agentescala-scrape.yml`: exemplo de scrape Prometheus
@@ -22,7 +22,7 @@ Este guia explica como implantar o AgentEscala no CT 102 como stack Docker isola
 - Não editar compose files de outros serviços do CT 102
 - Não reiniciar NPM, Nextcloud, OpenWebUI, AIOps ou qualquer outro stack
 - Não reaproveitar redes/volumes existentes sem confirmação explícita
-- Publicar o AgentEscala por bind local dedicado e proxy reverso manual, não por mudança global no host
+- Publicar o AgentEScala por bind local dedicado e proxy reverso manual, não por mudança global no host
 
 ## Passo a passo
 
@@ -44,7 +44,7 @@ nano .env.homelab
 ```bash
 ./scripts/couple_to_homelab.sh --build
 ```
-O script valida variáveis, verifica conflito de porta, valida o compose e sobe apenas o stack do AgentEscala. Se o `up` falhar, o rollback é restrito ao próprio stack do AgentEscala.
+O script valida variáveis, verifica conflito de porta, valida o compose e sobe apenas o stack do AgentEScala. Se o `up` falhar, o rollback é restrito ao próprio stack do AgentEScala.
 
 4. **Verificar status**
 ```bash
@@ -80,13 +80,13 @@ docker-compose -p agentescala -f docker-compose.homelab.yml exec backend \
 ## Publicação segura em `escalas.ks-sm.net:9443`
 
 ### Opção recomendada nesta fase
-- Suba o AgentEscala no CT 102 com `BACKEND_BIND_ADDRESS` local ou IP interno controlado e `BACKEND_HOST_PORT` dedicado
+- Suba o AgentEScala no CT 102 com `BACKEND_BIND_ADDRESS` local ou IP interno controlado e `BACKEND_HOST_PORT` dedicado
 - No NPM, crie um novo Proxy Host para `escalas.ks-sm.net`
 - Use certificado local/custom/self-signed
 - Não habilite Force SSL
 - Aponte o upstream para `http://IP_DO_CT102:BACKEND_HOST_PORT`
 
-O modelo de proxy reverso foi validado localmente com um container Nginx efêmero apontando para o bind do AgentEscala. O NPM real não foi alterado nesta rodada.
+O modelo de proxy reverso foi validado localmente com um container Nginx efêmero apontando para o bind do AgentEScala. O NPM real não foi alterado nesta rodada.
 
 ### Observação importante
 Se o NPM estiver em container separado, `127.0.0.1` não será acessível como upstream a partir dele. Nesse caso, ajuste `BACKEND_BIND_ADDRESS` para o IP LAN do CT 102 ou `0.0.0.0` após revisar o risco.
@@ -94,10 +94,28 @@ Se o NPM estiver em container separado, `127.0.0.1` não será acessível como u
 ### Caminho `/api` para futuro frontend
 Nesta rodada o escopo é apenas backend. A publicação mais simples e segura é expor o backend no host inteiro `escalas.ks-sm.net:9443`. Se um frontend separado for adicionado depois, mantenha o mesmo host e crie uma location `/api/` no NPM com rewrite para o backend, sem alterar a aplicação nesta etapa.
 
+### Verdade operacional: fallback SPA
+
+O frontend React é servido pelo backend FastAPI via StaticFiles, com fallback SPA já implementado no handler 404. Não há container nginx servindo o frontend. Se for necessário usar proxy reverso (Nginx, Traefik, NPM), configure fallback SPA no proxy também:
+
+```
+location / {
+    try_files $uri $uri/ /index.html;
+}
+```
+
+Se `/login` retornar 404, valide se o build do frontend está presente em `frontend/dist` no container backend.
+
+#### Validação rápida
+- `/`, `/login`, `/calendar`, `/swaps` → devem servir index.html
+- `/assets/vite.svg` → asset estático
+- `/health`, `/metrics` → JSON/texto do backend
+- `/users/me` → JSON ou 401
+
 ## Boas práticas
 - Usar senhas fortes e SECRET_KEY única
 - Restringir `CORS_ALLOW_ORIGINS` ao host publicado
 - Configurar backups do volume do PostgreSQL
 - Não reutilizar volume ou rede sem intenção explícita
 - Validar sempre com `--dry-run` antes do deploy real
-- Manter a mudança reversível: `docker-compose ... down` deve afetar apenas o stack do AgentEscala
+- Manter a mudança reversível: `docker-compose ... down` deve afetar apenas o stack do AgentEScala

@@ -122,7 +122,7 @@ Mensagem de tag sugerida:
 ## [0.1.0] - 2026-04-13
 
 ### Added
-- primeira base operacional do AgentEscala com compose próprio
+- primeira base operacional do AgentEScala com compose próprio
 - migrações automáticas antes do backend subir
 - seed e validação HTTP fim a fim do backend
 
@@ -132,3 +132,13 @@ Mensagem de tag sugerida:
 ### Fixed
 - rotas de exportação priorizadas corretamente
 - ajustes de runtime para execução consistente em host Docker compartilhado
+
+## [1.2.1] - 2026-04-16
+
+### Corrigido
+- Documentação operacional do fallback SPA: esclarece que o frontend React é servido pelo FastAPI via StaticFiles, com fallback SPA já implementado no handler 404.
+- Instruções de validação para rotas SPA, assets, health, métricas e API.
+- Alerta sobre necessidade de fallback SPA em proxies externos (Nginx, Traefik, NPM) se usados.
+
+### Observação
+- Nenhuma alteração de código; apenas documentação e validação operacional.
