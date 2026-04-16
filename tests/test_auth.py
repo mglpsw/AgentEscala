@@ -159,16 +159,16 @@ def test_refresh_apos_logout_retorna_401(client):
     assert "revogado" in refresh.json()["detail"].lower()
 
 
-def test_logout_com_token_invalido_retorna_401(client):
+def test_logout_com_token_invalido_retorna_200(client):
     response = client.post("/auth/logout", json={"refresh_token": "nao.e.um.token"})
-    assert response.status_code == 401
+    assert response.status_code == 200
 
 
-def test_logout_com_access_token_retorna_401(client):
-    """Logout deve rejeitar access token (exige refresh token)."""
+def test_logout_com_access_token_retorna_200(client):
+    """Logout com access token deve responder 200 sem efetivar revogação."""
     tokens = _login(client)
     response = client.post("/auth/logout", json={"refresh_token": tokens["access_token"]})
-    assert response.status_code == 401
+    assert response.status_code == 200
 
 
 # ---------------------------------------------------------------------------

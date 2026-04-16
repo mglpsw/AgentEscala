@@ -8,6 +8,9 @@ from ..config.database import Base
 class UserRole(str, enum.Enum):
     """Papéis de usuário no sistema"""
     ADMIN = "admin"
+    MEDICO = "medico"
+    FINANCEIRO = "financeiro"
+    # Legado para compatibilidade com dados antigos
     AGENT = "agent"
 
 

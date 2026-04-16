@@ -13,11 +13,19 @@ class UserService:
         email: str,
         name: str,
         password: str,
-        role: UserRole = UserRole.AGENT
+        role: UserRole = UserRole.MEDICO,
+        is_active: bool = True,
     ) -> User:
         """Criar um novo usuário"""
         hashed_password = get_password_hash(password)
-        user = User(email=email, name=name, hashed_password=hashed_password, role=role)
+        user = User(
+            email=email,
+            name=name,
+            hashed_password=hashed_password,
+            role=role,
+            is_admin=(role == UserRole.ADMIN),
+            is_active=is_active,
+        )
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -41,7 +49,10 @@ class UserService:
     @staticmethod
     def get_agents(db: Session) -> List[User]:
         """Listar todos os agentes ativos"""
-        return db.query(User).filter(User.role == UserRole.AGENT, User.is_active == True).all()
+        return db.query(User).filter(
+            User.role.in_([UserRole.MEDICO, UserRole.AGENT]),
+            User.is_active == True,  # noqa: E712
+        ).all()
 
     @staticmethod
     def get_admins(db: Session) -> List[User]:

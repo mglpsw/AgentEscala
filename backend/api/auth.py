@@ -1,7 +1,7 @@
 """
 Endpoints de autenticação da API.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import timedelta
@@ -53,7 +53,7 @@ class RefreshResponse(BaseModel):
 
 class LogoutRequest(BaseModel):
     """Modelo de requisição de logout"""
-    refresh_token: str
+    refresh_token: str | None = None
 
 
 class LogoutResponse(BaseModel):
@@ -218,16 +218,10 @@ async def logout(request: LogoutRequest):
         Mensagem de confirmação
     """
     token = request.refresh_token
-
-    # Valida minimamente antes de revogar (evita inserir lixo na blacklist)
-    payload = decode_token(token)
-    if payload is None or payload.get("token_type") != "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de logout inválido ou não é um refresh token",
-        )
-
-    revoke_refresh_token(token)
+    if token:
+        payload = decode_token(token)
+        if payload is not None and payload.get("token_type") == "refresh":
+            revoke_refresh_token(token)
 
     return {"message": "Logout realizado com sucesso"}
 
