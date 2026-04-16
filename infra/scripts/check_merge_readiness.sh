@@ -16,7 +16,7 @@ else
   echo "[OK] Nenhum arquivo em estado de merge pendente (index unmerged)."
 fi
 
-echo "\nProcurando marcadores de conflito (<<<<<<<, =======, >>>>>>>) em arquivos versionados..."
+printf "\nProcurando marcadores de conflito (<<<<<<<, =======, >>>>>>>) em arquivos versionados...\n"
 conflict_hits="$(git grep -n -E '^(<<<<<<<|=======|>>>>>>>)' -- . ':(exclude)package-lock.json' || true)"
 
 if [[ -n "$conflict_hits" ]]; then
@@ -28,8 +28,8 @@ else
 fi
 
 if [[ "$has_error" == true ]]; then
-  echo "\nResultado: FALHA — repositório não está pronto para merge."
+  printf "\nResultado: FALHA — repositório não está pronto para merge.\n"
   exit 1
 fi
 
-echo "\nResultado: SUCESSO — repositório pronto para merge (sem conflitos locais detectados)."
+printf "\nResultado: SUCESSO — repositório pronto para merge (sem conflitos locais detectados).\n"

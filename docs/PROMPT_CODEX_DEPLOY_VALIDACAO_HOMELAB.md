@@ -69,12 +69,18 @@ docker-compose -p agentescala -f docker-compose.homelab.yml ps
 docker-compose -p agentescala -f docker-compose.homelab.yml logs --tail=150 backend
 ```
 
+Depois valide endpoints locais:
+```bash
+curl -sSI http://127.0.0.1:18000/
+curl -sSI http://127.0.0.1:18000/health
+curl -sSI http://127.0.0.1:18000/metrics
+```
+
 Depois rode o checklist automatizado:
 ```bash
 ./infra/scripts/run_homelab_validation.sh --print-only
 ./infra/scripts/run_homelab_validation.sh --domain escala.ks-sm.net --public-port 9443 --local-base-url http://127.0.0.1:18000
 ```
-
 
 #### 5) Validação de roteamento NPM/OpenResty
 Descubra e valide config efetiva:
@@ -143,4 +149,3 @@ Responder nesta ordem:
 - Validação automatizada: `infra/scripts/run_homelab_validation.sh`
 - Operação: `docs/operations.md`
 - Backup/restore: `docs/backup_restore.md`
-

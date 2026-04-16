@@ -56,7 +56,7 @@ run_or_print() {
   if [[ "$PRINT_ONLY" == true ]]; then
     echo "$cmd"
   else
-    echo "\n$ $cmd"
+    printf "\n$ %s\n" "$cmd"
     bash -lc "$cmd" || true
   fi
 }
@@ -67,27 +67,27 @@ echo "Porta pública: $PUBLIC_PORT"
 echo "URL local: $LOCAL_BASE_URL"
 
 if [[ "$PRINT_ONLY" == true ]]; then
-  echo "\n[modo print-only]"
+  printf "\n[modo print-only]\n"
 fi
 
-echo "\n## 1) Baseline"
+printf "\n## 1) Baseline\n"
 run_or_print "hostnamectl"
 run_or_print "ip -br a"
 run_or_print "ip r"
 run_or_print "ss -lntp"
 
-echo "\n## 2) Saúde local"
+printf "\n## 2) Saúde local\n"
 run_or_print "curl -sSI ${LOCAL_BASE_URL}/"
 run_or_print "curl -sSI ${LOCAL_BASE_URL}/health"
 run_or_print "curl -sSI ${LOCAL_BASE_URL}/metrics"
 
-echo "\n## 3) DNS e TLS externo"
+printf "\n## 3) DNS e TLS externo\n"
 run_or_print "nslookup ${DOMAIN}"
 run_or_print "openssl s_client -connect ${DOMAIN}:${PUBLIC_PORT} -servername ${DOMAIN} </dev/null | head -n 40"
 run_or_print "curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/"
 run_or_print "curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/login"
 
-echo "\n## 4) NPM/OpenResty (se Docker disponível)"
+printf "\n## 4) NPM/OpenResty (se Docker disponível)\n"
 if command -v docker >/dev/null 2>&1; then
   run_or_print "docker ps --format 'table {{.Names}}\\t{{.Ports}}\\t{{.Image}}' | grep -Ei 'npm|nginx|openresty'"
   run_or_print "NPM_CONTAINER=\"\$(docker ps --format '{{.Names}}' | grep -Ei 'npm|nginx|openresty' | head -n1)\"; echo \"NPM_CONTAINER=\$NPM_CONTAINER\""
@@ -100,7 +100,7 @@ else
   echo "docker não encontrado; pulando inspeção de containers NPM/OpenResty."
 fi
 
-echo "\n## 5) Comandos de correção mínima sugerida (não executados automaticamente)"
+printf "\n## 5) Comandos de correção mínima sugerida (não executados automaticamente)\n"
 cat <<SUGGEST
 # Ajuste no NPM (UI):
 # - garantir host ${DOMAIN}
