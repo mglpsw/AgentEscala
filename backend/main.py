@@ -12,7 +12,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 
 from .config.database import init_db
 from .config.settings import settings
-from .api import users, shifts, swaps, auth, schedule_imports, medical_profiles, me
+from .api import users, shifts, swaps, auth, schedule_imports, medical_profiles, me, admin_schedule
 from .api.schemas import HealthResponse
 from .models import User
 from .services.terminal_action_service import TerminalActionExecutor
@@ -107,6 +107,7 @@ app.include_router(swaps.router)
 app.include_router(schedule_imports.router)
 app.include_router(medical_profiles.router)
 app.include_router(me.router)
+app.include_router(admin_schedule.router)
 
 
 @app.on_event("startup")
@@ -146,6 +147,7 @@ async def api_info():
             "schedule_imports": "/schedule-imports",
             "medical_profiles": "/api/v1/medical-profiles",
             "me": "/me",
+            "admin_schedule_validation": "/admin/schedule/validate",
         }
     }
 

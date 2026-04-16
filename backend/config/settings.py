@@ -1,6 +1,9 @@
+import os
 from typing import List
 
 from pydantic_settings import BaseSettings
+
+DEFAULT_DATABASE_URL = "sqlite:///./agentescala.db"
 
 
 class Settings(BaseSettings):
@@ -8,14 +11,17 @@ class Settings(BaseSettings):
 
     # Aplicação
     APP_NAME: str = "AgentEscala"
-    APP_VERSION: str = "1.2.0"
+    APP_VERSION: str = "1.3.0"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
     CORS_ALLOW_ORIGINS: str = ""
     METRICS_ENABLED: bool = True
 
+    SCHEDULE_MAX_DAILY_HOURS: float = 12.0
+    SCHEDULE_MAX_WEEKLY_HOURS: float = 60.0
+
     # Banco de dados
-    DATABASE_URL: str
+    DATABASE_URL: str = DEFAULT_DATABASE_URL
 
     # Segurança
     SECRET_KEY: str = "change-this-in-production"
@@ -31,6 +37,13 @@ class Settings(BaseSettings):
             for origin in self.CORS_ALLOW_ORIGINS.split(",")
             if origin.strip()
         ]
+
+    @property
+    def database_url_resolved(self) -> str:
+        """Retorna DATABASE_URL com fallback previsível para execução local."""
+        env_url = os.getenv("DATABASE_URL", "").strip()
+        configured = (self.DATABASE_URL or "").strip()
+        return env_url or configured or DEFAULT_DATABASE_URL
 
     class Config:
         env_file = ".env"

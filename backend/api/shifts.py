@@ -125,17 +125,20 @@ def create_shift(
     _: User = Depends(require_admin)
 ):
     """Criar um novo turno"""
-    return ShiftService.create_shift(
-        db,
-        shift.agent_id,
-        shift.start_time,
-        shift.end_time,
-        shift.title,
-        shift.description,
-        shift.location,
-        shift.user_id,
-        shift.legacy_agent_name,
-    )
+    try:
+        return ShiftService.create_shift(
+            db,
+            shift.agent_id,
+            shift.start_time,
+            shift.end_time,
+            shift.title,
+            shift.description,
+            shift.location,
+            shift.user_id,
+            shift.legacy_agent_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/", response_model=List[ShiftWithAgent])
@@ -305,7 +308,10 @@ def update_shift(
 ):
     """Atualizar um turno"""
     update_data = shift_update.model_dump(exclude_unset=True)
-    shift = ShiftService.update_shift(db, shift_id, **update_data)
+    try:
+        shift = ShiftService.update_shift(db, shift_id, **update_data)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if not shift:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Turno não encontrado")
     return shift

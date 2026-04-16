@@ -91,6 +91,27 @@ class ShiftWithAgent(ShiftResponse):
         from_attributes = True
 
 
+
+
+class ScheduleValidationShift(BaseModel):
+    shift_id: Optional[int] = None
+    agent_id: int
+    start_time: datetime
+    end_time: datetime
+    title: Optional[str] = None
+
+
+class ScheduleValidationRequest(BaseModel):
+    shifts: List[ScheduleValidationShift]
+    preview: bool = True
+
+
+class ScheduleValidationResponse(BaseModel):
+    valid: bool
+    preview: bool
+    errors: List[dict]
+    total_shifts: int
+
 class FinalScheduleRow(BaseModel):
     shift_id: int
     agent_id: int

@@ -3,6 +3,7 @@ from .shift_service import ShiftService
 from .schedule_presentation_service import SchedulePresentationService
 from .swap_service import SwapService
 from .user_service import UserService
+from .schedule_validation_service import validate_schedule, validate_shift
 
 __all__ = [
     "MedicalProfileService",
@@ -10,4 +11,6 @@ __all__ = [
     "ShiftService",
     "SwapService",
     "UserService",
+    "validate_schedule",
+    "validate_shift",
 ]

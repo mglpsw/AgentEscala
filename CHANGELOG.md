@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.3.1] - 2026-04-16 — Robustez operacional de migrations
+
+### Corrigido
+- fallback automático de `DATABASE_URL` para execução local previsível (`sqlite:///./agentescala.db`) quando variável não está definida.
+- resolução de URL no Alembic (`env.py`) padronizada com prioridade explícita: `DATABASE_URL` (env) → settings → ini → fallback.
+- documentação atualizada com fluxo sem configuração manual e exemplo de override por `DATABASE_URL`.
+
+## [1.3.0] - 2026-04-16 — Fase 3 concluída
+
+### Adicionado
+- validação de conflitos de plantão (sobreposição por usuário) antes de gravação via API e confirmação de importação.
+- validação de carga horária com limites configuráveis por dia e por semana (`SCHEDULE_MAX_DAILY_HOURS` e `SCHEDULE_MAX_WEEKLY_HOURS`).
+- validação centralizada e reutilizável com `validate_shift(shift)` e `validate_schedule(shifts)`.
+- endpoint administrativo `POST /admin/schedule/validate` para validar lotes em modo preview sem persistência.
+- base técnica para integração futura com OCR e AI, reaproveitando a mesma camada de validação.
+
+### Alterado
+- versionamento atualizado para `v1.3.0` em backend/frontend.
+
 ## [1.2.0] - 2026-04-16 — Fase 2 concluída
 
 ### Adicionado

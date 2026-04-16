@@ -1,4 +1,5 @@
 from logging.config import fileConfig
+import os
 import sys
 from pathlib import Path
 
@@ -13,14 +14,23 @@ sys.path.insert(0, app_path)
 
 # Importa models e settings
 from backend.config.database import Base
-from backend.config.settings import settings
+from backend.config.settings import DEFAULT_DATABASE_URL, settings
 from backend.models import models  # Import all models
 
 # Objeto de configuração do Alembic, que dá acesso aos valores do .ini em uso
 config = context.config
 
-# Sobrescreve sqlalchemy.url com o DATABASE_URL das configurações
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
+def _resolve_database_url() -> str:
+    """Resolve URL do banco priorizando env var e mantendo fallback previsível."""
+    env_url = os.getenv("DATABASE_URL", "").strip()
+    settings_url = (settings.DATABASE_URL or "").strip()
+    ini_url = (config.get_main_option("sqlalchemy.url") or "").strip()
+    return env_url or settings_url or ini_url or DEFAULT_DATABASE_URL
+
+
+# Sobrescreve sqlalchemy.url com a URL resolvida
+config.set_main_option("sqlalchemy.url", _resolve_database_url())
 
 # Interpreta o arquivo de configuração para logging do Python.
 # Esta linha basicamente configura os loggers.
@@ -30,6 +40,7 @@ if config.config_file_name is not None:
 # Adicione aqui o objeto MetaData do seu modelo
 # para suportar 'autogenerate'
 target_metadata = Base.metadata
+
 
 # Outros valores da configuração, definidos pelas necessidades do env.py,
 # podem ser obtidos:
