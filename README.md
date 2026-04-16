@@ -292,3 +292,37 @@ MIT License
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Verdade operacional: frontend SPA
+
+O frontend React é servido diretamente pelo backend FastAPI usando StaticFiles, com fallback SPA já implementado:
+- Qualquer rota desconhecida (ex: /login, /calendar, /swaps) retorna o index.html do React, permitindo navegação SPA.
+- Rotas de API, health, métricas e assets continuam retornando 404 JSON ou arquivos estáticos normalmente.
+- Não há container nginx servindo o frontend nem arquivo nginx.conf versionado.
+
+Se for necessário usar proxy reverso (Nginx, Traefik, NPM) na frente do backend, é obrigatório configurar fallback SPA também no proxy:
+
+```
+location / {
+    try_files $uri $uri/ /index.html;
+}
+```
+
+Se o build do frontend não estiver presente em `frontend/dist` no container backend, o fallback SPA não funcionará.
+
+### Validação
+
+Após subir o stack, valide:
+- `/` e `/login` servem o index.html do React
+- `/assets/vite.svg` retorna asset estático
+- `/health` e `/metrics` retornam JSON/texto do backend
+- `/users/me` (rota de API, requer auth) retorna JSON ou 401
+
+Exemplo:
+```bash
+curl -i http://localhost:8030/
+curl -i http://localhost:8030/login
+curl -i http://localhost:8030/assets/vite.svg
+curl -i http://localhost:8030/health
+curl -i http://localhost:8030/metrics
+```
