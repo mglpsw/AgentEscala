@@ -131,3 +131,16 @@ Use o script abaixo para executar (ou apenas imprimir) o checklist de validaçã
 ```
 
 O script cobre baseline de host, saúde local, DNS/TLS externo e inspeção NPM/OpenResty (quando Docker está disponível).
+
+
+## Verificação de conflitos antes do merge
+
+Antes de abrir/atualizar PR, execute:
+
+```bash
+./infra/scripts/check_merge_readiness.sh
+```
+
+Esse check falha se existir:
+- arquivo em estado de merge pendente (`git ls-files -u`);
+- marcador de conflito em arquivo versionado (`<<<<<<<`, `=======`, `>>>>>>>`).
