@@ -1,3 +1,10 @@
+from datetime import datetime, timedelta
+
+from backend.config.database import SessionLocal
+from backend.models import Shift, User, UserRole
+from backend.utils.auth import get_password_hash
+
+
 def test_healthcheck_is_public(client):
     response = client.get("/health")
 
@@ -91,3 +98,37 @@ def test_me_shifts_export_ics_works(client, agent_headers):
     assert response.status_code == 200
     assert "text/calendar" in response.headers["content-type"]
     assert b"BEGIN:VCALENDAR" in response.content
+
+
+def test_me_shifts_does_not_use_ambiguous_legacy_name_fallback(client, agent_headers):
+    db = SessionLocal()
+    try:
+        duplicate = User(
+            email="alice2@agentescala.com",
+            name="Alice Silva",
+            hashed_password=get_password_hash("password123"),
+            role=UserRole.AGENT,
+            is_active=True,
+        )
+        db.add(duplicate)
+        db.commit()
+        db.refresh(duplicate)
+
+        now = datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+        ambiguous_shift = Shift(
+            agent_id=duplicate.id,
+            user_id=None,
+            legacy_agent_name="Alice Silva",
+            start_time=now + timedelta(days=3, hours=8),
+            end_time=now + timedelta(days=3, hours=16),
+            title="Plantão legado ambíguo",
+        )
+        db.add(ambiguous_shift)
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get("/me/shifts", headers=agent_headers)
+    assert response.status_code == 200
+    titles = [shift["title"] for shift in response.json()]
+    assert "Plantão legado ambíguo" not in titles

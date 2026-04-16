@@ -16,6 +16,10 @@
 
 ### Compatibilidade legada
 - fallback temporário preservado para registros sem `user_id`, usando `agent_id` e, quando aplicável, `legacy_agent_name`.
+- fallback por `legacy_agent_name` bloqueia vínculo automático quando o nome do usuário é ambíguo (múltiplos usuários ativos com mesmo nome).
+
+### Correções
+- cadeia de migrations ajustada para execução em SQLite (testes) sem quebrar PostgreSQL.
 
 ## [1.1.0] - 2026-04-16 — Fase 1 concluída
 

@@ -57,13 +57,26 @@ class ShiftService:
         end_date: Optional[date] = None,
     ) -> List[Shift]:
         """Lista turnos do usuário logado, priorizando vínculo relacional."""
-        query = db.query(Shift).filter(
-            or_(
-                Shift.user_id == user_id,
-                and_(Shift.user_id.is_(None), Shift.agent_id == user_id),
-                and_(Shift.user_id.is_(None), Shift.legacy_agent_name == user_name),
-            )
+        has_unique_name = (
+            db.query(sa.func.count(User.id))
+            .filter(sa.func.lower(User.name) == user_name.strip().lower())
+            .scalar()
+            == 1
         )
+
+        criteria = [
+            Shift.user_id == user_id,
+            and_(Shift.user_id.is_(None), Shift.agent_id == user_id),
+        ]
+        if has_unique_name:
+            criteria.append(
+                and_(
+                    Shift.user_id.is_(None),
+                    sa.func.lower(Shift.legacy_agent_name) == user_name.strip().lower(),
+                )
+            )
+
+        query = db.query(Shift).filter(or_(*criteria))
 
         if start_date:
             query = query.filter(Shift.start_time >= datetime.combine(start_date, time.min))
@@ -142,11 +155,18 @@ class ShiftService:
         unresolved_user_link = [s.id for s in shifts if s.user_id is None and s.agent_id is None]
         legacy_name_only = [s.id for s in shifts if s.user_id is None and s.legacy_agent_name]
         no_link_data = [s.id for s in shifts if s.user_id is None and not s.legacy_agent_name]
-        ambiguous_names = (
+        ambiguous_legacy_names = (
             db.query(Shift.legacy_agent_name)
             .filter(Shift.user_id.is_(None), Shift.legacy_agent_name.isnot(None))
             .group_by(Shift.legacy_agent_name)
             .having(sa.func.count(Shift.id) > 1)
+            .all()
+        )
+        ambiguous_user_names = (
+            db.query(User.name)
+            .filter(User.is_active == True)  # noqa: E712
+            .group_by(User.name)
+            .having(sa.func.count(User.id) > 1)
             .all()
         )
         return {
@@ -155,6 +175,7 @@ class ShiftService:
             "legacy_name_only_shift_ids": legacy_name_only,
             "shifts_without_user_or_legacy_name": no_link_data,
             "shifts_without_any_relational_link": unresolved_user_link,
-            "ambiguous_legacy_names": [name for (name,) in ambiguous_names],
+            "ambiguous_legacy_names": [name for (name,) in ambiguous_legacy_names],
+            "ambiguous_user_names": [name for (name,) in ambiguous_user_names],
             "note": "Fallback por nome é temporário (legacy_agent_name). Priorize user_id.",
         }

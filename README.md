@@ -70,6 +70,7 @@ alembic upgrade head
 > Obrigatório para garantir schema atualizado (incluindo role de usuário).
 >
 > A Fase 2 adiciona migration de vínculo incremental em `shifts` (`user_id` + `legacy_agent_name`).
+> A cadeia de migrations também foi ajustada para validar em SQLite (ambiente de testes) e PostgreSQL.
 
 3. Popule o banco com dados de exemplo (senha padrão: `password123`):
 ```bash
@@ -203,6 +204,8 @@ Usuários comuns acessam apenas o próprio perfil por `/me`. Administradores pod
 - `GET /me` - Dados do usuário autenticado
 - `GET /me/shifts` - Plantões do usuário autenticado (`month=YYYY-MM` ou `start_date/end_date`)
 - `GET /me/shifts/export.ics` - Exportação ICS individual da própria escala
+
+> Compatibilidade legada: o fallback por nome (`legacy_agent_name`) é temporário e **não faz vínculo automático** quando há ambiguidade de nomes.
 
 ### Trocas
 - `POST /swaps/` - Criar solicitação de troca (usuário autenticado)
