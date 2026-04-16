@@ -5,6 +5,7 @@ import useAuth from '../hooks/use_auth.js'
 const nav_links = [
   { to: '/calendar', label: '📅 Calendário' },
   { to: '/shifts', label: '🕐 Turnos' },
+  { to: '/my-schedule', label: '👤 Minha Escala' },
   { to: '/swaps', label: '🔄 Trocas' },
   { to: '/swaps/pending', label: '⏳ Trocas Pendentes' },
   { to: '/import', label: '📥 Importar Escala' },

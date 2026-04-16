@@ -132,7 +132,9 @@ def create_shift(
         shift.end_time,
         shift.title,
         shift.description,
-        shift.location
+        shift.location,
+        shift.user_id,
+        shift.legacy_agent_name,
     )
 
 
@@ -270,6 +272,15 @@ def export_shifts_ics(
         limit,
     )
     return _build_shift_export_response(shifts, "ics", "full")
+
+
+@router.get("/consistency-report")
+def get_shift_consistency_report(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Resumo simples de consistência entre vínculo relacional e campos legados."""
+    return ShiftService.get_link_consistency_report(db)
 
 
 @router.get("/{shift_id}", response_model=ShiftWithAgent)

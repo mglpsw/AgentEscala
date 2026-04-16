@@ -4,6 +4,7 @@ import ProtectedRoute from '../components/protected_route.jsx'
 import LoginPage from '../pages/login_page.jsx'
 import CalendarPage from '../pages/calendar_page.jsx'
 import ShiftsPage from '../pages/shifts_page.jsx'
+import MySchedulePage from '../pages/my_schedule_page.jsx'
 import SwapsPage from '../pages/swaps_page.jsx'
 import PendingSwapsPage from '../pages/pending_swaps_page.jsx'
 import ImportPage from '../pages/import_page.jsx'
@@ -31,6 +32,7 @@ function AppRouter() {
           <Route element={<AppLayout />}>
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/shifts" element={<ShiftsPage />} />
+            <Route path="/my-schedule" element={<MySchedulePage />} />
             <Route path="/swaps" element={<SwapsPage />} />
           </Route>
         </Route>

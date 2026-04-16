@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.2.0] - 2026-04-16 — Fase 2 concluída
+
+### Adicionado
+- vínculo incremental de plantões com usuário via `shifts.user_id` (mantendo `agent_id` legado).
+- endpoint `GET /me` para dados do usuário autenticado.
+- endpoint `GET /me/shifts` para listar apenas plantões do usuário autenticado, com filtro simples por mês/período.
+- endpoint `GET /me/shifts/export.ics` para exportação ICS individual.
+- página frontend **Minha Escala** (`/my-schedule`) com lista própria, filtro por mês e botão **Exportar minha escala**.
+- relatório administrativo `GET /shifts/consistency-report` para mapear pendências de vínculo e ambiguidades legadas.
+
+### Alterado
+- versionamento atualizado para `v1.2.0` em frontend/backend.
+- documentação de endpoints e observações de compatibilidade legada por nome.
+
+### Compatibilidade legada
+- fallback temporário preservado para registros sem `user_id`, usando `agent_id` e, quando aplicável, `legacy_agent_name`.
+- fallback por `legacy_agent_name` bloqueia vínculo automático quando o nome do usuário é ambíguo (múltiplos usuários ativos com mesmo nome).
+
+### Correções
+- cadeia de migrations ajustada para execução em SQLite (testes) sem quebrar PostgreSQL.
+
 ## [1.1.0] - 2026-04-16 — Fase 1 concluída
 
 ### Adicionado
@@ -39,7 +60,7 @@
 
 ---
 
-## [1.2.0] - 2026-04-14
+## [1.1.1] - 2026-04-14
 
 ### Adicionado
 - Página /swaps implementada no frontend React:
