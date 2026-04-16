@@ -6,6 +6,8 @@ Fixtures de banco, client e headers vêm do conftest.py (autouse reset_database)
 """
 import pytest
 from fastapi.testclient import TestClient
+from io import BytesIO
+from openpyxl import load_workbook
 
 
 # ─── Fixture local ──────────────────────────────────────────────────────────
@@ -255,6 +257,79 @@ def test_listar_shifts_por_agente(client, agent_headers, admin_headers):
     shifts = resp.json()
     assert len(shifts) >= 1
     assert all(s["agent_id"] == alice_id for s in shifts)
+
+
+def test_final_schedule_retorna_campos_essenciais_para_frontend(client, agent_headers):
+    """GET /shifts/final-schedule entrega a linha já pronta para a tabela final."""
+    resp = client.get("/shifts/final-schedule", headers=agent_headers)
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert len(rows) >= 1
+
+    row = rows[0]
+    assert {
+        "shift_id",
+        "agent_id",
+        "display_name",
+        "professional_type",
+        "crm",
+        "crm_number",
+        "crm_uf",
+        "shift_start",
+        "shift_end",
+        "shift_period",
+    } <= row.keys()
+    assert row["display_name"]
+    assert row["professional_type"] == "Médico"
+    assert "/" in row["shift_period"]
+
+
+def test_export_excel_essential_gera_tabela_final_minima(client, agent_headers):
+    """view=essential exporta apenas Nome de escala, Tipo profissional, CRM e Plantão."""
+    resp = client.get("/shifts/export/excel?view=essential", headers=agent_headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert "escala_final.xlsx" in resp.headers["content-disposition"]
+
+    workbook = load_workbook(BytesIO(resp.content))
+    sheet = workbook["Escala Final"]
+    headers = [sheet.cell(row=1, column=col).value for col in range(1, 5)]
+    assert headers == ["Nome de escala", "Tipo de profissional", "CRM", "Plantão"]
+    assert sheet.cell(row=2, column=1).value
+    assert sheet.cell(row=2, column=2).value == "Médico"
+
+
+def test_export_padronizado_xlsx_essential_gera_tabela_final_minima(client, agent_headers):
+    """GET /shifts/export?format=xlsx&view=essential é o contrato padronizado."""
+    resp = client.get("/shifts/export?format=xlsx&view=essential", headers=agent_headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert "escala_final.xlsx" in resp.headers["content-disposition"]
+
+    workbook = load_workbook(BytesIO(resp.content))
+    sheet = workbook["Escala Final"]
+    headers = [sheet.cell(row=1, column=col).value for col in range(1, 5)]
+    assert headers == ["Nome de escala", "Tipo de profissional", "CRM", "Plantão"]
+
+
+def test_export_padronizado_ics_retorna_calendar(client, agent_headers):
+    """GET /shifts/export?format=ics exporta calendário pelo contrato padronizado."""
+    resp = client.get("/shifts/export?format=ics", headers=agent_headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/calendar")
+    assert "shifts.ics" in resp.headers["content-disposition"]
+    assert b"BEGIN:VCALENDAR" in resp.content
+
+
+def test_export_padronizado_recusa_ics_essential(client, agent_headers):
+    """view=essential é exclusiva da planilha xlsx."""
+    resp = client.get("/shifts/export?format=ics&view=essential", headers=agent_headers)
+    assert resp.status_code == 400
+    assert "xlsx" in resp.json()["detail"]
 
 
 def test_shift_inexistente_retorna_404(client, admin_headers):

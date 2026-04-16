@@ -64,6 +64,19 @@ class ShiftWithAgent(ShiftResponse):
         from_attributes = True
 
 
+class FinalScheduleRow(BaseModel):
+    shift_id: int
+    agent_id: int
+    display_name: str
+    professional_type: str
+    crm: str
+    crm_number: Optional[str] = None
+    crm_uf: Optional[str] = None
+    shift_start: datetime
+    shift_end: datetime
+    shift_period: str
+
+
 # Esquemas de SwapRequest
 class SwapRequestCreate(BaseModel):
     target_agent_id: int
