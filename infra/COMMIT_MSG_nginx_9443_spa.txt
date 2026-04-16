@@ -1,0 +1,7 @@
+docs: configura escala.ks-sm.net:9443 para servir SPA com fallback
+
+- Adiciona server block para porta 9443 com SSL e fallback SPA (index.html) para escala.ks-sm.net
+- Permite servir frontend React corretamente em ambiente seguro
+- Mantém configuração anterior para porta 80
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
