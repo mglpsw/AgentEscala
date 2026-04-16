@@ -2,6 +2,15 @@
 
 **AgentEscala** é um sistema profissional de gestão e troca de turnos criado para equipes que precisam organizar escalas de trabalho e administrar solicitações de troca com eficiência.
 
+## Visão geral do sistema
+
+O AgentEscala é composto por:
+- **Backend FastAPI** (API REST + autenticação JWT + regras de autorização por role).
+- **Frontend React/Vite** (login/logout, calendário, trocas e painel admin de usuários).
+- **PostgreSQL + Alembic** para persistência e versionamento de schema.
+
+Na **Fase 1 (Auth + Users)**, o sistema cobre login/logout, roles (`admin`, `medico`, `financeiro`) e CRUD administrativo de usuários via `/admin/users`.
+
 ## Funcionalidades
 
 - **Gestão de Turnos**: criar, atualizar e gerenciar turnos de trabalho para agentes
@@ -32,7 +41,7 @@ Veja instruções detalhadas em [frontend/README.md](frontend/README.md).
 - Docker e Docker Compose
 - Git
 
-### Desenvolvimento local
+### Desenvolvimento local (Docker)
 
 1. Clone o repositório:
 ```bash
@@ -50,7 +59,14 @@ Em um host Docker compartilhado, prefira portas isoladas:
 AGENTESCALA_BACKEND_HOST_PORT=18000 AGENTESCALA_DB_HOST_PORT=15432 docker-compose up -d
 ```
 
-As migrações do banco são aplicadas automaticamente antes de o backend iniciar.
+As migrações do banco são aplicadas automaticamente antes de o backend iniciar, mas em ambientes de desenvolvimento/recuperação você **deve** garantir manualmente:
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+> Obrigatório para garantir schema atualizado (incluindo role de usuário).
 
 3. Popule o banco com dados de exemplo (senha padrão: `password123`):
 ```bash
@@ -64,6 +80,23 @@ docker-compose exec backend python -m backend.seed
    - Métricas: http://localhost:8000/metrics
 
 Consulte [QUICKSTART.md](QUICKSTART.md) para instruções detalhadas.
+
+### Rodando backend e frontend separadamente (sem Docker)
+
+Backend:
+```bash
+pip install -r backend/requirements.txt
+cd backend
+alembic upgrade head
+uvicorn backend.main:app --reload
+```
+
+Frontend:
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
 ## Arquitetura
 
@@ -210,9 +243,26 @@ Separadores CSV aceitos: `,` e `;`
 
 ### Autenticação e observabilidade
 - `POST /auth/login` - Obter JWT
+- `POST /auth/logout` - Logout (revoga refresh token, quando informado)
 - `GET /auth/me` - Obter usuário autenticado
 - `GET /health` - Verificação de saúde
 - `GET /metrics` - Métricas Prometheus básicas
+
+## Fluxo de autenticação (Fase 1)
+
+1. **Login**: cliente envia credenciais para `POST /auth/login`.
+2. **Uso do token**: access token JWT é enviado no header `Authorization: Bearer <token>`.
+3. **Logout**: cliente chama `POST /auth/logout` e remove tokens locais.
+
+### Observação importante sobre logout
+
+O logout é **stateless para o access token JWT**: tokens de acesso já emitidos continuam válidos até expiração natural. O endpoint de logout atua na revogação de refresh token (quando enviado), mas não "mata" access token já distribuído.
+
+## Roles suportadas
+
+- `admin`: acesso administrativo completo (incluindo `/admin/users`).
+- `medico`: acesso de usuário autenticado sem permissões administrativas.
+- `financeiro`: acesso de usuário autenticado sem permissões administrativas.
 
 ## Implantação
 
@@ -264,11 +314,14 @@ cd backend
 alembic upgrade head
 ```
 
+Migração relevante da Fase 1:
+- `e1f9c7a3b2d1_add_medico_financeiro_roles.py` (enum de role com `MEDICO` e `FINANCEIRO`).
+
 ## Status Atual
 
 O site está acessível sem erros de certificado; o login funciona e a página de calendário carrega corretamente. É possível aceitar solicitações de troca (aprovar/rejeitar). No entanto, há limitações operacionais atuais:
 
-- Não é possível criar ou gerenciar usuários via interface.
+- Gestão administrativa de usuários disponível em `/admin/users` para role `admin`.
 - Não é possível alterar a escala existente através da UI (edições de turno não aplicadas).
 - Não é possível incluir manualmente plantões pelo frontend.
 - A importação de arquivos XLSX só funciona se o arquivo estiver no formato esperado; XLSX com formato diferente pode falhar.

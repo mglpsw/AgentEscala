@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.0] - 2026-04-16 — Fase 1 concluída
+
+### Adicionado
+- Login e logout com fluxo JWT no frontend/backend.
+- Roles simples de acesso: `admin`, `medico`, `financeiro`.
+- CRUD administrativo de usuários em `/admin/users`.
+- Página administrativa de usuários no frontend.
+
+### Observação
+- JWT de acesso permanece **stateless** no logout: token de acesso já emitido segue válido até expirar.
+
 ## [1.0.0] - 2026-04-14 — Release 01
 
 ### Features entregues
