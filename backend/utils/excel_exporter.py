@@ -1,6 +1,6 @@
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
-from typing import List
+from typing import Dict, List
 from io import BytesIO
 from datetime import datetime
 from ..models import Shift, User
@@ -108,6 +108,65 @@ class ExcelExporter:
         meta_ws.column_dimensions['B'].width = 30
 
         # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output
+
+    @staticmethod
+    def export_final_schedule(rows: List[Dict]) -> BytesIO:
+        """
+        Exportar a tabela final da escala com os campos essenciais.
+
+        Colunas mantidas de propósito para integração futura do frontend:
+        Nome de escala, Tipo de profissional, CRM e Plantão.
+        """
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Escala Final"
+
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+
+        headers = ["Nome de escala", "Tipo de profissional", "CRM", "Plantão"]
+        widths = [28, 24, 18, 34]
+
+        for index, width in enumerate(widths, 1):
+            ws.column_dimensions[chr(64 + index)].width = width
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+
+        for row_num, row in enumerate(rows, 2):
+            data = [
+                row["display_name"],
+                row["professional_type"],
+                row["crm"],
+                row["shift_period"],
+            ]
+            for col_num, value in enumerate(data, 1):
+                cell = ws.cell(row=row_num, column=col_num, value=value)
+                cell.alignment = Alignment(vertical="center")
+
+        meta_ws = wb.create_sheet("Metadados")
+        meta_ws['A1'] = "Data de exportação"
+        meta_ws['B1'] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        meta_ws['A2'] = "Total de linhas"
+        meta_ws['B2'] = len(rows)
+        meta_ws['A3'] = "Gerado por"
+        meta_ws['B3'] = "Sistema AgentEscala"
+        meta_ws['A4'] = "Formato"
+        meta_ws['B4'] = "Tabela final essencial"
+
+        for row in range(1, 5):
+            meta_ws[f'A{row}'].font = Font(bold=True)
+        meta_ws.column_dimensions['A'].width = 20
+        meta_ws.column_dimensions['B'].width = 30
+
         output = BytesIO()
         wb.save(output)
         output.seek(0)

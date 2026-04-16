@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from ..models import Shift, User
 
 
@@ -45,6 +45,33 @@ class ShiftService:
     def get_all_shifts(db: Session, skip: int = 0, limit: int = 100) -> List[Shift]:
         """Listar todos os turnos com paginação"""
         return db.query(Shift).offset(skip).limit(limit).all()
+
+    @staticmethod
+    def get_filtered_shifts(
+        db: Session,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        skip: int = 0,
+        limit: int = 1000,
+    ) -> List[Shift]:
+        """
+        Listar turnos para exportação com filtros opcionais por período.
+
+        A regra fica centralizada no serviço para garantir que JSON, Excel e ICS
+        exportem a mesma base de dados, com a mesma ordenação por início do turno.
+        """
+        query = db.query(Shift)
+
+        # O filtro usa start_time porque a escala final é organizada pela data de início do plantão.
+        if start_date:
+            query = query.filter(Shift.start_time >= datetime.combine(start_date, time.min))
+
+        if end_date:
+            # Usar limite exclusivo no dia seguinte inclui todos os horários do end_date.
+            exclusive_end = datetime.combine(end_date + timedelta(days=1), time.min)
+            query = query.filter(Shift.start_time < exclusive_end)
+
+        return query.order_by(Shift.start_time.asc()).offset(skip).limit(limit).all()
 
     @staticmethod
     def update_shift(

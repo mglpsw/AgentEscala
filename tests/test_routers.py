@@ -6,6 +6,8 @@ Fixtures de banco, client e headers vêm do conftest.py (autouse reset_database)
 """
 import pytest
 from fastapi.testclient import TestClient
+from io import BytesIO
+from openpyxl import load_workbook
 
 
 # ─── Fixture local ──────────────────────────────────────────────────────────
@@ -69,6 +71,30 @@ def _create_swap(client, agent_headers, admin_headers):
     )
     assert resp.status_code == 201
     return resp.json()
+
+
+def _create_shift_on_date(client, admin_headers, agent_id, date_value, title):
+    """Cria um turno em data controlada para testes de exportação."""
+    resp = client.post(
+        "/shifts/",
+        headers=admin_headers,
+        json={
+            "agent_id": agent_id,
+            "start_time": f"{date_value}T08:00:00",
+            "end_time": f"{date_value}T16:00:00",
+            "title": title,
+            "location": "PA Teste",
+        },
+    )
+    assert resp.status_code == 201
+    return resp.json()
+
+
+def _count_excel_data_rows(response_content):
+    """Conta linhas de dados da aba principal, desconsiderando o cabeçalho."""
+    workbook = load_workbook(BytesIO(response_content))
+    sheet = workbook["Escala Final"]
+    return max(sheet.max_row - 1, 0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -255,6 +281,160 @@ def test_listar_shifts_por_agente(client, agent_headers, admin_headers):
     shifts = resp.json()
     assert len(shifts) >= 1
     assert all(s["agent_id"] == alice_id for s in shifts)
+
+
+def test_final_schedule_retorna_campos_essenciais_para_frontend(client, agent_headers):
+    """GET /shifts/final-schedule entrega a linha já pronta para a tabela final."""
+    resp = client.get("/shifts/final-schedule", headers=agent_headers)
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert len(rows) >= 1
+
+    row = rows[0]
+    assert {
+        "shift_id",
+        "agent_id",
+        "display_name",
+        "professional_type",
+        "crm",
+        "crm_number",
+        "crm_uf",
+        "shift_start",
+        "shift_end",
+        "shift_period",
+    } <= row.keys()
+    assert row["display_name"]
+    assert row["professional_type"] == "Médico"
+    assert "/" in row["shift_period"]
+
+
+def test_export_excel_essential_gera_tabela_final_minima(client, agent_headers):
+    """view=essential exporta apenas Nome de escala, Tipo profissional, CRM e Plantão."""
+    resp = client.get("/shifts/export/excel?view=essential", headers=agent_headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert "escala_final.xlsx" in resp.headers["content-disposition"]
+
+    workbook = load_workbook(BytesIO(resp.content))
+    sheet = workbook["Escala Final"]
+    headers = [sheet.cell(row=1, column=col).value for col in range(1, 5)]
+    assert headers == ["Nome de escala", "Tipo de profissional", "CRM", "Plantão"]
+    assert sheet.cell(row=2, column=1).value
+    assert sheet.cell(row=2, column=2).value == "Médico"
+
+
+def test_export_padronizado_xlsx_essential_gera_tabela_final_minima(client, agent_headers):
+    """GET /shifts/export?format=xlsx&view=essential é o contrato padronizado."""
+    resp = client.get("/shifts/export?format=xlsx&view=essential", headers=agent_headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert "escala_final.xlsx" in resp.headers["content-disposition"]
+
+    workbook = load_workbook(BytesIO(resp.content))
+    sheet = workbook["Escala Final"]
+    headers = [sheet.cell(row=1, column=col).value for col in range(1, 5)]
+    assert headers == ["Nome de escala", "Tipo de profissional", "CRM", "Plantão"]
+
+
+def test_export_padronizado_ics_retorna_calendar(client, agent_headers):
+    """GET /shifts/export?format=ics exporta calendário pelo contrato padronizado."""
+    resp = client.get("/shifts/export?format=ics", headers=agent_headers)
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/calendar")
+    assert "shifts.ics" in resp.headers["content-disposition"]
+    assert b"BEGIN:VCALENDAR" in resp.content
+
+
+def test_export_padronizado_recusa_ics_essential(client, agent_headers):
+    """view=essential é exclusiva da planilha xlsx."""
+    resp = client.get("/shifts/export?format=ics&view=essential", headers=agent_headers)
+    assert resp.status_code == 400
+    assert "xlsx" in resp.json()["detail"]
+
+
+def test_export_final_json_filtra_por_periodo(client, admin_headers, agent_headers):
+    """Filtro por período retorna apenas turnos com start_time dentro do intervalo."""
+    alice_id = _user_id(client, admin_headers, "alice@agentescala.com")
+    _create_shift_on_date(client, admin_headers, alice_id, "2030-01-10", "Plantão Janeiro 10")
+    _create_shift_on_date(client, admin_headers, alice_id, "2030-01-11", "Plantão Janeiro 11")
+    _create_shift_on_date(client, admin_headers, alice_id, "2030-02-01", "Plantão Fevereiro")
+
+    resp = client.get(
+        "/shifts/export/final/json?start_date=2030-01-10&end_date=2030-01-11",
+        headers=agent_headers,
+    )
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["metadata"]["total"] == 2
+    assert data["metadata"]["filters"] == {
+        "start_date": "2030-01-10",
+        "end_date": "2030-01-11",
+    }
+    periods = [shift["shift_period"] for shift in data["shifts"]]
+    assert periods == sorted(periods)
+    assert all("2030" in period for period in periods)
+
+
+def test_export_final_json_intervalo_sem_resultados_retorna_lista_vazia(client, agent_headers):
+    """Intervalo sem turnos retorna payload válido com lista vazia."""
+    resp = client.get(
+        "/shifts/export/final/json?start_date=2099-01-01&end_date=2099-01-31",
+        headers=agent_headers,
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["shifts"] == []
+    assert data["metadata"]["total"] == 0
+
+
+def test_export_final_json_data_invalida_retorna_400(client, agent_headers):
+    """Datas fora do formato YYYY-MM-DD são recusadas com mensagem padronizada."""
+    resp = client.get(
+        "/shifts/export/final/json?start_date=01-01-2030&end_date=2030-01-31",
+        headers=agent_headers,
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Formato de data inválido. Use YYYY-MM-DD."
+
+
+def test_export_final_json_start_date_maior_que_end_date_retorna_400(client, agent_headers):
+    """A data inicial não pode ser posterior à data final."""
+    resp = client.get(
+        "/shifts/export/final/json?start_date=2030-02-01&end_date=2030-01-01",
+        headers=agent_headers,
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Data inicial não pode ser maior que a data final."
+
+
+def test_export_final_json_sem_autenticacao_retorna_401(client):
+    """Exportação JSON exige autenticação como os demais endpoints de escala."""
+    resp = client.get("/shifts/export/final/json")
+    assert resp.status_code == 401
+
+
+def test_export_final_json_e_excel_usam_mesma_base_filtrada(client, admin_headers, agent_headers):
+    """JSON e Excel compartilham filtros e fonte de dados via ShiftService."""
+    alice_id = _user_id(client, admin_headers, "alice@agentescala.com")
+    _create_shift_on_date(client, admin_headers, alice_id, "2031-03-10", "Plantão Março 10")
+    _create_shift_on_date(client, admin_headers, alice_id, "2031-03-11", "Plantão Março 11")
+    _create_shift_on_date(client, admin_headers, alice_id, "2031-04-01", "Plantão Abril")
+
+    query = "start_date=2031-03-01&end_date=2031-03-31"
+    json_resp = client.get(f"/shifts/export/final/json?{query}", headers=agent_headers)
+    excel_resp = client.get(
+        f"/shifts/export?format=xlsx&view=essential&{query}",
+        headers=agent_headers,
+    )
+
+    assert json_resp.status_code == 200
+    assert excel_resp.status_code == 200
+    assert json_resp.json()["metadata"]["total"] == _count_excel_data_rows(excel_resp.content)
 
 
 def test_shift_inexistente_retorna_404(client, admin_headers):
