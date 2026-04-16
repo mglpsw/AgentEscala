@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
-from datetime import datetime
+from typing import List, Optional
+from datetime import date, datetime
 from ..models import UserRole, SwapStatus
 
 
@@ -75,6 +75,22 @@ class FinalScheduleRow(BaseModel):
     shift_start: datetime
     shift_end: datetime
     shift_period: str
+
+
+class FinalScheduleFilters(BaseModel):
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+
+
+class FinalScheduleMetadata(BaseModel):
+    total: int
+    generated_at: datetime
+    filters: FinalScheduleFilters
+
+
+class FinalScheduleExportResponse(BaseModel):
+    shifts: List[FinalScheduleRow]
+    metadata: FinalScheduleMetadata
 
 
 # Esquemas de SwapRequest
