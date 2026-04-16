@@ -17,7 +17,21 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-    role: UserRole = UserRole.AGENT
+    role: UserRole = UserRole.MEDICO
+
+
+class AdminUserCreate(UserBase):
+    password: str = Field(min_length=6)
+    role: UserRole
+    is_active: bool = True
+
+
+class AdminUserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    name: Optional[str] = None
+    password: Optional[str] = Field(default=None, min_length=6)
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
 
 
 class UserResponse(UserBase):

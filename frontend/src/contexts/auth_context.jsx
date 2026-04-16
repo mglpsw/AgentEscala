@@ -13,18 +13,15 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(async () => {
     const refreshToken = getRefreshToken()
-    clearTokens()
-    setUser(null)
     if (refreshToken) {
       try {
-        await api.post('/auth/logout', null, {
-          headers: { Authorization: `Bearer ${refreshToken}` },
-          _skipAuthRetry: true,
-        })
+        await api.post('/auth/logout', { refresh_token: refreshToken }, { _skipAuthRetry: true })
       } catch {
         // silencia erro no logout — tokens já foram limpos localmente
       }
     }
+    clearTokens()
+    setUser(null)
   }, [])
 
   // Busca dados do usuário autenticado usando o access_token atual
