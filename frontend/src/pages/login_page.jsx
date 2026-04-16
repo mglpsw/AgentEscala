@@ -94,7 +94,7 @@ function LoginPage() {
         </form>
 
         <div className="mt-6 text-center">
-          <p className="text-xs text-gray-400">v1.1.0 • @mglpsw</p>
+          <p className="text-xs text-gray-400">v1.2.0 • @mglpsw</p>
         </div>
       </div>
     </div>

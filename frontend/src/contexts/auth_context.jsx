@@ -26,7 +26,7 @@ export function AuthProvider({ children }) {
 
   // Busca dados do usuário autenticado usando o access_token atual
   const fetchCurrentUser = useCallback(async () => {
-    const { data } = await api.get('/auth/me')
+    const { data } = await api.get('/me')
     setUser(data)
     return data
   }, [])

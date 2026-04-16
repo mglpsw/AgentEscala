@@ -9,13 +9,14 @@ O AgentEscala é composto por:
 - **Frontend React/Vite** (login/logout, calendário, trocas e painel admin de usuários).
 - **PostgreSQL + Alembic** para persistência e versionamento de schema.
 
-Na **Fase 1 (Auth + Users)**, o sistema cobre login/logout, roles (`admin`, `medico`, `financeiro`) e CRUD administrativo de usuários via `/admin/users`.
+Na **Fase 2 (Minha Escala + vínculo usuário↔plantão)**, o sistema cobre login/logout, roles (`admin`, `medico`, `financeiro`), CRUD administrativo de usuários via `/admin/users`, endpoint do usuário autenticado (`/me`) e visão individual da escala.
 
 ## Funcionalidades
 
 - **Gestão de Turnos**: criar, atualizar e gerenciar turnos de trabalho para agentes
 - **Importação de Escala Base**: importar escala do mês anterior via CSV ou XLSX com normalização e validação automáticas
 - **Fluxo de Trocas**: solicitar, listar e cancelar trocas de turnos via interface web (/swaps), com aprovação obrigatória do administrador
+- **Minha Escala**: página `/my-schedule` para o usuário autenticado visualizar e exportar apenas seus próprios plantões
 ## Frontend
 
 O frontend React (Vite + Tailwind) inclui:
@@ -67,6 +68,8 @@ alembic upgrade head
 ```
 
 > Obrigatório para garantir schema atualizado (incluindo role de usuário).
+>
+> A Fase 2 adiciona migration de vínculo incremental em `shifts` (`user_id` + `legacy_agent_name`).
 
 3. Popule o banco com dados de exemplo (senha padrão: `password123`):
 ```bash
@@ -194,6 +197,12 @@ Usuários comuns acessam apenas o próprio perfil por `/me`. Administradores pod
 - `PATCH /shifts/{id}` - Atualizar turno (admin)
 - `DELETE /shifts/{id}` - Excluir turno (admin)
 - `GET /shifts/{id}/export/ics` - Exportar turno individual para ICS (autenticado)
+- `GET /shifts/consistency-report` - Relatório administrativo de consistência de vínculo usuário↔plantão
+
+### Usuário autenticado
+- `GET /me` - Dados do usuário autenticado
+- `GET /me/shifts` - Plantões do usuário autenticado (`month=YYYY-MM` ou `start_date/end_date`)
+- `GET /me/shifts/export.ics` - Exportação ICS individual da própria escala
 
 ### Trocas
 - `POST /swaps/` - Criar solicitação de troca (usuário autenticado)

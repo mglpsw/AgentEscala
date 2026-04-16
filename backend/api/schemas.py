@@ -57,19 +57,26 @@ class ShiftBase(BaseModel):
 
 class ShiftCreate(ShiftBase):
     agent_id: int
+    user_id: Optional[int] = None
+    legacy_agent_name: Optional[str] = None
 
 
 class ShiftUpdate(BaseModel):
+    agent_id: Optional[int] = None
+    user_id: Optional[int] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     title: Optional[str] = None
     description: Optional[str] = None
     location: Optional[str] = None
+    legacy_agent_name: Optional[str] = None
 
 
 class ShiftResponse(ShiftBase):
     id: int
     agent_id: int
+    user_id: Optional[int] = None
+    legacy_agent_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

@@ -509,6 +509,8 @@ def confirm_import(
 
         shift = Shift(
             agent_id=row.agent_id,
+            user_id=row.agent_id,
+            legacy_agent_name=row.raw_professional,
             start_time=row.normalized_start,
             end_time=row.normalized_end,
             title="Turno importado",

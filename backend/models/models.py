@@ -123,6 +123,8 @@ class Shift(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     agent_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    legacy_agent_name = Column(String, nullable=True)
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=False)
     title = Column(String, default="Turno de trabalho")
@@ -133,6 +135,7 @@ class Shift(Base):
 
     # Relacionamentos
     agent = relationship("User", back_populates="shifts", foreign_keys=[agent_id])
+    user = relationship("User", foreign_keys=[user_id])
     swap_requests_origin = relationship(
         "SwapRequest",
         back_populates="origin_shift",

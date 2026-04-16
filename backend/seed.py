@@ -70,6 +70,7 @@ def seed_database():
             morning_agent = agents[day % len(agents)]
             morning_shift = Shift(
                 agent_id=morning_agent.id,
+                user_id=morning_agent.id,
                 start_time=current_date.replace(hour=8, minute=0, second=0, microsecond=0),
                 end_time=current_date.replace(hour=16, minute=0, second=0, microsecond=0),
                 title="Turno da Manhã",
@@ -83,6 +84,7 @@ def seed_database():
             afternoon_agent = agents[(day + 1) % len(agents)]
             afternoon_shift = Shift(
                 agent_id=afternoon_agent.id,
+                user_id=afternoon_agent.id,
                 start_time=current_date.replace(hour=16, minute=0, second=0, microsecond=0),
                 end_time=(current_date + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0),
                 title="Turno da Tarde",
@@ -96,6 +98,7 @@ def seed_database():
             night_agent = agents[(day + 2) % len(agents)]
             night_shift = Shift(
                 agent_id=night_agent.id,
+                user_id=night_agent.id,
                 start_time=(current_date + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0),
                 end_time=(current_date + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0),
                 title="Turno da Noite",

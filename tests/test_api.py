@@ -73,3 +73,21 @@ def test_swap_flow_requires_authenticated_requester_and_admin_approval(
     assert updated_target_shift.status_code == 200
     assert updated_origin_shift.json()["agent_id"] == target_shift["agent_id"]
     assert updated_target_shift.json()["agent_id"] == origin_shift["agent_id"]
+
+
+def test_me_endpoints_return_authenticated_user_and_only_user_shifts(client, agent_headers):
+    me_response = client.get("/me", headers=agent_headers)
+    assert me_response.status_code == 200
+    assert me_response.json()["email"] == "alice@agentescala.com"
+
+    shifts_response = client.get("/me/shifts", headers=agent_headers)
+    assert shifts_response.status_code == 200
+    shift_agent_ids = {shift["agent_id"] for shift in shifts_response.json()}
+    assert shift_agent_ids == {me_response.json()["id"]}
+
+
+def test_me_shifts_export_ics_works(client, agent_headers):
+    response = client.get("/me/shifts/export.ics", headers=agent_headers)
+    assert response.status_code == 200
+    assert "text/calendar" in response.headers["content-type"]
+    assert b"BEGIN:VCALENDAR" in response.content
