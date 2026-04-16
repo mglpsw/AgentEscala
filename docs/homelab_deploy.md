@@ -119,3 +119,15 @@ Se `/login` retornar 404, valide se o build do frontend está presente em `front
 - Não reutilizar volume ou rede sem intenção explícita
 - Validar sempre com `--dry-run` antes do deploy real
 - Manter a mudança reversível: `docker-compose ... down` deve afetar apenas o stack do AgentEScala
+
+
+## Validação rápida automatizada
+
+Use o script abaixo para executar (ou apenas imprimir) o checklist de validação de deploy/roteamento:
+
+```bash
+./infra/scripts/run_homelab_validation.sh --print-only
+./infra/scripts/run_homelab_validation.sh --domain escala.ks-sm.net --public-port 9443 --local-base-url http://127.0.0.1:18000
+```
+
+O script cobre baseline de host, saúde local, DNS/TLS externo e inspeção NPM/OpenResty (quando Docker está disponível).
