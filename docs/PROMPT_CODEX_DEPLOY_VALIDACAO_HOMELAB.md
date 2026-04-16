@@ -76,6 +76,12 @@ curl -sSI http://127.0.0.1:18000/health
 curl -sSI http://127.0.0.1:18000/metrics
 ```
 
+Depois rode o checklist automatizado:
+```bash
+./infra/scripts/run_homelab_validation.sh --print-only
+./infra/scripts/run_homelab_validation.sh --domain escala.ks-sm.net --public-port 9443 --local-base-url http://127.0.0.1:18000
+```
+
 #### 5) Validação de roteamento NPM/OpenResty
 Descubra e valide config efetiva:
 ```bash
@@ -140,6 +146,6 @@ Responder nesta ordem:
 - Guia atual: `docs/homelab_deploy.md`
 - Stack homelab: `infra/docker-compose.homelab.yml`
 - Script de acoplamento/deploy: `infra/scripts/couple_to_homelab.sh`
+- Validação automatizada: `infra/scripts/run_homelab_validation.sh`
 - Operação: `docs/operations.md`
 - Backup/restore: `docs/backup_restore.md`
-
