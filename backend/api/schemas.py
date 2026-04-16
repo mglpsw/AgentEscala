@@ -1,7 +1,12 @@
-from pydantic import BaseModel, EmailStr, Field
+import re
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from typing import List, Optional
 from datetime import date, datetime
-from ..models import UserRole, SwapStatus
+from ..models import UFEnum, UserRole, SwapStatus
+
+
+CPF_PATTERN = re.compile(r"^\d{11}$")
 
 
 # Esquemas de usuário
@@ -18,6 +23,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     role: UserRole
+    is_admin: bool = False
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -72,9 +78,74 @@ class FinalScheduleRow(BaseModel):
     crm: str
     crm_number: Optional[str] = None
     crm_uf: Optional[str] = None
+    medico: Optional[dict] = None
     shift_start: datetime
     shift_end: datetime
     shift_period: str
+
+
+# Esquemas de perfil médico
+class MedicalProfileBase(BaseModel):
+    nome_completo: str = Field(min_length=2)
+    cpf: str
+    crm_numero: str = Field(min_length=1)
+    crm_uf: UFEnum
+    data_nascimento: date
+    cartao_nacional_saude: str = Field(min_length=1)
+    email_profissional: EmailStr
+    telefone: Optional[str] = None
+    endereco: Optional[str] = None
+    rg: Optional[str] = None
+    rg_orgao_emissor: Optional[str] = None
+    rg_data_emissao: Optional[date] = None
+    crm_data_emissao: Optional[date] = None
+    arquivo_vacinacao: Optional[str] = None
+
+    @field_validator("cpf")
+    @classmethod
+    def validar_formato_cpf(cls, value: str) -> str:
+        """Validação estrutural do CPF; algoritmo completo fica para fase posterior."""
+        if not CPF_PATTERN.match(value):
+            raise ValueError("CPF deve conter exatamente 11 dígitos.")
+        return value
+
+
+class MedicalProfileCreate(MedicalProfileBase):
+    pass
+
+
+class MedicalProfileUpdate(BaseModel):
+    nome_completo: Optional[str] = Field(default=None, min_length=2)
+    cpf: Optional[str] = None
+    crm_numero: Optional[str] = Field(default=None, min_length=1)
+    crm_uf: Optional[UFEnum] = None
+    data_nascimento: Optional[date] = None
+    cartao_nacional_saude: Optional[str] = Field(default=None, min_length=1)
+    email_profissional: Optional[EmailStr] = None
+    telefone: Optional[str] = None
+    endereco: Optional[str] = None
+    rg: Optional[str] = None
+    rg_orgao_emissor: Optional[str] = None
+    rg_data_emissao: Optional[date] = None
+    crm_data_emissao: Optional[date] = None
+    arquivo_vacinacao: Optional[str] = None
+
+    @field_validator("cpf")
+    @classmethod
+    def validar_formato_cpf(cls, value: Optional[str]) -> Optional[str]:
+        """Validação estrutural do CPF quando o campo é enviado para atualização."""
+        if value is not None and not CPF_PATTERN.match(value):
+            raise ValueError("CPF deve conter exatamente 11 dígitos.")
+        return value
+
+
+class MedicalProfileResponse(MedicalProfileBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    created_at: datetime
+    updated_at: datetime
 
 
 class FinalScheduleFilters(BaseModel):

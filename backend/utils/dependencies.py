@@ -116,7 +116,7 @@ async def require_admin(
     Raises:
         HTTPException: Se o usuário não for administrador
     """
-    if current_user.role != UserRole.ADMIN:
+    if current_user.role != UserRole.ADMIN and not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Privilégios de administrador são necessários"

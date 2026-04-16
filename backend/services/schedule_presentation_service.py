@@ -16,15 +16,21 @@ class SchedulePresentationService:
         agent = shift.agent
         crm_number = SchedulePresentationService._crm_number(agent)
         crm_uf = SchedulePresentationService._crm_uf(agent)
+        display_name = SchedulePresentationService._display_name(agent)
 
         return {
             "shift_id": shift.id,
             "agent_id": shift.agent_id,
-            "display_name": SchedulePresentationService._display_name(agent),
+            "display_name": display_name,
             "professional_type": SchedulePresentationService._professional_type(agent),
             "crm": SchedulePresentationService._format_crm(crm_number, crm_uf),
             "crm_number": crm_number,
             "crm_uf": crm_uf,
+            "medico": {
+                "nome": display_name,
+                "crm": crm_number,
+                "uf": crm_uf,
+            },
             "shift_start": shift.start_time,
             "shift_end": shift.end_time,
             "shift_period": SchedulePresentationService._format_shift_period(
@@ -49,6 +55,11 @@ class SchedulePresentationService:
     def _display_name(agent) -> str:
         if not agent:
             return "N/D"
+
+        medical_profile = SchedulePresentationService._future_medical_profile(agent)
+        medical_name = getattr(medical_profile, "nome_completo", None)
+        if medical_name:
+            return medical_name
 
         profile = SchedulePresentationService._future_profile(agent)
         profile_display_name = getattr(profile, "display_name", None)
@@ -95,7 +106,8 @@ class SchedulePresentationService:
     def _crm_number(agent) -> Optional[str]:
         medical_profile = SchedulePresentationService._future_medical_profile(agent)
         value = (
-            getattr(medical_profile, "crm_number", None)
+            getattr(medical_profile, "crm_numero", None)
+            or getattr(medical_profile, "crm_number", None)
             or getattr(agent, "crm_number", None)
         )
         return str(value) if value else None
@@ -104,7 +116,8 @@ class SchedulePresentationService:
     def _crm_uf(agent) -> Optional[str]:
         medical_profile = SchedulePresentationService._future_medical_profile(agent)
         value = getattr(medical_profile, "crm_uf", None) or getattr(agent, "crm_uf", None)
-        return str(value).upper() if value else None
+        enum_value = getattr(value, "value", value)
+        return str(enum_value).upper() if enum_value else None
 
     @staticmethod
     def _format_crm(crm_number: Optional[str], crm_uf: Optional[str]) -> str:

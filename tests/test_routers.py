@@ -349,6 +349,15 @@ def test_export_padronizado_ics_retorna_calendar(client, agent_headers):
     assert b"BEGIN:VCALENDAR" in resp.content
 
 
+def test_export_padronizado_json_retorna_payload_final(client, agent_headers):
+    """GET /shifts/export?format=json usa o mesmo contrato da escala final JSON."""
+    resp = client.get("/shifts/export?format=json", headers=agent_headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert {"shifts", "metadata"} <= data.keys()
+    assert data["metadata"]["total"] == len(data["shifts"])
+
+
 def test_export_padronizado_recusa_ics_essential(client, agent_headers):
     """view=essential é exclusiva da planilha xlsx."""
     resp = client.get("/shifts/export?format=ics&view=essential", headers=agent_headers)

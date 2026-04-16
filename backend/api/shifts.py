@@ -3,7 +3,8 @@ from datetime import date, datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import StreamingResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..config.database import get_db
@@ -97,6 +98,26 @@ def _build_shift_export_response(shifts, export_format: str, view: str) -> Strea
     )
 
 
+def _build_final_schedule_payload(
+    shifts,
+    start_date: Optional[date],
+    end_date: Optional[date],
+) -> dict:
+    """Montar payload JSON da escala final reutilizado por rotas equivalentes."""
+    rows = SchedulePresentationService.build_essential_rows(shifts)
+    return {
+        "shifts": rows,
+        "metadata": {
+            "total": len(rows),
+            "generated_at": datetime.utcnow().isoformat(),
+            "filters": {
+                "start_date": start_date.isoformat() if start_date else None,
+                "end_date": end_date.isoformat() if end_date else None,
+            },
+        },
+    }
+
+
 @router.post("/", response_model=ShiftResponse, status_code=status.HTTP_201_CREATED)
 def create_shift(
     shift: ShiftCreate,
@@ -136,11 +157,11 @@ def list_agent_shifts(
     return ShiftService.get_shifts_by_agent(db, agent_id)
 
 
-@router.get("/export", response_class=StreamingResponse)
+@router.get("/export")
 def export_shifts_standardized(
     skip: int = 0,
     limit: int = 1000,
-    export_format: str = Query("xlsx", alias="format", pattern="^(xlsx|ics)$"),
+    export_format: str = Query("xlsx", alias="format", pattern="^(xlsx|json|ics)$"),
     view: str = Query("full", pattern="^(full|essential)$"),
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -156,6 +177,13 @@ def export_shifts_standardized(
         skip,
         limit,
     )
+    if export_format == "json":
+        return JSONResponse(
+            content=jsonable_encoder(
+                _build_final_schedule_payload(shifts, parsed_start_date, parsed_end_date)
+            )
+        )
+
     return _build_shift_export_response(shifts, export_format, view)
 
 
@@ -177,19 +205,7 @@ def export_final_schedule_json(
         skip,
         limit,
     )
-    rows = SchedulePresentationService.build_essential_rows(shifts)
-
-    return {
-        "shifts": rows,
-        "metadata": {
-            "total": len(rows),
-            "generated_at": datetime.utcnow(),
-            "filters": {
-                "start_date": parsed_start_date,
-                "end_date": parsed_end_date,
-            },
-        },
-    }
+    return _build_final_schedule_payload(shifts, parsed_start_date, parsed_end_date)
 
 
 @router.get("/export/excel", response_class=StreamingResponse)
