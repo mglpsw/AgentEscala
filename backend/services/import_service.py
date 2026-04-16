@@ -31,6 +31,8 @@ from ..models.models import (
     User,
 )
 
+from .schedule_validation_service import validate_shift
+
 logger = logging.getLogger("agentescala.import_service")
 
 # ─── Turnos padrão reconhecidos ──────────────────────────────────────────────
@@ -484,20 +486,28 @@ def confirm_import(
     ).all()
 
     shifts_created = 0
+    shifts_buffer: Dict[int, List[Shift]] = {}
+
     for row in importable_rows:
-        # Verifica sobreposição com turnos já existentes no banco
-        existing = db.query(Shift).filter(
-            Shift.agent_id == row.agent_id,
-            Shift.start_time < row.normalized_end,
-            Shift.end_time > row.normalized_start,
-        ).first()
-        if existing:
+        agent_existing_shifts = shifts_buffer.get(row.agent_id)
+        if agent_existing_shifts is None:
+            agent_existing_shifts = db.query(Shift).filter(Shift.agent_id == row.agent_id).all()
+            shifts_buffer[row.agent_id] = agent_existing_shifts
+
+        validation_errors = validate_shift(
+            {
+                "agent_id": row.agent_id,
+                "start_time": row.normalized_start,
+                "end_time": row.normalized_end,
+            },
+            existing_shifts=agent_existing_shifts,
+        )
+        if validation_errors:
             row.has_overlap = True
             issues_list = json.loads(row.issues) if row.issues else []
-            issues_list.append(
-                f"Sobreposição com turno existente #{existing.id} ao confirmar importação"
-            )
-            row.issues = json.dumps(issues_list)
+            for error in validation_errors:
+                issues_list.append(error.get("message", "Erro de validação de escala"))
+            row.issues = json.dumps(list(dict.fromkeys(issues_list)))
             if row.row_status == RowStatus.VALID:
                 row.row_status = RowStatus.WARNING
             continue
@@ -519,6 +529,7 @@ def confirm_import(
         db.add(shift)
         db.flush()
         row.created_shift_id = shift.id
+        shifts_buffer.setdefault(row.agent_id, []).append(shift)
         shifts_created += 1
 
     schedule_import.confirmed_at = datetime.utcnow()

@@ -9,11 +9,12 @@ O AgentEscala é composto por:
 - **Frontend React/Vite** (login/logout, calendário, trocas e painel admin de usuários).
 - **PostgreSQL + Alembic** para persistência e versionamento de schema.
 
-Na **Fase 2 (Minha Escala + vínculo usuário↔plantão)**, o sistema cobre login/logout, roles (`admin`, `medico`, `financeiro`), CRUD administrativo de usuários via `/admin/users`, endpoint do usuário autenticado (`/me`) e visão individual da escala.
+Na **Fase 3 (validação de escala + base para OCR/AI)**, o sistema adiciona validação centralizada de conflitos e carga horária antes de gravações, além de endpoint de preview administrativo para validar lotes sem persistência.
 
 ## Funcionalidades
 
 - **Gestão de Turnos**: criar, atualizar e gerenciar turnos de trabalho para agentes
+- **Validação de Escala (Fase 3)**: bloqueio de sobreposição por usuário, validação de faixa de horário e limites de carga diária/semanal configuráveis
 - **Importação de Escala Base**: importar escala do mês anterior via CSV ou XLSX com normalização e validação automáticas
 - **Fluxo de Trocas**: solicitar, listar e cancelar trocas de turnos via interface web (/swaps), com aprovação obrigatória do administrador
 - **Minha Escala**: página `/my-schedule` para o usuário autenticado visualizar e exportar apenas seus próprios plantões
@@ -65,6 +66,16 @@ As migrações do banco são aplicadas automaticamente antes de o backend inicia
 ```bash
 cd backend
 alembic upgrade head
+```
+
+Por padrão, se `DATABASE_URL` não estiver definida, o backend e o Alembic usam fallback local automático:
+
+- `sqlite:///./agentescala.db`
+
+Isso permite executar `alembic upgrade head` sem configuração manual implícita. Para sobrescrever, defina `DATABASE_URL` explicitamente antes do comando:
+
+```bash
+DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/agentescala alembic upgrade head
 ```
 
 > Obrigatório para garantir schema atualizado (incluindo role de usuário).
@@ -177,6 +188,31 @@ Essa separação mantém o login em `users` e concentra dados regulatórios em `
 
 Usuários comuns acessam apenas o próprio perfil por `/me`. Administradores podem listar, detalhar, editar e remover perfis para manter a base médica consistente.
 
+
+### Validação de escala (Fase 3)
+
+A validação foi centralizada em funções reutilizáveis na camada de serviço:
+
+- `validate_shift(shift)`
+- `validate_schedule(shifts)`
+
+Essas funções retornam **lista de erros estruturados** (sem exceções silenciosas), permitindo reaproveitamento futuro pela API, fluxo de importação e próximas etapas de OCR/AI.
+
+#### Regras atualmente aplicadas
+
+- Um mesmo usuário não pode ter plantões sobrepostos (`OVERLAPPING_SHIFTS`).
+- `end_time` deve ser maior que `start_time` (`INVALID_TIME_RANGE`).
+- Limite de horas por dia (`SCHEDULE_MAX_DAILY_HOURS`, padrão 12h).
+- Limite de horas por semana (`SCHEDULE_MAX_WEEKLY_HOURS`, padrão 60h).
+
+#### Endpoint de preview administrativo
+
+`POST /admin/schedule/validate`
+
+- Entrada: lista de plantões (`shifts`) + flag `preview`.
+- Saída: `valid`, `errors`, `total_shifts`, `preview`.
+- Não grava nada no banco (modo preview), servindo como base segura para futuras automações OCR/AI.
+
 ## Endpoints da API
 
 ### Usuários
@@ -199,6 +235,7 @@ Usuários comuns acessam apenas o próprio perfil por `/me`. Administradores pod
 - `DELETE /shifts/{id}` - Excluir turno (admin)
 - `GET /shifts/{id}/export/ics` - Exportar turno individual para ICS (autenticado)
 - `GET /shifts/consistency-report` - Relatório administrativo de consistência de vínculo usuário↔plantão
+- `POST /admin/schedule/validate` - Validar lote de escala em preview (admin, sem persistência)
 
 ### Usuário autenticado
 - `GET /me` - Dados do usuário autenticado

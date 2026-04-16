@@ -2,13 +2,34 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date, datetime, time, timedelta
 import sqlalchemy as sa
-from sqlalchemy import or_, and_
+from sqlalchemy import and_, or_
 
 from ..models import Shift, User
+from .schedule_validation_service import validate_shift
 
 
 class ShiftService:
     """Serviço para gerenciar turnos"""
+
+    @staticmethod
+    def _serialize_validation_errors(errors: List[dict]) -> str:
+        details = []
+        for error in errors:
+            code = error.get("code", "VALIDATION_ERROR")
+            message = error.get("message", "Erro de validação")
+            details.append(f"{code}: {message}")
+        return "; ".join(details)
+
+    @staticmethod
+    def _build_existing_shifts_for_validation(
+        db: Session,
+        agent_id: int,
+        ignore_shift_id: Optional[int] = None,
+    ) -> List[Shift]:
+        query = db.query(Shift).filter(Shift.agent_id == agent_id)
+        if ignore_shift_id is not None:
+            query = query.filter(Shift.id != ignore_shift_id)
+        return query.all()
 
     @staticmethod
     def create_shift(
@@ -21,8 +42,20 @@ class ShiftService:
         location: Optional[str] = None,
         user_id: Optional[int] = None,
         legacy_agent_name: Optional[str] = None,
+        validate_before_save: bool = True,
     ) -> Shift:
         """Criar um novo turno"""
+        if validate_before_save:
+            candidate = {
+                "agent_id": agent_id,
+                "start_time": start_time,
+                "end_time": end_time,
+            }
+            existing_shifts = ShiftService._build_existing_shifts_for_validation(db, agent_id)
+            validation_errors = validate_shift(candidate, existing_shifts=existing_shifts)
+            if validation_errors:
+                raise ValueError(ShiftService._serialize_validation_errors(validation_errors))
+
         shift = Shift(
             agent_id=agent_id,
             user_id=user_id if user_id is not None else agent_id,
@@ -122,12 +155,29 @@ class ShiftService:
     def update_shift(
         db: Session,
         shift_id: int,
+        validate_before_save: bool = True,
         **kwargs
     ) -> Optional[Shift]:
         """Atualizar um turno"""
         shift = db.query(Shift).filter(Shift.id == shift_id).first()
         if not shift:
             return None
+
+        candidate_payload = {
+            "id": shift.id,
+            "agent_id": kwargs.get("agent_id", shift.agent_id),
+            "start_time": kwargs.get("start_time", shift.start_time),
+            "end_time": kwargs.get("end_time", shift.end_time),
+        }
+        if validate_before_save:
+            existing_shifts = ShiftService._build_existing_shifts_for_validation(
+                db,
+                candidate_payload["agent_id"],
+                ignore_shift_id=shift.id,
+            )
+            validation_errors = validate_shift(candidate_payload, existing_shifts=existing_shifts)
+            if validation_errors:
+                raise ValueError(ShiftService._serialize_validation_errors(validation_errors))
 
         for key, value in kwargs.items():
             if hasattr(shift, key):
