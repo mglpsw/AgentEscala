@@ -127,6 +127,19 @@ AgentEscala/
 - Compatível com Google Calendar, Outlook etc.
 - Inclui informações do agente na descrição
 
+### Perfis Médicos
+
+O AgentEscala possui uma camada administrativa de identidade médica vinculada ao usuário autenticado. O perfil médico registra nome completo, CPF, CRM/UF, data de nascimento, Cartão Nacional de Saúde e e-mail profissional, além de campos administrativos opcionais como telefone, endereço, RG, datas de emissão e arquivo de vacinação.
+
+Essa separação mantém o login em `users` e concentra dados regulatórios em `medical_profiles`, com relacionamento 1:1. A decisão prepara o sistema para:
+
+- validações administrativas de CPF e CRM;
+- exportações de escala com identidade médica estruturada;
+- governança de acesso por administrador;
+- OCR inteligente de escalas, permitindo cruzar nomes/CRM extraídos de documentos com perfis oficiais cadastrados.
+
+Usuários comuns acessam apenas o próprio perfil por `/me`. Administradores podem listar, detalhar, editar e remover perfis para manter a base médica consistente.
+
 ## Endpoints da API
 
 ### Usuários
@@ -140,6 +153,8 @@ AgentEscala/
 - `POST /shifts/` - Criar turno (admin)
 - `GET /shifts/` - Listar turnos (autenticado)
 - `GET /shifts/agent/{id}` - Listar turnos de um agente (autenticado)
+- `GET /shifts/export?format=xlsx|json|ics` - Exportar turnos pelo endpoint padronizado (autenticado)
+- `GET /shifts/export/final/json` - Exportar escala final em JSON com metadata e filtros (autenticado)
 - `GET /shifts/export/excel` - Exportar para Excel (autenticado)
 - `GET /shifts/export/ics` - Exportar para ICS (autenticado)
 - `GET /shifts/{id}` - Detalhar turno (autenticado)
@@ -157,6 +172,15 @@ AgentEscala/
 - `POST /swaps/{id}/approve` - Aprovar troca (admin)
 - `POST /swaps/{id}/reject` - Rejeitar troca (admin)
 - `POST /swaps/{id}/cancel` - Cancelar troca (solicitante autenticado)
+
+### Perfis Médicos
+- `POST /api/v1/medical-profiles/` - Criar perfil médico do usuário autenticado
+- `GET /api/v1/medical-profiles/me` - Consultar próprio perfil médico
+- `PUT /api/v1/medical-profiles/me` - Atualizar próprio perfil médico
+- `GET /api/v1/medical-profiles/` - Listar perfis médicos (admin)
+- `GET /api/v1/medical-profiles/{id}` - Detalhar perfil médico (admin)
+- `PUT /api/v1/medical-profiles/{id}` - Editar perfil médico (admin)
+- `DELETE /api/v1/medical-profiles/{id}` - Remover perfil médico (admin)
 
 ### Importação de Escala Base (admin)
 - `POST /schedule-imports/` - Upload de arquivo CSV ou XLSX e processamento em staging

@@ -124,7 +124,7 @@ async def login(
         "expires_in": ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # in seconds
         "user_id": user.id,
         "user_email": user.email,
-        "user_role": user.role.value
+        "user_role": "admin" if user.is_admin else user.role.value
     }
 
 
@@ -250,5 +250,6 @@ async def get_current_user_info(
         "email": current_user.email,
         "name": current_user.name,
         "role": current_user.role.value,
+        "is_admin": current_user.is_admin,
         "is_active": current_user.is_active
     }

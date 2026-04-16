@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Enum as SQLEnum, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Enum as SQLEnum, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -9,6 +9,37 @@ class UserRole(str, enum.Enum):
     """Papéis de usuário no sistema"""
     ADMIN = "admin"
     AGENT = "agent"
+
+
+class UFEnum(str, enum.Enum):
+    """Unidades Federativas do Brasil usadas no registro CRM"""
+    AC = "AC"
+    AL = "AL"
+    AP = "AP"
+    AM = "AM"
+    BA = "BA"
+    CE = "CE"
+    DF = "DF"
+    ES = "ES"
+    GO = "GO"
+    MA = "MA"
+    MT = "MT"
+    MS = "MS"
+    MG = "MG"
+    PA = "PA"
+    PB = "PB"
+    PR = "PR"
+    PE = "PE"
+    PI = "PI"
+    RJ = "RJ"
+    RN = "RN"
+    RS = "RS"
+    RO = "RO"
+    RR = "RR"
+    SC = "SC"
+    SP = "SP"
+    SE = "SE"
+    TO = "TO"
 
 
 class SwapStatus(str, enum.Enum):
@@ -28,6 +59,7 @@ class User(Base):
     name = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
     role = Column(SQLEnum(UserRole), default=UserRole.AGENT, nullable=False)
+    is_admin = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -44,6 +76,42 @@ class User(Base):
         back_populates="target_agent",
         foreign_keys="SwapRequest.target_agent_id"
     )
+    medical_profile = relationship(
+        "MedicalProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
+
+
+class MedicalProfile(Base):
+    """Identidade médica administrativa vinculada a um usuário"""
+    __tablename__ = "medical_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    nome_completo = Column(String, nullable=False)
+    cpf = Column(String(11), unique=True, index=True, nullable=False)
+    crm_numero = Column(String, nullable=False)
+    crm_uf = Column(SQLEnum(UFEnum), nullable=False)
+    data_nascimento = Column(Date, nullable=False)
+    cartao_nacional_saude = Column(String, nullable=False)
+    email_profissional = Column(String, nullable=False)
+    telefone = Column(String, nullable=True)
+    endereco = Column(Text, nullable=True)
+    rg = Column(String, nullable=True)
+    rg_orgao_emissor = Column(String, nullable=True)
+    rg_data_emissao = Column(Date, nullable=True)
+    crm_data_emissao = Column(Date, nullable=True)
+    arquivo_vacinacao = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("crm_numero", "crm_uf", name="uq_medical_profiles_crm_numero_uf"),
+    )
+
+    user = relationship("User", back_populates="medical_profile")
 
 
 class Shift(Base):
@@ -100,7 +168,6 @@ class SwapRequest(Base):
 
 # ─── Blacklist de Refresh Tokens ───────────────────────
 
-from sqlalchemy import UniqueConstraint
 import hashlib
 
 class RevokedRefreshToken(Base):
