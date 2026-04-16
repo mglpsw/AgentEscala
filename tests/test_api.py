@@ -132,3 +132,59 @@ def test_me_shifts_does_not_use_ambiguous_legacy_name_fallback(client, agent_hea
     assert response.status_code == 200
     titles = [shift["title"] for shift in response.json()]
     assert "Plantão legado ambíguo" not in titles
+
+
+def test_me_shifts_considers_agent_reassignment_even_with_user_id_filled(
+    client,
+    admin_headers,
+    agent_headers,
+):
+    bob_login = client.post(
+        "/auth/login",
+        json={"email": "bob@agentescala.com", "password": "password123"},
+    )
+    assert bob_login.status_code == 200
+    bob_headers = {"Authorization": f"Bearer {bob_login.json()['access_token']}"}
+
+    shifts_response = client.get("/shifts", headers=agent_headers)
+    assert shifts_response.status_code == 200
+    shifts = shifts_response.json()
+    origin_shift = next(shift for shift in shifts if shift["agent"]["email"] == "alice@agentescala.com")
+    target_shift = next(shift for shift in shifts if shift["agent"]["email"] == "bob@agentescala.com")
+
+    create_swap_response = client.post(
+        "/swaps/",
+        headers=agent_headers,
+        json={
+            "target_agent_id": target_shift["agent_id"],
+            "origin_shift_id": origin_shift["id"],
+            "target_shift_id": target_shift["id"],
+            "reason": "troca para validar /me/shifts",
+        },
+    )
+    assert create_swap_response.status_code == 201
+    swap_id = create_swap_response.json()["id"]
+
+    approve_response = client.post(
+        f"/swaps/{swap_id}/approve",
+        headers=admin_headers,
+        json={"admin_notes": "ok"},
+    )
+    assert approve_response.status_code == 200
+
+    alice_me_shifts = client.get("/me/shifts", headers=agent_headers)
+    bob_me_shifts = client.get("/me/shifts", headers=bob_headers)
+    assert alice_me_shifts.status_code == 200
+    assert bob_me_shifts.status_code == 200
+
+    alice_shift_ids = {shift["id"] for shift in alice_me_shifts.json()}
+    bob_shift_ids = {shift["id"] for shift in bob_me_shifts.json()}
+
+    assert origin_shift["id"] not in alice_shift_ids
+    assert origin_shift["id"] in bob_shift_ids
+
+
+def test_me_shifts_invalid_month_returns_400(client, agent_headers):
+    response = client.get("/me/shifts?month=2026-13", headers=agent_headers)
+    assert response.status_code == 400
+    assert "Mês inválido" in response.json()["detail"]

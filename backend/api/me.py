@@ -43,12 +43,21 @@ def get_my_shifts(
 
     if month:
         year, mon = month.split("-")
-        parsed_start = date(int(year), int(mon), 1)
-        if int(mon) == 12:
-            parsed_end = date(int(year) + 1, 1, 1)
+        try:
+            year_num = int(year)
+            month_num = int(mon)
+            parsed_start = date(year_num, month_num, 1)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Mês inválido. Use valores entre 01 e 12 no formato YYYY-MM.",
+            ) from exc
+
+        if month_num == 12:
+            parsed_end = date(year_num + 1, 1, 1)
             parsed_end = parsed_end.fromordinal(parsed_end.toordinal() - 1)
         else:
-            next_month = date(int(year), int(mon) + 1, 1)
+            next_month = date(year_num, month_num + 1, 1)
             parsed_end = next_month.fromordinal(next_month.toordinal() - 1)
 
     if parsed_start and parsed_end and parsed_start > parsed_end:

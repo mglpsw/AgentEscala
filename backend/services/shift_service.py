@@ -66,7 +66,7 @@ class ShiftService:
 
         criteria = [
             Shift.user_id == user_id,
-            and_(Shift.user_id.is_(None), Shift.agent_id == user_id),
+            Shift.agent_id == user_id,
         ]
         if has_unique_name:
             criteria.append(
