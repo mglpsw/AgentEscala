@@ -6,7 +6,6 @@ import App from '../src/app.jsx';
 describe('App', () => {
   it('renderiza sem crashar', () => {
     render(<App />);
-    // Espera encontrar algum texto padrão do app
-    expect(screen.getByText(/escala|login|bem-vindo/i)).toBeDefined();
+    expect(screen.getByRole('heading', { name: /agentescala/i })).toBeDefined();
   });
 });
