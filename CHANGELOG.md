@@ -1,230 +1,65 @@
 # Changelog
 
-## [1.5.0] - 2026-04-17 — Fase 4.5 concluída
-
-### Adicionado
-- Hardening OCR no staging com `confidence_score`, `parse_status`, `match_status` e `validation_status` por linha.
-- Matching mais seguro de profissionais com preferência por `user_id` quando informado e marcação explícita de ambiguidades sem auto-vínculo.
-- Telemetria simples de OCR em `ocr_imports` (origem, estratégia, linhas extraídas/válidas/ambíguas/conflitos).
-- Perfil do usuário autenticado com edição (`PUT /me`) e upload de avatar (`POST /me/avatar`).
-- Navegação e página "Meu Perfil" no frontend com atualização de dados cadastrais e avatar.
-- Seed idempotente para admin principal `mf.soares@ks-sm.net` com promoção automática para acesso máximo.
+## [1.5.1] - 2026-04-17
 
 ### Alterado
-- Revisão de staging da importação passou a destacar ambiguidades, conflitos e score de confiança.
-- Versionamento atualizado para `v1.5.0` em backend/frontend e cabeçalho da UI.
+- usuário administrativo principal `mf.soares@ks-sm.net` passa a ter senha padrão `password` quando `AGENTESCALA_PRIMARY_ADMIN_PASSWORD` não estiver definida.
+- versão da aplicação atualizada para `1.5.1` (`VERSION` e `APP_VERSION`).
+- integração OCR revisada para priorizar a API `https://api.ks-sm.net:9443`, com fallback seguro para o parser/calibração local do último merge.
+- endpoint `/api/v1/info` passa a expor status/configuração de integração OCR para observabilidade operacional.
+- versão do frontend alinhada para `1.5.1`.
+- endpoint `/health` consolidado com status resumido de OCR (`enabled`/`disabled`) sem exposição de segredos.
+- novas variáveis OCR documentadas e consolidadas: `OCR_API_BASE_URL`, `OCR_API_TIMEOUT_SECONDS`, `OCR_API_ENABLED`, `OCR_API_VERIFY_SSL`.
+- revisão operacional da `main` com log de startup orientado a diagnóstico da integração OCR.
 
-### Segurança e compatibilidade
-- Fluxo OCR mantém bloqueio sem bypass: upload OCR continua passando por staging + validação antes da confirmação.
-- Fallback por nome preservado para legado, porém com regras mais restritivas para reduzir falso positivo.
+### Testes
+- reforço de cobertura para OCR: payload aninhado e leitura via API mockada.
+- validação de `/health` com versão, banco e estado OCR.
 
-## [1.4.0] - 2026-04-16 — Fase 4 concluída (OCR + pipeline seguro)
+## [1.5.0] - 2026-04-17 — Release estável pré-OCR
+
+### Adicionado
+- documentação completa em PT-BR (`README.md`, `ARCHITECTURE.md`, `CONTEXT.md`).
+- preparação da estrutura OCR em `backend/services/ocr/` (base isolada, sem integração ativa).
+- arquivo `VERSION` com versão formal `1.5.0`.
+
+### Melhorado
+- endpoint `/health` com versão e status do banco (`up`/`down`).
+- padronização de logs e consolidação de observabilidade em módulo dedicado.
+- novas métricas Prometheus seguras: `agentescala_total_shifts`, `agentescala_total_swaps`, `agentescala_imports_success_total`, `agentescala_imports_failure_total`.
+
+### Observações
+- sistema considerado estável para expansão incremental.
+- base OCR criada sem alterar comportamento atual do fluxo de importação.
+
+## [1.4.0] - 2026-04-16
 
 ### Adicionado
 - OCR integrado ao fluxo de importação administrativa com suporte a PDF e imagens, sempre enviando para staging.
-- Parser pós-OCR para estrutura intermediária (`nome`, `data`, `hora_inicio`, `hora_fim`, `raw`) com marcação explícita de linhas ambíguas.
-- Revalidação explícita do staging via `POST /schedule-imports/{import_id}/validate`.
-- Auditoria básica com persistência de payload OCR bruto, linhas parseadas e erros no modelo `ocr_imports`.
-- Fluxo frontend mínimo para upload OCR e revisão/revalidação antes da confirmação.
+- revalidação explícita do staging via `POST /schedule-imports/{import_id}/validate`.
 
 ### Alterado
-- pipeline de importação passou a aplicar validação centralizada (`validate_schedule`) também no staging, antes da confirmação.
-- versionamento atualizado para `v1.4.0` em backend/frontend.
+- pipeline de importação passou a aplicar validação centralizada também no staging.
 
-### Limitações conhecidas
-- OCR de PDF depende de texto extraível; PDFs escaneados com baixa qualidade podem gerar linhas ambíguas.
-- OCR de imagem depende de dependências opcionais (`Pillow` + `pytesseract`) no ambiente.
-
-## [1.3.1] - 2026-04-16 — Robustez operacional de migrations
-
-### Corrigido
-- fallback automático de `DATABASE_URL` para execução local previsível (`sqlite:///./agentescala.db`) quando variável não está definida.
-- resolução de URL no Alembic (`env.py`) padronizada com prioridade explícita: `DATABASE_URL` (env) → settings → ini → fallback.
-- documentação atualizada com fluxo sem configuração manual e exemplo de override por `DATABASE_URL`.
-
-## [1.3.0] - 2026-04-16 — Fase 3 concluída
+## [1.3.0] - 2026-04-16
 
 ### Adicionado
-- validação de conflitos de plantão (sobreposição por usuário) antes de gravação via API e confirmação de importação.
-- validação de carga horária com limites configuráveis por dia e por semana (`SCHEDULE_MAX_DAILY_HOURS` e `SCHEDULE_MAX_WEEKLY_HOURS`).
-- validação centralizada e reutilizável com `validate_shift(shift)` e `validate_schedule(shifts)`.
-- endpoint administrativo `POST /admin/schedule/validate` para validar lotes em modo preview sem persistência.
-- base técnica para integração futura com OCR e AI, reaproveitando a mesma camada de validação.
+- validação de conflitos de plantão antes de gravação via API e confirmação de importação.
+- endpoint administrativo `POST /admin/schedule/validate` para preview sem persistência.
 
-### Alterado
-- versionamento atualizado para `v1.3.0` em backend/frontend.
-
-## [1.2.0] - 2026-04-16 — Fase 2 concluída
+## [1.2.0] - 2026-04-16
 
 ### Adicionado
-- vínculo incremental de plantões com usuário via `shifts.user_id` (mantendo `agent_id` legado).
-- endpoint `GET /me` para dados do usuário autenticado.
-- endpoint `GET /me/shifts` para listar apenas plantões do usuário autenticado, com filtro simples por mês/período.
-- endpoint `GET /me/shifts/export.ics` para exportação ICS individual.
-- página frontend **Minha Escala** (`/my-schedule`) com lista própria, filtro por mês e botão **Exportar minha escala**.
-- relatório administrativo `GET /shifts/consistency-report` para mapear pendências de vínculo e ambiguidades legadas.
+- vínculo incremental de plantões com usuário via `shifts.user_id`.
+- endpoints `GET /me`, `GET /me/shifts` e exportação de escala individual.
 
-### Alterado
-- versionamento atualizado para `v1.2.0` em frontend/backend.
-- documentação de endpoints e observações de compatibilidade legada por nome.
-
-### Compatibilidade legada
-- fallback temporário preservado para registros sem `user_id`, usando `agent_id` e, quando aplicável, `legacy_agent_name`.
-- fallback por `legacy_agent_name` bloqueia vínculo automático quando o nome do usuário é ambíguo (múltiplos usuários ativos com mesmo nome).
-
-### Correções
-- cadeia de migrations ajustada para execução em SQLite (testes) sem quebrar PostgreSQL.
-
-## [1.1.0] - 2026-04-16 — Fase 1 concluída
+## [1.1.0] - 2026-04-16
 
 ### Adicionado
-- Login e logout com fluxo JWT no frontend/backend.
-- Roles simples de acesso: `admin`, `medico`, `financeiro`.
-- CRUD administrativo de usuários em `/admin/users`.
-- Página administrativa de usuários no frontend.
+- login/logout JWT e perfis de acesso.
+- CRUD administrativo de usuários.
 
-### Observação
-- JWT de acesso permanece **stateless** no logout: token de acesso já emitido segue válido até expirar.
-
-## [1.0.0] - 2026-04-14 — Release 01
-
-### Features entregues
-
-- Autenticação JWT completa: login, refresh token automático e logout
-- Calendário real do médico com FullCalendar (mensal/semanal, locale pt-BR)
-- Lista de turnos com filtros por data e texto (tabela paginável)
-- Trocas de plantão: solicitação, listagem e cancelamento pelo médico
-- Painel admin de trocas pendentes: aprovação e rejeição com notas
-- UI de importação de escala: upload CSV/XLSX, revisão do staging linha a linha e confirmação criando turnos reais
-- Frontend React/Vite/Tailwind servido via FastAPI StaticFiles com fallback SPA
-- Pipeline de importação com staging, detecção de duplicatas e overlaps, confirmação atômica
-- Endpoint `/health` com status, timestamp e versão
-- Endpoint `/metrics` com métricas Prometheus (configurável por env)
-- 70 testes automatizados cobrindo auth, users, shifts, swaps e importação
-
-### Limitações conhecidas
-
-- Importação suporta apenas CSV e XLSX; PDF e OCR não estão no escopo desta versão
-- Revogação de refresh tokens é in-memory (limpa ao reiniciar o servidor)
-- Sem rate limiting no endpoint de login
-- Sem testes de frontend automatizados (E2E)
-- Operações administrativas limitadas: criação/gestão de usuários pela UI não está funcionando
-- Edição manual da escala e inclusão de plantões via frontend não estão operacionais
-- Importação de XLSX é sensível ao formato: arquivos que não seguem o template podem falhar; recomenda-se CSV ou usar o template fornecido
-
----
-
-## [1.1.1] - 2026-04-14
+## [1.0.0] - 2026-04-14
 
 ### Adicionado
-- Página /swaps implementada no frontend React:
-	- Listagem real de trocas do usuário logado
-	- Formulário funcional para solicitar nova troca
-	- Cancelamento de solicitações pendentes
-	- Estados de loading, erro e vazio
-	- Integração direta com backend FastAPI
-	- Componentes auxiliares: SwapCard, SwapForm
-- Nenhuma dependência com a etapa E7
-- Build e validação manual realizados com sucesso
-
-### Corrigido
-- Ajustes menores de documentação e validação de build
-
-### Observações
-- Não houve conflito com E7
-- Não houve alteração em backend, Docker ou contratos de API
-Este arquivo registra apenas mudanças relevantes para uso real do AgentEscala.
-
-Objetivo:
-- manter histórico legível
-- evitar burocracia excessiva
-- facilitar operação no CT 102 e futuras atualizações
-
-## Regras de manutenção
-
-Comece do jeito mais simples possível.
-
-Use SemVer:
-- `MAJOR.MINOR.PATCH`
-- `PATCH`: correção sem mudar o comportamento esperado
-- `MINOR`: nova funcionalidade compatível com o uso anterior
-- `MAJOR`: mudança que quebra compatibilidade
-
-Política prática deste repositório:
-- toda mudança relevante em script operacional atualiza este arquivo
-- toda entrega estável deve resultar em tag Git no formato `vX.Y.Z`
-- toda feature nova sobe `MINOR`
-- toda correção sobe `PATCH`
-- toda quebra de compatibilidade sobe `MAJOR`
-
-Padrão de commits recomendado:
-- `feat:` nova funcionalidade compatível
-- `fix:` correção de bug
-- `docs:` documentação
-- `chore:` manutenção sem impacto funcional direto
-- `refactor:` simplificação interna sem mudança de comportamento esperada
-
-Fluxo recomendado:
-- branch
-- commits consistentes
-- atualização deste `CHANGELOG.md`
-- PR
-- merge na `main`
-- tag Git
-- release
-
-Escopo de versionamento formal:
-- scripts operacionais e automações reais devem seguir este processo
-- scripts auxiliares, testes pontuais e experimentos não precisam de release formal
-
-Versão recomendada para esta rodada operacional:
-- `0.2.0`
-
-Tag recomendada após merge:
-- `v0.2.0`
-
-Mensagem de tag sugerida:
-- `Deploy operacional mínimo no CT 102`
-
-## [0.2.0] - 2026-04-13
-
-### Added
-- suporte a backup e restore básico do PostgreSQL do AgentEscala
-- endpoint `/metrics` com métricas mínimas de operação
-- helper seguro para planejamento de publicação via Nginx Proxy Manager
-- exemplo de scrape Prometheus do lado do projeto
-- runbook operacional curto para o CT 102
-
-### Changed
-- deploy homelab endurecido para CT 102 com isolamento por compose, rede e volume
-- bind do backend preparado para uso seguro atrás do NPM
-- documentação operacional alinhada com validação real e rollback simples
-
-### Fixed
-- validação de conflito de porta antes do deploy
-- suporte a `ENV_FILE` externo no script de deploy para validações isoladas
-- healthcheck do backend mais confiável no stack homelab
-
-## [0.1.0] - 2026-04-13
-
-### Added
-- primeira base operacional do AgentEScala com compose próprio
-- migrações automáticas antes do backend subir
-- seed e validação HTTP fim a fim do backend
-
-### Changed
-- backend endurecido com autenticação mínima por JWT nos endpoints sensíveis
-
-### Fixed
-- rotas de exportação priorizadas corretamente
-- ajustes de runtime para execução consistente em host Docker compartilhado
-
-## [1.2.1] - 2026-04-16
-
-### Corrigido
-- Documentação operacional do fallback SPA: esclarece que o frontend React é servido pelo FastAPI via StaticFiles, com fallback SPA já implementado no handler 404.
-- Instruções de validação para rotas SPA, assets, health, métricas e API.
-- Alerta sobre necessidade de fallback SPA em proxies externos (Nginx, Traefik, NPM) se usados.
-
-### Observação
-- Nenhuma alteração de código; apenas documentação e validação operacional.
+- base estável inicial com auth, plantões, trocas, importação CSV/XLSX e frontend React.

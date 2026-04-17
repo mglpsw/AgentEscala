@@ -10,6 +10,9 @@ def test_healthcheck_is_public(client):
 
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
+    assert response.json()["version"] == "1.5.1"
+    assert response.json()["database"] in {"up", "down"}
+    assert response.json()["ocr"] in {"enabled", "disabled"}
 
 
 def test_login_and_protected_route_require_auth(client, admin_headers):

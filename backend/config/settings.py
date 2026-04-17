@@ -11,11 +11,15 @@ class Settings(BaseSettings):
 
     # Aplicação
     APP_NAME: str = "AgentEscala"
-    APP_VERSION: str = "1.5.0"
+    APP_VERSION: str = "1.5.1"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
     CORS_ALLOW_ORIGINS: str = ""
     METRICS_ENABLED: bool = True
+    OCR_API_BASE_URL: str = "https://api.ks-sm.net:9443"
+    OCR_API_TIMEOUT_SECONDS: float = 20.0
+    OCR_API_ENABLED: bool = True
+    OCR_API_VERIFY_SSL: bool = True
 
     SCHEDULE_MAX_DAILY_HOURS: float = 12.0
     SCHEDULE_MAX_WEEKLY_HOURS: float = 60.0

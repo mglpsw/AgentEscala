@@ -20,9 +20,11 @@ import re
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+import httpx
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
+from ..config.settings import settings
 from ..models.models import (
     ImportStatus,
     RowStatus,
@@ -245,6 +247,62 @@ def _read_image_ocr(content: bytes) -> Tuple[List[str], List[Dict[str, Any]], Di
     raw_text = pytesseract.image_to_string(image, lang="por+eng")
     headers, rows, errors = _parse_ocr_text_to_rows(raw_text)
     return headers, rows, {"raw_text": raw_text, "errors": errors}
+
+
+def _extract_text_from_ocr_payload(payload: Dict[str, Any]) -> str:
+    if isinstance(payload.get("raw_text"), str):
+        return payload["raw_text"]
+    if isinstance(payload.get("text"), str):
+        return payload["text"]
+    if isinstance(payload.get("content"), str):
+        return payload["content"]
+
+    lines = payload.get("lines")
+    if isinstance(lines, list):
+        return "\n".join(str(line) for line in lines if line is not None)
+
+    data = payload.get("data")
+    if isinstance(data, dict):
+        return _extract_text_from_ocr_payload(data)
+
+    result = payload.get("result")
+    if isinstance(result, dict):
+        return _extract_text_from_ocr_payload(result)
+
+    return ""
+
+
+def _read_ocr_via_api(content: bytes, filename: str) -> Tuple[List[str], List[Dict[str, Any]], Dict[str, Any]]:
+    base_url = (settings.OCR_API_BASE_URL or "").rstrip("/")
+    if not settings.OCR_API_ENABLED or not base_url:
+        raise ValueError("OCR API desabilitada por configuração.")
+
+    endpoint_candidates = ("/ocr/extract", "/api/ocr/extract", "/extract")
+    timeout = settings.OCR_API_TIMEOUT_SECONDS
+    last_error: Optional[Exception] = None
+
+    for endpoint in endpoint_candidates:
+        target_url = f"{base_url}{endpoint}"
+        try:
+            with httpx.Client(timeout=timeout, verify=settings.OCR_API_VERIFY_SSL) as client:
+                response = client.post(
+                    target_url,
+                    files={"file": (filename, content, "application/octet-stream")},
+                )
+            response.raise_for_status()
+            payload = response.json()
+            raw_text = _extract_text_from_ocr_payload(payload if isinstance(payload, dict) else {})
+            if not raw_text.strip():
+                raise ValueError(
+                    "OCR API retornou payload sem conteúdo textual reconhecível; acionando fallback local."
+                )
+            headers, rows, errors = _parse_ocr_text_to_rows(raw_text)
+            return headers, rows, {"raw_text": raw_text, "errors": errors, "source": target_url}
+        except Exception as exc:  # pragma: no cover - integração externa
+            last_error = exc
+            logger.warning("Falha OCR API em %s: %s", target_url, exc)
+
+    raise ValueError(f"OCR API indisponível em {base_url}: {last_error}")
 
 
 def read_file(content: bytes, filename: str) -> Tuple[List[str], List[Dict[str, Any]]]:
@@ -671,9 +729,27 @@ def process_import_file(
     try:
         ocr_meta: Dict[str, Any] = {}
         if fn_lower.endswith(".pdf"):
-            headers, raw_rows, ocr_meta = _read_pdf_ocr(file_content)
+            try:
+                headers, raw_rows, ocr_meta = _read_ocr_via_api(file_content, filename)
+            except Exception as api_exc:
+                logger.warning(
+                    "OCR API indisponível para '%s'; usando fallback calibrado local. Motivo: %s",
+                    filename,
+                    api_exc,
+                )
+                headers, raw_rows, ocr_meta = _read_pdf_ocr(file_content)
+                ocr_meta["fallback"] = "local_pdf"
         elif fn_lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".tiff")):
-            headers, raw_rows, ocr_meta = _read_image_ocr(file_content)
+            try:
+                headers, raw_rows, ocr_meta = _read_ocr_via_api(file_content, filename)
+            except Exception as api_exc:
+                logger.warning(
+                    "OCR API indisponível para '%s'; usando fallback calibrado local. Motivo: %s",
+                    filename,
+                    api_exc,
+                )
+                headers, raw_rows, ocr_meta = _read_image_ocr(file_content)
+                ocr_meta["fallback"] = "local_image"
         else:
             headers, raw_rows = read_file(file_content, filename)
 
@@ -684,7 +760,11 @@ def process_import_file(
                 file_name=filename,
                 file_type="pdf" if fn_lower.endswith(".pdf") else "image",
                 source_origin=source_description,
-                processing_strategy="pypdf-extract-text" if fn_lower.endswith(".pdf") else "pytesseract-ocr",
+                processing_strategy=(
+                    "ks-sm-api-ocr"
+                    if ocr_meta.get("source")
+                    else ("pypdf-extract-text" if fn_lower.endswith(".pdf") else "pytesseract-ocr")
+                ),
                 raw_payload={"text": ocr_meta.get("raw_text", "")},
                 parsed_rows=[
                     {
