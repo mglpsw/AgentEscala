@@ -110,7 +110,7 @@ def test_me_shifts_does_not_use_ambiguous_legacy_name_fallback(client, agent_hea
         duplicate = User(
             email="alice2@agentescala.com",
             name="Alice Silva",
-            hashed_password=get_password_hash("password123"),
+            hashed_password=get_password_hash("CHANGE_ME_TEST_PASSWORD"),
             role=UserRole.AGENT,
             is_active=True,
         )
@@ -145,7 +145,7 @@ def test_me_shifts_considers_agent_reassignment_even_with_user_id_filled(
 ):
     bob_login = client.post(
         "/auth/login",
-        json={"email": "bob@agentescala.com", "password": "password123"},
+        json={"email": "bob@agentescala.com", "password": "CHANGE_ME_TEST_PASSWORD"},
     )
     assert bob_login.status_code == 200
     bob_headers = {"Authorization": f"Bearer {bob_login.json()['access_token']}"}

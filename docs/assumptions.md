@@ -8,7 +8,7 @@ Documentar as principais premissas, decisões e trade-offs usados no MVP do Agen
 - MVP focado apenas em backend (sem frontend ainda)
 - Fluxo de trocas requer aprovação do administrador
 - Fuso horário UTC para todos os horários
-- Usuários seed usam senha padrão `password123`
+- Usuários seed exigem senha definida via ambiente (sem credenciais versionadas)
 
 ## Arquitetura
 - Arquitetura em três camadas (API → Service → Model)

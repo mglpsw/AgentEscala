@@ -9,14 +9,34 @@ from backend.models import User, Shift, SwapRequest, UserRole, SwapStatus
 from backend.utils.auth import get_password_hash
 
 PRIMARY_ADMIN_EMAIL = "mf.soares@ks-sm.net"
-PRIMARY_ADMIN_DEFAULT_PASSWORD = "password"
+PRIMARY_ADMIN_DEFAULT_PASSWORD = "CHANGE_ME"
+
+
+def _get_non_empty_env(var_name: str, default: str) -> str:
+    """
+    Retorna variável de ambiente sem aceitar string vazia.
+
+    Valores ausentes, vazios ou só com espaços fazem fallback para `default`.
+    """
+    value = os.getenv(var_name)
+    if value is None:
+        return default
+
+    normalized = value.strip()
+    if not normalized:
+        return default
+
+    return normalized
 
 
 def ensure_primary_admin(db) -> None:
     """Garante usuário admin principal de forma idempotente."""
     existing = db.query(User).filter(User.email == PRIMARY_ADMIN_EMAIL).first()
     desired_name = os.getenv("AGENTESCALA_PRIMARY_ADMIN_NAME", "Administrador Principal")
-    initial_password = os.getenv("AGENTESCALA_PRIMARY_ADMIN_PASSWORD", PRIMARY_ADMIN_DEFAULT_PASSWORD)
+    initial_password = _get_non_empty_env(
+        "AGENTESCALA_PRIMARY_ADMIN_PASSWORD",
+        PRIMARY_ADMIN_DEFAULT_PASSWORD,
+    )
 
     if existing:
         existing.role = UserRole.ADMIN
@@ -60,8 +80,9 @@ def seed_database():
 
         print("Criando usuários...")
 
-        # Senha padrão para todos os usuários: "password123"
-        default_password = get_password_hash("password123")
+        # Senha padrão de seed deve ser definida via variável de ambiente.
+        seed_default_password = _get_non_empty_env("AGENTESCALA_SEED_DEFAULT_PASSWORD", "CHANGE_ME")
+        default_password = get_password_hash(seed_default_password)
 
         # Cria admin
         admin = User(
@@ -191,7 +212,7 @@ def seed_database():
         ensure_primary_admin(db)
 
         print("\n=== Seed concluído ===")
-        print("\nCredenciais de exemplo:")
+        print("\nUsuários de exemplo:")
         print(f"  Admin: {admin.email}")
         print(f"  Agentes: {', '.join([a.email for a in agents])}")
         print("\nAgora você pode:")

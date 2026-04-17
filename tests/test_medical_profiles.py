@@ -9,7 +9,7 @@ def bob_headers(client: TestClient):
     """Token JWT de Bob para validar duplicidades entre usuários."""
     resp = client.post(
         "/auth/login",
-        json={"email": "bob@agentescala.com", "password": "password123"},
+        json={"email": "bob@agentescala.com", "password": "CHANGE_ME_TEST_PASSWORD"},
     )
     assert resp.status_code == 200
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}

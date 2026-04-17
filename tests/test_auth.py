@@ -38,14 +38,14 @@ def setup_database():
         user = User(
             email="medico@agentescala.com",
             name="Dr. Teste",
-            hashed_password=get_password_hash("senha123"),
+            hashed_password=get_password_hash("CHANGE_ME_TEST_PASSWORD"),
             role=UserRole.AGENT,
             is_active=True,
         )
         inactive = User(
             email="inativo@agentescala.com",
             name="Inativo",
-            hashed_password=get_password_hash("senha123"),
+            hashed_password=get_password_hash("CHANGE_ME_TEST_PASSWORD"),
             role=UserRole.AGENT,
             is_active=False,
         )
@@ -63,7 +63,7 @@ def client():
         yield c
 
 
-def _login(client: TestClient, email: str = "medico@agentescala.com", password: str = "senha123") -> dict:
+def _login(client: TestClient, email: str = "medico@agentescala.com", password: str = "CHANGE_ME_TEST_PASSWORD") -> dict:
     response = client.post("/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200
     return response.json()
@@ -82,18 +82,18 @@ def test_login_retorna_access_e_refresh_tokens(client):
     assert data["user_email"] == "medico@agentescala.com"
 
 
-def test_login_com_senha_errada_retorna_401(client):
-    response = client.post("/auth/login", json={"email": "medico@agentescala.com", "password": "errada"})
+def test_login_com_senha_incorreta_retorna_401(client):
+    response = client.post("/auth/login", json={"email": "medico@agentescala.com", "password": "CHANGE_ME_WRONG_PASSWORD"})
     assert response.status_code == 401
 
 
 def test_login_com_usuario_inativo_retorna_403(client):
-    response = client.post("/auth/login", json={"email": "inativo@agentescala.com", "password": "senha123"})
+    response = client.post("/auth/login", json={"email": "inativo@agentescala.com", "password": "CHANGE_ME_TEST_PASSWORD"})
     assert response.status_code == 403
 
 
 def test_login_com_email_inexistente_retorna_401(client):
-    response = client.post("/auth/login", json={"email": "naoexiste@x.com", "password": "qualquer"})
+    response = client.post("/auth/login", json={"email": "naoexiste@x.com", "password": "CHANGE_ME_ANY_PASSWORD"})
     assert response.status_code == 401
 
 

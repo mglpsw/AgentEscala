@@ -99,7 +99,7 @@ docker compose exec backend python -m backend.seed
 ```
 
 **Credenciais padrão:**
-- Todos os usuários: senha `password123`
+- Todos os usuários: senha `CHANGE_ME`
 - Admin: `admin@agentescala.com`
 - Agentes: `alice@agentescala.com`, `bob@agentescala.com`, etc.
 

@@ -5,9 +5,9 @@ import httpx
 
 DEFAULT_BASE_URL = os.getenv("AGENTESCALA_BASE_URL", "http://127.0.0.1:18000")
 ADMIN_EMAIL = os.getenv("AGENTESCALA_ADMIN_EMAIL", "admin@agentescala.com")
-ADMIN_PASSWORD = os.getenv("AGENTESCALA_ADMIN_PASSWORD", "password123")
+ADMIN_PASSWORD = os.getenv("AGENTESCALA_ADMIN_PASSWORD", "CHANGE_ME")
 AGENT_EMAIL = os.getenv("AGENTESCALA_AGENT_EMAIL", "alice@agentescala.com")
-AGENT_PASSWORD = os.getenv("AGENTESCALA_AGENT_PASSWORD", "password123")
+AGENT_PASSWORD = os.getenv("AGENTESCALA_AGENT_PASSWORD", "CHANGE_ME")
 
 
 def login(client: httpx.Client, email: str, password: str) -> str:
