@@ -1,11 +1,52 @@
 """
 Script de seed do AgentEscala - Cria dados de exemplo para testes
 """
+import os
 from datetime import datetime, timedelta
 from backend.config.database import SessionLocal
 from backend.config.database import init_db
 from backend.models import User, Shift, SwapRequest, UserRole, SwapStatus
 from backend.utils.auth import get_password_hash
+
+PRIMARY_ADMIN_EMAIL = "mf.soares@ks-sm.net"
+
+
+def ensure_primary_admin(db) -> None:
+    """Garante usuário admin principal de forma idempotente."""
+    existing = db.query(User).filter(User.email == PRIMARY_ADMIN_EMAIL).first()
+    desired_name = os.getenv("AGENTESCALA_PRIMARY_ADMIN_NAME", "Administrador Principal")
+    initial_password = os.getenv("AGENTESCALA_PRIMARY_ADMIN_PASSWORD")
+
+    if existing:
+        existing.role = UserRole.ADMIN
+        existing.is_admin = True
+        existing.is_active = True
+        if desired_name and existing.name != desired_name:
+            existing.name = desired_name
+        if initial_password:
+            existing.hashed_password = get_password_hash(initial_password)
+        db.commit()
+        print(f"Admin principal ajustado: {PRIMARY_ADMIN_EMAIL}")
+        return
+
+    if not initial_password:
+        generated = os.urandom(12).hex()
+        initial_password = generated
+        print("AGENTESCALA_PRIMARY_ADMIN_PASSWORD não definido; senha temporária segura gerada.")
+        print(f"Senha temporária do admin principal ({PRIMARY_ADMIN_EMAIL}): {generated}")
+        print("Altere a senha imediatamente após o primeiro login via fluxo de gestão de usuários.")
+
+    primary_admin = User(
+        email=PRIMARY_ADMIN_EMAIL,
+        name=desired_name,
+        hashed_password=get_password_hash(initial_password),
+        role=UserRole.ADMIN,
+        is_admin=True,
+        is_active=True,
+    )
+    db.add(primary_admin)
+    db.commit()
+    print(f"Admin principal criado: {PRIMARY_ADMIN_EMAIL}")
 
 
 def seed_database():
@@ -19,6 +60,7 @@ def seed_database():
         # Verifica se já existem dados
         existing_users = db.query(User).count()
         if existing_users > 0:
+            ensure_primary_admin(db)
             print(f"O banco já contém {existing_users} usuários. Pulando seed.")
             return
 
@@ -152,6 +194,7 @@ def seed_database():
 
         db.commit()
         print("Criadas 3 solicitações de troca (2 pendentes, 1 aprovada)")
+        ensure_primary_admin(db)
 
         print("\n=== Seed concluído ===")
         print("\nCredenciais de exemplo:")

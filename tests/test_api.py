@@ -86,6 +86,7 @@ def test_me_endpoints_return_authenticated_user_and_only_user_shifts(client, age
     me_response = client.get("/me", headers=agent_headers)
     assert me_response.status_code == 200
     assert me_response.json()["email"] == "alice@agentescala.com"
+    assert "avatar_url" in me_response.json()
 
     shifts_response = client.get("/me/shifts", headers=agent_headers)
     assert shifts_response.status_code == 200
@@ -188,3 +189,31 @@ def test_me_shifts_invalid_month_returns_400(client, agent_headers):
     response = client.get("/me/shifts?month=2026-13", headers=agent_headers)
     assert response.status_code == 400
     assert "Mês inválido" in response.json()["detail"]
+
+
+def test_me_profile_update_and_avatar_upload(client, agent_headers):
+    update_payload = {
+        "name": "Alice Silva Atualizada",
+        "phone": "+55 11 99999-1111",
+        "specialty": "Cardiologia",
+        "profile_notes": "Perfil atualizado em teste.",
+    }
+    update_response = client.put("/me", headers=agent_headers, json=update_payload)
+    assert update_response.status_code == 200
+    data = update_response.json()
+    assert data["name"] == update_payload["name"]
+    assert data["phone"] == update_payload["phone"]
+    assert data["specialty"] == update_payload["specialty"]
+
+    fake_png = b"\\x89PNG\\r\\n\\x1a\\n" + b"0" * 64
+    avatar_response = client.post(
+        "/me/avatar",
+        headers=agent_headers,
+        files={"file": ("avatar.png", fake_png, "image/png")},
+    )
+    assert avatar_response.status_code == 200
+    assert avatar_response.json()["avatar_url"].startswith("/api/media/avatars/")
+
+    refreshed = client.get("/me", headers=agent_headers)
+    assert refreshed.status_code == 200
+    assert refreshed.json()["avatar_url"] is not None

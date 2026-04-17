@@ -10,6 +10,7 @@ O AgentEscala é composto por:
 - **PostgreSQL + Alembic** para persistência e versionamento de schema.
 
 Na **Fase 4 (OCR + integração com pipeline existente)**, o sistema adiciona OCR como entrada de dados para importação administrativa, mantendo staging obrigatório e validação centralizada antes de qualquer gravação definitiva de turnos.
+Na **Fase 4.5**, o OCR foi endurecido com score/status por linha, matching mais seguro com preferência por `user_id`, telemetria útil e revisão visual aprimorada no staging.
 
 ## Funcionalidades
 
@@ -224,6 +225,23 @@ O fluxo OCR foi integrado ao pipeline de importação existente sem bypass:
 5. Revisão/admin no frontend e confirmação explícita em `/schedule-imports/{id}/confirm`.
 6. Somente após confirmação os turnos são criados em `shifts`.
 
+### Hardening OCR (Fase 4.5)
+
+- Cada linha de staging passa a expor:
+  - `confidence_score`
+  - `parse_status`
+  - `match_status`
+  - `validation_status`
+- Matching de usuário endurecido:
+  - preferência por `user_id` quando disponível;
+  - fallback por nome mantido para legado;
+  - ambiguidade explícita sem auto-vínculo.
+- Auditoria/telemetria OCR em `ocr_imports`:
+  - origem (`source_origin`) e estratégia (`processing_strategy`);
+  - status de processamento;
+  - linhas extraídas, válidas, ambíguas e com conflito.
+- **Sem bypass**: OCR continua obrigatório em staging + validação + confirmação manual.
+
 #### Limitações conhecidas do OCR
 
 - PDFs com texto não extraível (scan de baixa qualidade) podem gerar linhas ambíguas para revisão manual.
@@ -255,6 +273,8 @@ O fluxo OCR foi integrado ao pipeline de importação existente sem bypass:
 
 ### Usuário autenticado
 - `GET /me` - Dados do usuário autenticado
+- `PUT /me` - Atualizar nome/email/telefone/especialidade/observações cadastrais do usuário autenticado
+- `POST /me/avatar` - Upload do avatar (PNG/JPG/WEBP até 2MB)
 - `GET /me/shifts` - Plantões do usuário autenticado (`month=YYYY-MM` ou `start_date/end_date`)
 - `GET /me/shifts/export.ics` - Exportação ICS individual da própria escala
 
@@ -281,13 +301,23 @@ O fluxo OCR foi integrado ao pipeline de importação existente sem bypass:
 - `DELETE /api/v1/medical-profiles/{id}` - Remover perfil médico (admin)
 
 ### Importação de Escala Base (admin)
-- `POST /schedule-imports/` - Upload de arquivo CSV ou XLSX e processamento em staging
+- `POST /schedule-imports/` - Upload de arquivo CSV/XLSX/PDF/imagem e processamento em staging
 - `GET /schedule-imports/` - Listar lotes de importação
 - `GET /schedule-imports/{id}` - Detalhe do lote com todas as linhas
 - `GET /schedule-imports/{id}/summary` - Resumo de contadores (válidas, alertas, inválidas, duplicatas)
 - `GET /schedule-imports/{id}/rows` - Listar linhas; filtrar por `?row_status=invalid|warning|valid`
 - `POST /schedule-imports/{id}/confirm` - Confirmar importação: converter linhas válidas em Shifts reais
 - `GET /schedule-imports/{id}/report` - Baixar CSV com inconsistências detectadas
+
+## Seed do administrador principal
+
+- Usuário alvo: `mf.soares@ks-sm.net`
+- Implementação idempotente no script `backend/seed.py`:
+  - cria se não existir;
+  - se existir, ajusta para acesso máximo (`role=admin`, `is_admin=true`, `is_active=true`);
+  - não duplica registro.
+- Senha inicial recomendada via variável `AGENTESCALA_PRIMARY_ADMIN_PASSWORD`.
+- Sem variável, o script gera senha temporária aleatória e orienta troca imediata após primeiro login.
 
 **Formato aceito no arquivo de importação:**
 

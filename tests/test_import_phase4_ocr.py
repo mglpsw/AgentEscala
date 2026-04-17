@@ -32,3 +32,11 @@ def test_validate_import_endpoint_revalidates_staging(client, admin_headers):
     payload = validate_response.json()
     assert payload["import_id"] == import_id
     assert payload["total_rows"] == 1
+
+    rows_response = client.get(f"/schedule-imports/{import_id}/rows", headers=admin_headers)
+    assert rows_response.status_code == 200
+    row = rows_response.json()[0]
+    assert "confidence_score" in row
+    assert "parse_status" in row
+    assert "match_status" in row
+    assert "validation_status" in row

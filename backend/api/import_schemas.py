@@ -33,6 +33,10 @@ class ScheduleImportRowResponse(BaseModel):
     is_standard_shift: bool = False
 
     row_status: RowStatus
+    confidence_score: Optional[float] = None
+    parse_status: str = "ok"
+    match_status: str = "unmatched"
+    validation_status: str = "pending"
     issues: Optional[List[str]] = None
     is_duplicate: bool = False
     has_overlap: bool = False

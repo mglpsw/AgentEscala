@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -175,6 +176,12 @@ async def terminal_action(
 
 _frontend_logger = logging.getLogger("agentescala.frontend")
 _FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+_AVATAR_DIR = Path((os.getenv("AGENTESCALA_AVATAR_DIR", "backend/uploads/avatars")).strip()).resolve()
+
+if _AVATAR_DIR.is_dir() or not _AVATAR_DIR.exists():
+    _AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+    app.mount("/media/avatars", StaticFiles(directory=str(_AVATAR_DIR)), name="avatars_media")
+    app.mount("/api/media/avatars", StaticFiles(directory=str(_AVATAR_DIR)), name="avatars_media_api")
 
 if _FRONTEND_DIST.is_dir():
     _frontend_logger.info("Servindo frontend buildado em %s", _FRONTEND_DIST)

@@ -6,6 +6,7 @@ const nav_links = [
   { to: '/calendar', label: '📅 Calendário' },
   { to: '/shifts', label: '🕐 Turnos' },
   { to: '/my-schedule', label: '👤 Minha Escala' },
+  { to: '/profile', label: '🧾 Meu Perfil' },
   { to: '/swaps', label: '🔄 Trocas' },
   { to: '/swaps/pending', label: '⏳ Trocas Pendentes' },
   { to: '/import', label: '📥 Importar Escala' },
@@ -35,10 +36,15 @@ function AppLayout() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold tracking-wide">AgentEscala</h1>
-            <p className="text-sm text-blue-200">Gestão de escalas médicas</p>
+            <p className="text-sm text-blue-200">Gestão de escalas médicas · v1.5.0</p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-blue-100">{user?.name}</p>
+            <div className="flex items-center gap-2 justify-end">
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-blue-900/40 border border-blue-200/20 flex items-center justify-center text-xs">
+                {user?.avatar_url ? <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" /> : '👤'}
+              </div>
+              <p className="text-sm text-blue-100">{user?.name}</p>
+            </div>
             <button
               type="button"
               onClick={handleLogout}

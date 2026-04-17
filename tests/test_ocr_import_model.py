@@ -16,7 +16,9 @@ def test_ocr_import_columns():
     """Todas as colunas especificadas existem na tabela."""
     expected = {
         "id", "status", "file_name", "file_type",
+        "source_origin", "processing_strategy",
         "raw_payload", "parsed_rows", "errors", "action_log",
+        "extracted_lines", "valid_lines", "ambiguous_lines", "conflict_lines",
         "created_by", "confirmed_by", "created_at", "confirmed_at",
     }
     actual = {c.name for c in OcrImport.__table__.columns}

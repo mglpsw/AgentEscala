@@ -9,6 +9,7 @@ import SwapsPage from '../pages/swaps_page.jsx'
 import PendingSwapsPage from '../pages/pending_swaps_page.jsx'
 import ImportPage from '../pages/import_page.jsx'
 import UsersAdminPage from '../pages/users_admin_page.jsx'
+import ProfilePage from '../pages/profile_page.jsx'
 import NotFoundPage from '../pages/not_found_page.jsx'
 import useAuth from '../hooks/use_auth.js'
 
@@ -34,6 +35,7 @@ function AppRouter() {
             <Route path="/shifts" element={<ShiftsPage />} />
             <Route path="/my-schedule" element={<MySchedulePage />} />
             <Route path="/swaps" element={<SwapsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>
 
