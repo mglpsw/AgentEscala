@@ -2,6 +2,14 @@
 
 ## [1.5.1] - 2026-04-17
 
+### Consolidado (operação segura OCR)
+- instrumentação Prometheus adicionada para OCR com métricas dedicadas: `ocr_requests_total`, `ocr_api_success_total`, `ocr_api_failure_total`, `ocr_fallback_used_total` e `ocr_api_latency_seconds`.
+- logs operacionais OCR padronizados com estratégia (`api`/`fallback_local`), status (sucesso/falha), latência da API externa e motivo resumido do fallback.
+- endpoint `/api/v1/info` mantém contrato existente e passa a expor também `api_timeout_seconds` e `api_verify_ssl` no bloco `ocr`.
+- smoke test operacional pós-deploy adicionado em `scripts/smoke_ocr_release.sh` (health, info, metrics e checklist manual para fallback).
+- documentação operacional curta em PT-BR adicionada: `docs/ocr_operacao_pos_deploy.md`.
+- testes dedicados de `/api/v1/info` e validação de presença de métricas OCR no `/metrics`.
+
 ### Alterado
 - usuário administrativo principal `mf.soares@ks-sm.net` passa a ter senha padrão `password` quando `AGENTESCALA_PRIMARY_ADMIN_PASSWORD` não estiver definida.
 - versão da aplicação atualizada para `1.5.1` (`VERSION` e `APP_VERSION`).

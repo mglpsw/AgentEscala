@@ -164,6 +164,8 @@ async def api_info():
         "ocr": {
             "api_enabled": settings.OCR_API_ENABLED,
             "api_base_url": settings.OCR_API_BASE_URL,
+            "api_timeout_seconds": settings.OCR_API_TIMEOUT_SECONDS,
+            "api_verify_ssl": settings.OCR_API_VERIFY_SSL,
         },
     }
 
