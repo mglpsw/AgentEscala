@@ -762,12 +762,20 @@ def process_import_file(
             except Exception as api_exc:
                 record_ocr_fallback_used("local_pdf")
                 record_ocr_request("fallback_local")
-                logger.warning(
-                    "ocr_execution strategy=fallback_local status=success fallback_type=local_pdf file=%s reason=%s",
-                    filename,
-                    api_exc,
-                )
-                headers, raw_rows, ocr_meta = _read_pdf_ocr(file_content)
+                try:
+                    headers, raw_rows, ocr_meta = _read_pdf_ocr(file_content)
+                    logger.warning(
+                        "ocr_execution strategy=fallback_local status=success fallback_type=local_pdf file=%s reason=%s",
+                        filename,
+                        api_exc,
+                    )
+                except Exception as fallback_exc:
+                    logger.error(
+                        "ocr_execution strategy=fallback_local status=failure fallback_type=local_pdf file=%s reason=%s",
+                        filename,
+                        fallback_exc,
+                    )
+                    raise
                 ocr_meta["fallback"] = "local_pdf"
         elif fn_lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".tiff")):
             try:
@@ -776,12 +784,20 @@ def process_import_file(
             except Exception as api_exc:
                 record_ocr_fallback_used("local_image")
                 record_ocr_request("fallback_local")
-                logger.warning(
-                    "ocr_execution strategy=fallback_local status=success fallback_type=local_image file=%s reason=%s",
-                    filename,
-                    api_exc,
-                )
-                headers, raw_rows, ocr_meta = _read_image_ocr(file_content)
+                try:
+                    headers, raw_rows, ocr_meta = _read_image_ocr(file_content)
+                    logger.warning(
+                        "ocr_execution strategy=fallback_local status=success fallback_type=local_image file=%s reason=%s",
+                        filename,
+                        api_exc,
+                    )
+                except Exception as fallback_exc:
+                    logger.error(
+                        "ocr_execution strategy=fallback_local status=failure fallback_type=local_image file=%s reason=%s",
+                        filename,
+                        fallback_exc,
+                    )
+                    raise
                 ocr_meta["fallback"] = "local_image"
         else:
             headers, raw_rows = read_file(file_content, filename)
