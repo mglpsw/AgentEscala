@@ -17,7 +17,7 @@ def bob_headers(client: TestClient):
     """Token JWT de Bob (agente) — necessário para testes de visibilidade entre agentes."""
     resp = client.post(
         "/auth/login",
-        json={"email": "bob@agentescala.com", "password": "password123"},
+        json={"email": "bob@agentescala.com", "password": "CHANGE_ME_TEST_PASSWORD"},
     )
     assert resp.status_code == 200
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
@@ -107,7 +107,7 @@ def test_login_response_inclui_user_id_e_role(client):
     """Login retorna user_id (int) e user_role — campos consumidos pela Web UI."""
     resp = client.post(
         "/auth/login",
-        json={"email": "admin@agentescala.com", "password": "password123"},
+        json={"email": "admin@agentescala.com", "password": "CHANGE_ME_TEST_PASSWORD"},
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -138,7 +138,7 @@ def test_admin_cria_usuario_retorna_201(client, admin_headers):
         json={
             "email": "novo@agentescala.com",
             "name": "Novo Médico",
-            "password": "senha_forte_123",
+            "password": "CHANGE_ME_STRONG_PASSWORD",
             "role": "agent",
         },
     )
@@ -168,7 +168,7 @@ def test_email_duplicado_retorna_400(client, admin_headers):
         json={
             "email": "alice@agentescala.com",  # já existe no seed
             "name": "Duplicado",
-            "password": "qualquer",
+            "password": "CHANGE_ME_ANY_PASSWORD",
         },
     )
     assert resp.status_code == 400

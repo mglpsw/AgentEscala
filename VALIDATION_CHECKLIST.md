@@ -78,7 +78,7 @@ docker-compose exec backend python -m backend.seed
 - "Criando solicitações de troca de exemplo..."
 - "Seed concluído"
 - Sem erros
-- Senha padrão para todos os usuários: `password123`
+- Senha padrão para todos os usuários: `CHANGE_ME`
 
 **Validação:**
 ```bash

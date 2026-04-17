@@ -23,7 +23,7 @@ Este guia resume como subir o stack do AgentEscala em Docker, trabalhar no VS Co
    ```bash
    docker-compose up -d
    ```
-4. Aplique o seed de dados (senha padrão `password123`):
+4. Defina as variáveis de senha do seed (`AGENTESCALA_PRIMARY_ADMIN_PASSWORD` e `AGENTESCALA_SEED_DEFAULT_PASSWORD`) com valores fora do Git e aplique o seed:
    ```bash
    docker-compose exec backend python -m backend.seed
    ```

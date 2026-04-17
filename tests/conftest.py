@@ -35,21 +35,21 @@ def reset_database():
         admin = User(
             email="admin@agentescala.com",
             name="Admin User",
-            hashed_password=get_password_hash("password123"),
+            hashed_password=get_password_hash("CHANGE_ME_TEST_PASSWORD"),
             role=UserRole.ADMIN,
             is_active=True,
         )
         alice = User(
             email="alice@agentescala.com",
             name="Alice Silva",
-            hashed_password=get_password_hash("password123"),
+            hashed_password=get_password_hash("CHANGE_ME_TEST_PASSWORD"),
             role=UserRole.AGENT,
             is_active=True,
         )
         bob = User(
             email="bob@agentescala.com",
             name="Bob Santos",
-            hashed_password=get_password_hash("password123"),
+            hashed_password=get_password_hash("CHANGE_ME_TEST_PASSWORD"),
             role=UserRole.AGENT,
             is_active=True,
         )
@@ -116,11 +116,11 @@ def _login(client: TestClient, email: str, password: str) -> str:
 
 @pytest.fixture
 def admin_headers(client: TestClient):
-    token = _login(client, "admin@agentescala.com", "password123")
+    token = _login(client, "admin@agentescala.com", "CHANGE_ME_TEST_PASSWORD")
     return {"Authorization": f"Bearer {token}"}
 
 
 @pytest.fixture
 def agent_headers(client: TestClient):
-    token = _login(client, "alice@agentescala.com", "password123")
+    token = _login(client, "alice@agentescala.com", "CHANGE_ME_TEST_PASSWORD")
     return {"Authorization": f"Bearer {token}"}

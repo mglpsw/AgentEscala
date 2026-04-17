@@ -34,7 +34,7 @@ Isso inicia:
 
 As migrações são aplicadas automaticamente antes de a API subir. Aguarde os serviços ficarem saudáveis (cerca de 10–20 segundos).
 
-### 3. Execute o seed (senha: `password123`)
+### 3. Execute o seed (senha: `CHANGE_ME`)
 
 ```bash
 docker-compose exec backend python -m backend.seed
@@ -66,7 +66,7 @@ Use os endpoints da API como alternativa para operações administrativas até q
 ```bash
 TOKEN=$(curl -s http://localhost:8000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@agentescala.com","password":"password123"}' | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+  -d '{"email":"admin@agentescala.com","password":"CHANGE_ME"}' | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
 ```
 
 #### Ver todos os turnos
@@ -119,7 +119,7 @@ Após o seed, você terá:
 **Admin**:
 - E-mail: admin@agentescala.com
 - Nome: Admin User
-- Senha: password123
+- Senha: CHANGE_ME
 
 **Agentes**:
 - alice@agentescala.com (Alice Silva)
@@ -127,7 +127,7 @@ Após o seed, você terá:
 - carol@agentescala.com (Carol Oliveira)
 - david@agentescala.com (David Costa)
 - eve@agentescala.com (Eve Martins)
-- Senha para todos os usuários de exemplo: password123
+- Senha para todos os usuários de exemplo: CHANGE_ME
 
 ## Comandos úteis
 

@@ -11,7 +11,7 @@
 - testes dedicados de `/api/v1/info` e validação de presença de métricas OCR no `/metrics`.
 
 ### Alterado
-- usuário administrativo principal `mf.soares@ks-sm.net` passa a ter senha padrão `password` quando `AGENTESCALA_PRIMARY_ADMIN_PASSWORD` não estiver definida.
+- usuário administrativo principal `mf.soares@ks-sm.net` passa a exigir configuração explícita de senha por variável de ambiente (`AGENTESCALA_PRIMARY_ADMIN_PASSWORD`), com placeholder seguro no código (`CHANGE_ME`) para evitar credencial versionada.
 - versão da aplicação atualizada para `1.5.1` (`VERSION` e `APP_VERSION`).
 - integração OCR revisada para priorizar a API `https://api.ks-sm.net:9443`, com fallback seguro para o parser/calibração local do último merge.
 - endpoint `/api/v1/info` passa a expor status/configuração de integração OCR para observabilidade operacional.

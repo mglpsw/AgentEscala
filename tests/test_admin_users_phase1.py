@@ -13,7 +13,7 @@ def test_admin_crud_users(client: TestClient, admin_headers):
         json={
             'name': 'Financeiro Teste',
             'email': 'financeiro@agentescala.com',
-            'password': 'senha123',
+            'password': 'CHANGE_ME_TEST_PASSWORD',
             'role': 'financeiro',
             'is_active': True,
         },
@@ -35,7 +35,7 @@ def test_admin_crud_users(client: TestClient, admin_headers):
             'email': 'medico.editado@agentescala.com',
             'role': 'medico',
             'is_active': False,
-            'password': 'novaSenha123',
+            'password': 'CHANGE_ME_UPDATED_PASSWORD',
         },
     )
     assert update.status_code == 200
