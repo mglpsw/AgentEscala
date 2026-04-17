@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.5.5] - 2026-04-17
+
+### Alterado
+- documentação de deploy homelab atualizada para a arquitetura canônica do CT 102:
+  `/opt/repos/AgentEscala`, stack `agentescala_official`, backend em
+  `192.168.3.155:18000` e NPM interno em `443`.
+- README, guia de deploy, guia operacional e backup/restore agora documentam que
+  `https://escala.ks-sm.net:9443` é a origem externa via roteador, enquanto
+  dentro do CT 102 o NPM escuta em `443`.
+- `infra/.env.homelab.example` passa a refletir os nomes e URLs canônicos do
+  deploy validado: `escala.ks-sm.net`, `VITE_API_BASE_URL` com `:9443`, volume
+  `agentescala_postgres_data_official18000` e stack `agentescala_official`.
+- `infra/docker-compose.homelab.yml` passa a usar `VITE_API_BASE_URL` vindo do
+  env, removendo hardcode para `api.ks-sm.net:9443`.
+- `infra/scripts/plan_npm_publish.sh` atualizado para orientar NPM com upstream
+  `192.168.3.155:18000` e lembrar que `9443` é port-forward externo.
+
+### Planejado
+- plano de limpeza CT 102 adicionado em `docs/ct102_cleanup_plan.md`, sem
+  executar remoções. O plano lista diretórios, containers, redes e volumes
+  legados a excluir/mover em uma janela futura.
+
 ## [1.5.4] - 2026-04-17
 
 ### Adicionado

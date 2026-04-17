@@ -33,8 +33,8 @@ Documentar as principais premissas, decisões e trade-offs usados no MVP do Agen
 
 ## Deploy
 - Docker Compose para ambiente local
-- Compose homelab isolado para CT 102, com bind local configurável, rede dedicada e volume dedicado
-- Publicação externa preparada via NPM/manual proxy em `escalas.ks-sm.net:9443`, sem automação destrutiva sobre proxies existentes
+- Compose homelab isolado para CT 102, com bind em `192.168.3.155:18000`, rede dedicada e volume dedicado
+- Publicação externa canônica via NPM em `escala.ks-sm.net`: o roteador expõe `:9443` externo e encaminha para o NPM interno em `443`
 - Script `infra/scripts/couple_to_homelab.sh` com `--dry-run`, validação de conflitos e rollback do stack do AgentEscala
 - Variáveis de ambiente em `.env.example` e `.env.homelab.example`
 

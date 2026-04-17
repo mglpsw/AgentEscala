@@ -3,7 +3,7 @@ set -euo pipefail
 
 DOMAIN="${DOMAIN:-escala.ks-sm.net}"
 PUBLIC_PORT="${PUBLIC_PORT:-9443}"
-LOCAL_BASE_URL="${LOCAL_BASE_URL:-http://127.0.0.1:18000}"
+LOCAL_BASE_URL="${LOCAL_BASE_URL:-http://192.168.3.155:18000}"
 PRINT_ONLY=false
 
 usage() {
@@ -15,7 +15,7 @@ Executa um checklist prático de validação de deploy/roteamento do AgentEscala
 Opções:
   --domain          Domínio público (default: escala.ks-sm.net)
   --public-port     Porta HTTPS pública (default: 9443)
-  --local-base-url  URL local do backend (default: http://127.0.0.1:18000)
+  --local-base-url  URL local do backend (default: http://192.168.3.155:18000)
   --print-only      Apenas imprime os comandos sem executar
   -h, --help        Exibe esta ajuda
 USAGE
@@ -83,6 +83,8 @@ run_or_print "curl -sSI ${LOCAL_BASE_URL}/metrics"
 
 printf "\n## 3) DNS e TLS externo\n"
 run_or_print "nslookup ${DOMAIN}"
+run_or_print "curl -k -sSI https://${DOMAIN}/"
+run_or_print "curl -k -sSI https://${DOMAIN}/login"
 run_or_print "openssl s_client -connect ${DOMAIN}:${PUBLIC_PORT} -servername ${DOMAIN} </dev/null | head -n 40"
 run_or_print "curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/"
 run_or_print "curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/login"
@@ -104,10 +106,12 @@ printf "\n## 5) Comandos de correção mínima sugerida (não executados automat
 cat <<SUGGEST
 # Ajuste no NPM (UI):
 # - garantir host ${DOMAIN}
-# - upstream para frontend estável já existente
-# - não usar target de preview frágil
+# - upstream: http://192.168.3.155:18000
+# - dentro do CT 102 o NPM escuta em 443; :${PUBLIC_PORT} é port-forward externo do roteador
 
 # Revalidação final:
+curl -k -sSI https://${DOMAIN}/
+curl -k -sSI https://${DOMAIN}/login
 curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/
 curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/login
 curl -k -s https://${DOMAIN}:${PUBLIC_PORT}/ | head -n 40

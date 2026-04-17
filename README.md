@@ -97,18 +97,31 @@ npm install
 npm run dev
 ```
 
-## Execução em homelab (CT 102)
+## Execução Em Homelab (CT 102)
 
-> **Fonte de verdade atual:** `infra/docker-compose.homelab.yml` + `infra/.env.homelab` + `infra/scripts/couple_to_homelab.sh`.
+> **Fonte de verdade atual no CT 102:** clone em `/opt/repos/AgentEscala`, stack Docker `agentescala_official`, `infra/docker-compose.homelab.yml` e `infra/.env.homelab`.
 
-## 🚀 Deploy (homelab / CT 102)
+## Deploy Canônico (homelab / CT 102)
 
 ### Pré-requisitos
 
 - Docker Engine ativo no CT 102.
 - Docker Compose disponível (`docker compose` ou `docker-compose`).
-- Porta dedicada livre para o backend (ex.: `18000`).
-- Nginx Proxy Manager já operacional no ambiente.
+- Porta dedicada do backend no host: `192.168.3.155:18000`.
+- Nginx Proxy Manager já operacional no CT 102 em `443`.
+- Port-forward externo do roteador: `9443 externo -> CT 102:443`.
+
+### Mapa operacional validado
+
+```text
+Cliente externo
+  -> https://escala.ks-sm.net:9443
+  -> roteador encaminha para CT 102:443
+  -> NPM no CT 102 encaminha para http://192.168.3.155:18000
+  -> backend AgentEscala no container escuta em 8030
+```
+
+Dentro do CT 102, **não há listener em `9443`**. Use `https://escala.ks-sm.net` para testar o NPM local ou `http://192.168.3.155:18000` para testar o backend direto.
 
 ### Variáveis obrigatórias
 
@@ -133,36 +146,76 @@ Preencha no mínimo:
 - `INTERNAL_NETWORK_NAME`
 - `PUBLIC_DOMAIN`
 - `PUBLIC_PORT`
+- `PUBLIC_BASE_URL`
+- `VITE_API_BASE_URL`
 - `CORS_ALLOW_ORIGINS`
 
-### Comandos oficiais (ordem única)
+Valores operacionais esperados no CT 102:
+
+```text
+COMPOSE_PROJECT_NAME=agentescala_official
+PUBLIC_DOMAIN=escala.ks-sm.net
+PUBLIC_PORT=9443
+PUBLIC_BASE_URL=https://escala.ks-sm.net:9443
+VITE_API_BASE_URL=https://escala.ks-sm.net:9443
+BACKEND_BIND_ADDRESS=192.168.3.155
+BACKEND_HOST_PORT=18000
+POSTGRES_VOLUME_NAME=agentescala_postgres_data_official18000
+INTERNAL_NETWORK_NAME=agentescala_official_internal
+```
+
+### Primeira subida
 
 ```bash
-# 1) Dry-run (não aplica mudança)
+cd /opt/repos/AgentEscala
+cp infra/.env.homelab.example infra/.env.homelab
+nano infra/.env.homelab
+
 ./infra/scripts/couple_to_homelab.sh --dry-run
-
-# 2) Deploy/build
 ./infra/scripts/couple_to_homelab.sh --build
+```
 
-# 3) Status dos containers
-docker compose -p agentescala -f infra/docker-compose.homelab.yml --env-file infra/.env.homelab ps
+### Atualização de stack já ativo
 
-# 4) Seed (apenas primeira subida ou reset planejado)
-docker compose -p agentescala -f infra/docker-compose.homelab.yml --env-file infra/.env.homelab exec backend python -m backend.seed
+Quando o backend oficial já está rodando, a porta `18000` estará ocupada pelo próprio AgentEscala. Nesse caso, use o fluxo de atualização validado:
+
+```bash
+cd /opt/repos/AgentEscala
+git fetch origin main
+git merge --ff-only FETCH_HEAD
+
+DEBUG=false docker-compose -p agentescala_official \
+  -f infra/docker-compose.homelab.yml \
+  --env-file infra/.env.homelab \
+  up -d --build --force-recreate backend
+```
+
+O `DEBUG=false` é intencional: alguns shells do CT exportam `DEBUG=release`, mas o backend espera booleano.
+
+Status:
+
+```bash
+docker-compose -p agentescala_official \
+  -f infra/docker-compose.homelab.yml \
+  --env-file infra/.env.homelab ps
 ```
 
 ### Validação pós-deploy
 
 ```bash
-curl -fsS http://127.0.0.1:18000/health
-curl -fsS http://127.0.0.1:18000/api/v1/info
+curl -fsS http://192.168.3.155:18000/health
+curl -kfsS https://escala.ks-sm.net/health
+curl -kfsS https://escala.ks-sm.net/api/v1/info
 ```
 
 Checklist funcional mínimo:
 
-1. Login em `/auth/login` (ou `/api/auth/login`) responde 200 com credencial válida.
-2. Endpoint admin (`/admin/users` ou `/admin/audit/users`) retorna 200 com token admin.
-3. OCR:
+1. `/` e `/login` retornam o `index.html` do frontend.
+2. Bundle frontend contém `https://escala.ks-sm.net:9443`.
+3. Preflight CORS de `Origin: https://escala.ks-sm.net:9443` retorna `access-control-allow-origin` correto.
+4. Login em `/auth/login` ou `/api/auth/login` responde 200 com credencial válida.
+5. Endpoint admin (`/admin/users`, `/api/admin/users` ou `/admin/audit/users`) retorna 401 sem token e 200 com token admin.
+6. OCR:
    - importação PDF/imagem funciona com API externa **ou**
    - fallback local entra em ação sem quebrar o fluxo.
 
@@ -187,20 +240,23 @@ Esses arquivos foram mantidos em `infra/legacy/` para rastreabilidade histórica
 - `/metrics`: métricas Prometheus (requisições, importações e domínio).
 - `/api/v1/info`: versão da API e bloco de configuração operacional OCR.
 
-## 🧠 Arquitetura real do sistema
+## Arquitetura Real Do Sistema
 
 Fluxo atual em produção/homelab:
 
-1. Cliente acessa o backend FastAPI (porta publicada no CT 102).
-2. FastAPI expõe API REST e também serve o frontend buildado (`frontend/dist`) quando disponível.
-3. Banco PostgreSQL roda no mesmo compose homelab, em rede interna dedicada.
-4. OCR de PDF/imagem prioriza API externa (`OCR_API_BASE_URL`) e mantém fallback local obrigatório.
-5. Autenticação é JWT; endpoints administrativos exigem perfil admin (`role=admin` ou `is_admin=true`).
-6. Métricas Prometheus saem em `/metrics`; saúde em `/health`; versão/config operacional em `/api/v1/info`.
+1. Cliente acessa `https://escala.ks-sm.net:9443`.
+2. O roteador entrega a conexão no NPM do CT 102 em `443`.
+3. NPM encaminha para `http://192.168.3.155:18000`.
+4. FastAPI expõe API REST e também serve o frontend buildado (`frontend/dist`).
+5. Banco PostgreSQL roda no mesmo compose homelab, em rede interna dedicada.
+6. OCR de PDF/imagem prioriza API externa (`OCR_API_BASE_URL`) e mantém fallback local obrigatório.
+7. Autenticação é JWT; endpoints administrativos exigem perfil admin (`role=admin` ou `is_admin=true`).
+8. Métricas Prometheus saem em `/metrics`; saúde em `/health`; versão/config operacional em `/api/v1/info`.
 
 Pontos críticos:
 
 - Build frontend deve existir no container (`Dockerfile` faz build multi-stage).
+- `VITE_API_BASE_URL` deve ser `https://escala.ks-sm.net:9443`, pois é a origem vista pelo navegador externo.
 - Migrações Alembic são aplicadas no startup do backend.
 - Sem `.env.homelab` válido, o deploy não inicia (falha rápida e explícita).
 - Se OCR externo estiver indisponível, fallback local deve manter continuidade operacional.
