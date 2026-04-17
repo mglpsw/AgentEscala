@@ -50,6 +50,20 @@ class UserResponse(UserBase):
         from_attributes = True
 
 
+
+
+class AdminUserAuditResponse(BaseModel):
+    id: int
+    action: str
+    admin_user_id: int
+    target_user_id: int
+    change_summary: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class MeUpdatePayload(BaseModel):
     name: Optional[str] = Field(default=None, min_length=2)
     email: Optional[EmailStr] = None

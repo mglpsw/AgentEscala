@@ -91,6 +91,20 @@ class User(Base):
     )
 
 
+
+
+class AdminUserAuditLog(Base):
+    """Auditoria mínima de ações administrativas em usuários."""
+    __tablename__ = "admin_user_audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    action = Column(String(64), nullable=False, index=True)
+    admin_user_id = Column(Integer, nullable=False, index=True)
+    target_user_id = Column(Integer, nullable=False, index=True)
+    change_summary = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
 class MedicalProfile(Base):
     """Identidade médica administrativa vinculada a um usuário"""
     __tablename__ = "medical_profiles"

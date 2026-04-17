@@ -1,11 +1,11 @@
-# AgentEscala (Release 1.5.1)
+# AgentEscala (Release 1.5.3)
 
 Sistema de gestão de escalas médicas com foco em estabilidade operacional, rastreabilidade e evolução incremental segura para ambiente homelab.
 
 ## Visão geral
 
 O AgentEscala centraliza o ciclo de escala médica: cadastro de usuários, geração/consulta de plantões, trocas e importação assistida com staging.  
-Na release **1.5.1**, o sistema está consolidado com OCR resiliente, observabilidade e versionamento alinhado entre backend e frontend.
+Na release **1.5.3**, o sistema está consolidado com OCR resiliente, observabilidade e versionamento alinhado entre backend e frontend.
 
 ## Problema que resolve
 
@@ -21,6 +21,7 @@ Hospitais e clínicas precisam reduzir conflitos de plantão, evitar sobreposiç
 - Login público disponível em `/auth/login` e alias compatível `/api/auth/login` (sem token).
 - Gestão de usuários, plantões e solicitações de troca.
 - Área administrativa de usuários (somente admin) com listagem, criação, edição e ativação/desativação.
+- Trilha de auditoria administrativa mínima para usuários (criação, edição, status e exclusão), com consulta em `GET /admin/audit/users`.
 - Importação de escala com staging e validação.
 - Observabilidade com `/health`, `/metrics` e `/api/v1/info`.
 - Frontend React com login, calendário e fluxo de trocas.

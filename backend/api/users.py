@@ -1,14 +1,21 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from ..config.database import get_db
 from ..models import User, UserRole
-from ..services import UserService
+from ..services import AdminAuditService, UserService
 from ..utils.auth import get_password_hash
 from ..utils.dependencies import get_current_user, require_admin
-from .schemas import AdminUserCreate, AdminUserStatusUpdate, AdminUserUpdate, UserCreate, UserResponse
+from .schemas import (
+    AdminUserAuditResponse,
+    AdminUserCreate,
+    AdminUserStatusUpdate,
+    AdminUserUpdate,
+    UserCreate,
+    UserResponse,
+)
 
 router = APIRouter(tags=["Usuários"])
 
@@ -17,7 +24,7 @@ router = APIRouter(tags=["Usuários"])
 def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ):
     """Criar um novo usuário (compatibilidade)."""
     existing_user = UserService.get_user_by_email(db, user.email)
@@ -26,7 +33,20 @@ def create_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Já existe um usuário com este e-mail",
         )
-    return UserService.create_user(db, user.email, user.name, user.password, user.role)
+    created_user = UserService.create_user(db, user.email, user.name, user.password, user.role)
+    AdminAuditService.log_user_action(
+        db,
+        action="user_create",
+        admin_user_id=current_user.id,
+        target_user_id=created_user.id,
+        summary=AdminAuditService.build_create_summary(
+            email=created_user.email,
+            name=created_user.name,
+            role=created_user.role.value,
+            is_active=created_user.is_active,
+        ),
+    )
+    return created_user
 
 
 @router.get("/users", response_model=List[UserResponse])
@@ -82,12 +102,24 @@ def get_user(
 def deactivate_user(
     user_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ):
     """Desativar um usuário (compatibilidade)."""
+    user = UserService.get_user(db, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+
     success = UserService.deactivate_user(db, user_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+
+    AdminAuditService.log_user_action(
+        db,
+        action="user_deactivate",
+        admin_user_id=current_user.id,
+        target_user_id=user_id,
+        summary={"is_active": False},
+    )
     return None
 
 
@@ -106,13 +138,13 @@ def admin_list_users(
 def admin_create_user(
     payload: AdminUserCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ):
     """Criar usuário via área administrativa."""
     if UserService.get_user_by_email(db, payload.email):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="E-mail já cadastrado")
 
-    return UserService.create_user(
+    created_user = UserService.create_user(
         db,
         email=payload.email,
         name=payload.name,
@@ -121,13 +153,27 @@ def admin_create_user(
         is_active=payload.is_active,
     )
 
+    AdminAuditService.log_user_action(
+        db,
+        action="admin_user_create",
+        admin_user_id=current_user.id,
+        target_user_id=created_user.id,
+        summary=AdminAuditService.build_create_summary(
+            email=created_user.email,
+            name=created_user.name,
+            role=created_user.role.value,
+            is_active=created_user.is_active,
+        ),
+    )
+    return created_user
+
 
 @router.put("/admin/users/{user_id}", response_model=UserResponse)
 def admin_update_user(
     user_id: int,
     payload: AdminUserUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ):
     """Atualiza nome, e-mail, senha, role e status do usuário."""
     user = UserService.get_user(db, user_id)
@@ -141,6 +187,8 @@ def admin_update_user(
         if existing and existing.id != user_id:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="E-mail já cadastrado")
 
+    summary_data = AdminAuditService.build_update_summary(changes=data.copy())
+
     password = data.pop("password", None)
     if password:
         data["hashed_password"] = get_password_hash(password)
@@ -151,6 +199,14 @@ def admin_update_user(
     updated_user = UserService.update_user(db, user_id, **data)
     if updated_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+
+    AdminAuditService.log_user_action(
+        db,
+        action="admin_user_update",
+        admin_user_id=current_user.id,
+        target_user_id=updated_user.id,
+        summary=summary_data,
+    )
 
     return updated_user
 
@@ -174,6 +230,14 @@ def admin_delete_user(
 
     db.delete(user)
     db.commit()
+
+    AdminAuditService.log_user_action(
+        db,
+        action="admin_user_delete",
+        admin_user_id=current_user.id,
+        target_user_id=user_id,
+        summary={"deleted": True},
+    )
     return None
 
 
@@ -195,4 +259,23 @@ def admin_update_user_status(
     if updated_user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
 
+    AdminAuditService.log_user_action(
+        db,
+        action="admin_user_status_change",
+        admin_user_id=current_user.id,
+        target_user_id=updated_user.id,
+        summary={"is_active": updated_user.is_active},
+    )
+
     return updated_user
+
+
+@router.get("/admin/audit/users", response_model=List[AdminUserAuditResponse])
+def admin_list_user_audit_logs(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Lista eventos recentes de auditoria de administração de usuários."""
+    return AdminAuditService.list_user_audit_logs(db, skip=skip, limit=limit)
