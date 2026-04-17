@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.3] - 2026-04-17
+
+### Adicionado
+- trilha mínima de auditoria administrativa de usuários com nova tabela `admin_user_audit_logs` (ação, admin responsável, usuário alvo, resumo e timestamp).
+- endpoint admin-only `GET /admin/audit/users` para consulta de eventos recentes com `skip`/`limit` básico.
+
+### Alterado
+- endpoints administrativos de usuários agora registram auditoria em criação, edição, ativação/desativação e exclusão.
+- sanitização de payload de auditoria para não persistir senha em claro nem hash de senha (`password_changed=true` quando aplicável).
+
+### Testes
+- cobertura para geração de log em criação/edição e ativação/desativação de usuário.
+- cobertura para bloqueio de acesso de não-admin ao endpoint de auditoria.
+
 ## [1.5.2] - 2026-04-17
 
 ### Corrigido

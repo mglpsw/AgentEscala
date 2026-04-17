@@ -1,6 +1,6 @@
 # CONTEXT — AgentEscala (para agentes IA)
 
-## Estado atual (release 1.5.1)
+## Estado atual (release 1.5.3)
 
 AgentEscala está estável em operação com:
 
@@ -10,9 +10,12 @@ AgentEscala está estável em operação com:
 - importação com staging e validação;
 - observabilidade via `/health`, `/metrics` e `/api/v1/info`;
 - OCR integrado ao fluxo de importação para PDF/imagem.
+- auditoria administrativa mínima para gestão de usuários (persistência + consulta admin-only).
 
 ## Atualização operacional (2026-04-17)
 
+- trilha de auditoria administrativa de usuários ativa para criação, edição, ativação/desativação e exclusão via endpoints administrativos.
+- endpoint `GET /admin/audit/users` disponível para consulta de eventos recentes de auditoria (admin-only).
 - endpoint de login permanece público e compatível em dois caminhos: `/auth/login` e `/api/auth/login`.
 - área administrativa de usuários reforçada com endpoint dedicado de status (`PATCH /admin/users/{id}/status`), protegido por dependência admin no backend.
 - frontend passou a considerar `role=admin` **ou** `is_admin=true` para renderização/guarda de rotas administrativas.
