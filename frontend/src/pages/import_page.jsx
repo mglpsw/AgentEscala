@@ -170,6 +170,9 @@ function UploadForm({
 
 function ReviewPanel({ summary, importDetail, isConfirming, error, onConfirm, onValidate, onReset }) {
   const rows = importDetail?.rows ?? []
+  const invalidCount = rows.filter((row) => row.row_status === 'invalid').length
+  const ambiguousCount = rows.filter((row) => row.match_status?.includes('ambiguous')).length
+  const conflictCount = rows.filter((row) => row.validation_status === 'conflict' || row.has_overlap).length
   const hasImportable = summary.importable_rows > 0
   const isAlreadyConfirmed = summary.confirmed
 
@@ -202,6 +205,11 @@ function ReviewPanel({ summary, importDetail, isConfirming, error, onConfirm, on
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
         <p className="text-sm font-semibold text-gray-600 mb-3">Resumo da validação</p>
         <SummaryBadges summary={summary} />
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <span className="px-2 py-1 rounded bg-red-50 text-red-700">Inválidas: {invalidCount}</span>
+          <span className="px-2 py-1 rounded bg-rose-50 text-rose-700">Ambíguas: {ambiguousCount}</span>
+          <span className="px-2 py-1 rounded bg-orange-50 text-orange-700">Conflitos: {conflictCount}</span>
+        </div>
 
         {!hasImportable && !isAlreadyConfirmed && (
           <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded px-3 py-2">

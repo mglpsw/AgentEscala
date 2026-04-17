@@ -131,6 +131,7 @@ export function AuthProvider({ children }) {
     isAdmin: user?.role === 'admin',
     login,
     logout,
+    refreshUser: fetchCurrentUser,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

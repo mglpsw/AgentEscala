@@ -46,6 +46,14 @@ class UserResponse(UserBase):
         from_attributes = True
 
 
+class MeUpdatePayload(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=2)
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = Field(default=None, max_length=32)
+    specialty: Optional[str] = Field(default=None, max_length=120)
+    profile_notes: Optional[str] = Field(default=None, max_length=1500)
+
+
 # Esquemas de turno
 class ShiftBase(BaseModel):
     start_time: datetime

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Enum as SQLEnum, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Enum as SQLEnum, Text, UniqueConstraint, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -64,6 +64,10 @@ class User(Base):
     role = Column(SQLEnum(UserRole), default=UserRole.AGENT, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    phone = Column(String, nullable=True)
+    specialty = Column(String, nullable=True)
+    profile_notes = Column(Text, nullable=True)
+    avatar_path = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -263,6 +267,10 @@ class ScheduleImportRow(Base):
 
     # Diagnóstico
     row_status = Column(SQLEnum(RowStatus), default=RowStatus.VALID, nullable=False)
+    confidence_score = Column(Float, nullable=True)
+    parse_status = Column(String, nullable=False, default="ok")
+    match_status = Column(String, nullable=False, default="unmatched")
+    validation_status = Column(String, nullable=False, default="pending")
     issues = Column(Text, nullable=True)   # JSON: lista de strings descrevendo problemas
     is_duplicate = Column(Boolean, default=False, nullable=False)
     has_overlap = Column(Boolean, default=False, nullable=False)

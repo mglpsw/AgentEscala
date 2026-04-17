@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 from datetime import date
+import os
+from pathlib import Path
+import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..config.database import get_db
+from ..config.settings import settings
 from ..models import User
+from .schemas import MeUpdatePayload
 from ..services import ShiftService
 from ..utils.dependencies import get_current_user
 from ..utils.ics_exporter import ICSExporter
@@ -26,6 +31,73 @@ def get_me(current_user: User = Depends(get_current_user)):
         "role": current_user.role.value,
         "is_admin": current_user.is_admin,
         "is_active": current_user.is_active,
+        "phone": current_user.phone,
+        "specialty": current_user.specialty,
+        "profile_notes": current_user.profile_notes,
+        "avatar_url": f"/media/avatars/{current_user.avatar_path}" if current_user.avatar_path else None,
+    }
+
+
+@router.put("")
+def update_me(
+    payload: MeUpdatePayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if payload.email and payload.email != current_user.email:
+        duplicate = db.query(User).filter(User.email == payload.email, User.id != current_user.id).first()
+        if duplicate:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="E-mail já está em uso")
+        current_user.email = payload.email
+
+    update_data = payload.model_dump(exclude_unset=True, exclude={"email"})
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+
+    db.commit()
+    db.refresh(current_user)
+    return get_me(current_user=current_user)
+
+
+def _avatar_root() -> Path:
+    raw_dir = os.getenv("AGENTESCALA_AVATAR_DIR", "backend/uploads/avatars").strip()
+    return Path(raw_dir).resolve()
+
+
+@router.post("/avatar")
+async def upload_my_avatar(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    allowed = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+    if content_type not in allowed:
+        raise HTTPException(status_code=415, detail="Formato inválido. Use PNG, JPG ou WEBP.")
+
+    content = await file.read()
+    max_size = 2 * 1024 * 1024
+    if not content or len(content) > max_size:
+        raise HTTPException(status_code=400, detail="Arquivo vazio ou acima de 2MB.")
+
+    avatars_dir = _avatar_root()
+    avatars_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"user_{current_user.id}_{uuid.uuid4().hex}{allowed[content_type]}"
+    target = avatars_dir / filename
+    target.write_bytes(content)
+
+    if current_user.avatar_path and current_user.avatar_path != filename:
+        old_file = avatars_dir / current_user.avatar_path
+        if old_file.exists():
+            old_file.unlink()
+
+    current_user.avatar_path = filename
+    db.commit()
+    db.refresh(current_user)
+
+    return {
+        "avatar_url": f"/media/avatars/{filename}",
+        "max_size_bytes": max_size,
     }
 
 

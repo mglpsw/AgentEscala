@@ -20,6 +20,8 @@ class OcrImport(Base):
 
     file_name = Column(String, nullable=True)
     file_type = Column(String, nullable=True)
+    source_origin = Column(String, nullable=True)
+    processing_strategy = Column(String, nullable=True)
     # valores possíveis para file_type: "pdf", "image", "xlsx", "csv"
 
     # Payload bruto extraído antes do parsing
@@ -34,6 +36,10 @@ class OcrImport(Base):
     # Trilha de edições manuais: [{"user_id", "timestamp", "row_id", "field",
     #                               "old_value", "new_value"}]
     action_log = Column(JSON, nullable=True)
+    extracted_lines = Column(Integer, nullable=False, default=0)
+    valid_lines = Column(Integer, nullable=False, default=0)
+    ambiguous_lines = Column(Integer, nullable=False, default=0)
+    conflict_lines = Column(Integer, nullable=False, default=0)
 
     # users.id é Integer — FK deve respeitar o tipo da PK referenciada
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)

@@ -58,6 +58,7 @@ function ImportRowsTable({ rows }) {
             <th className="px-3 py-2 font-medium">Início</th>
             <th className="px-3 py-2 font-medium">Fim</th>
             <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Confiança</th>
             <th className="px-3 py-2 font-medium">Issues / Observações</th>
           </tr>
         </thead>
@@ -98,6 +99,11 @@ function ImportRowsTable({ rows }) {
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-1">
                     <StatusBadge status={row.row_status} />
+                    {row.match_status?.includes('ambiguous') && (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-rose-100 text-rose-700 font-medium">
+                        ambíguo
+                      </span>
+                    )}
                     {row.is_duplicate && (
                       <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700 font-medium">
                         duplicata
@@ -108,11 +114,26 @@ function ImportRowsTable({ rows }) {
                         sobreposição
                       </span>
                     )}
+                    {row.validation_status === 'conflict' && (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-red-100 text-red-700 font-medium">
+                        conflito
+                      </span>
+                    )}
                     {row.is_overnight && (
                       <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-medium">
                         noturno
                       </span>
                     )}
+                  </div>
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-700">
+                      {typeof row.confidence_score === 'number' ? `${Math.round(row.confidence_score * 100)}%` : '—'}
+                    </span>
+                    <span className="text-gray-400">
+                      {row.parse_status}/{row.match_status}/{row.validation_status}
+                    </span>
                   </div>
                 </td>
 

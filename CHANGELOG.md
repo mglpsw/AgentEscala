@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.5.0] - 2026-04-17 — Fase 4.5 concluída
+
+### Adicionado
+- Hardening OCR no staging com `confidence_score`, `parse_status`, `match_status` e `validation_status` por linha.
+- Matching mais seguro de profissionais com preferência por `user_id` quando informado e marcação explícita de ambiguidades sem auto-vínculo.
+- Telemetria simples de OCR em `ocr_imports` (origem, estratégia, linhas extraídas/válidas/ambíguas/conflitos).
+- Perfil do usuário autenticado com edição (`PUT /me`) e upload de avatar (`POST /me/avatar`).
+- Navegação e página "Meu Perfil" no frontend com atualização de dados cadastrais e avatar.
+- Seed idempotente para admin principal `mf.soares@ks-sm.net` com promoção automática para acesso máximo.
+
+### Alterado
+- Revisão de staging da importação passou a destacar ambiguidades, conflitos e score de confiança.
+- Versionamento atualizado para `v1.5.0` em backend/frontend e cabeçalho da UI.
+
+### Segurança e compatibilidade
+- Fluxo OCR mantém bloqueio sem bypass: upload OCR continua passando por staging + validação antes da confirmação.
+- Fallback por nome preservado para legado, porém com regras mais restritivas para reduzir falso positivo.
+
 ## [1.4.0] - 2026-04-16 — Fase 4 concluída (OCR + pipeline seguro)
 
 ### Adicionado

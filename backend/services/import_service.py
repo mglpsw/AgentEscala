@@ -18,7 +18,7 @@ import json
 import logging
 import re
 from datetime import date, datetime, time, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
@@ -48,6 +48,7 @@ STANDARD_SHIFTS: List[Tuple[time, time]] = [
 # ─── Aliases de colunas aceitos ──────────────────────────────────────────────
 _COL_ALIASES: Dict[str, List[str]] = {
     "profissional":  ["profissional", "professional", "nome", "name", "agente", "agent", "colaborador"],
+    "user_id":       ["user_id", "usuario_id", "id_usuario", "id_user", "profissional_id"],
     "data":          ["data", "date", "data_turno", "shift_date", "dia_data"],
     "dia_semana":    ["dia_semana", "dia", "day", "weekday", "semana"],
     "hora_inicio":   ["hora_inicio", "hora_inicial", "start_time", "inicio", "start", "start_hour",
@@ -159,6 +160,10 @@ _TIME_PATTERN = re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\b")
 _OCR_SPLIT_PATTERN = re.compile(r"[|;,\t]| {2,}")
 
 
+def _normalize_match_text(value: Optional[str]) -> str:
+    return re.sub(r"\s+", " ", (value or "").strip().lower())
+
+
 def _parse_ocr_line(raw_line: str) -> Tuple[Dict[str, Any], Optional[str]]:
     line = raw_line.strip()
     if not line:
@@ -251,24 +256,44 @@ def read_file(content: bytes, filename: str) -> Tuple[List[str], List[Dict[str, 
 
 # ─── Matching de profissional ─────────────────────────────────────────────────
 
-def _find_agent(db: Session, name: Optional[str]) -> Tuple[Optional[User], List[str]]:
+def _find_agent(db: Session, name: Optional[str], preferred_user_id: Optional[str] = None) -> Tuple[Optional[User], List[str], str]:
+    if preferred_user_id:
+        try:
+            user_id = int(str(preferred_user_id).strip())
+            by_id = db.query(User).filter(User.id == user_id, User.is_active == True).first()  # noqa: E712
+            if by_id:
+                return by_id, [], "resolved_by_user_id"
+            return None, [f"user_id '{preferred_user_id}' não encontrado ou inativo"], "unmatched_user_id"
+        except (TypeError, ValueError):
+            return None, [f"user_id '{preferred_user_id}' inválido"], "invalid_user_id"
+
     if not name:
-        return None, ["Profissional não informado"]
-    name_clean = name.strip().lower()
-    # Busca exata de nome (case-insensitive) ou email
+        return None, ["Profissional não informado"], "missing_name"
+
+    name_clean = _normalize_match_text(name)
     users: List[User] = db.query(User).filter(User.is_active == True).all()  # noqa: E712
-    # Exact match
-    for u in users:
-        if u.name.lower() == name_clean or u.email.lower() == name_clean:
-            return u, []
-    # Partial match
-    matches = [u for u in users if name_clean in u.name.lower() or u.name.lower() in name_clean]
+    for user in users:
+        if _normalize_match_text(user.name) == name_clean or _normalize_match_text(user.email) == name_clean:
+            return user, [], "exact_name"
+
+    name_tokens: Set[str] = {token for token in name_clean.split(" ") if len(token) >= 3}
+    matches: List[User] = []
+    for user in users:
+        user_name = _normalize_match_text(user.name)
+        if name_clean in user_name or user_name in name_clean:
+            matches.append(user)
+            continue
+        if name_tokens:
+            overlap = len(name_tokens.intersection(set(user_name.split(" "))))
+            if overlap >= 2:
+                matches.append(user)
+
     if len(matches) == 1:
-        return matches[0], [f"Profissional '{name}' resolvido por correspondência parcial com '{matches[0].name}'"]
+        return matches[0], [f"Profissional '{name}' resolvido por correspondência aproximada com '{matches[0].name}'"], "fuzzy_name"
     if len(matches) > 1:
-        names = ", ".join(u.name for u in matches)
-        return None, [f"Profissional '{name}' ambíguo: múltiplas correspondências ({names})"]
-    return None, [f"Profissional '{name}' não encontrado no sistema"]
+        names = ", ".join(user.name for user in matches)
+        return None, [f"Profissional '{name}' ambíguo: múltiplas correspondências ({names})"], "ambiguous_name"
+    return None, [f"Profissional '{name}' não encontrado no sistema"], "not_found"
 
 
 # ─── Normalização de turno ────────────────────────────────────────────────────
@@ -317,6 +342,7 @@ def _validate_row(
         return str(val).strip() if val is not None and str(val).strip() else None
 
     raw_professional = get_raw("profissional")
+    raw_user_id = get_raw("user_id")
     raw_date_str = get_raw("data")
     raw_start = get_raw("hora_inicio")
     raw_end = get_raw("hora_fim")
@@ -325,7 +351,7 @@ def _validate_row(
     raw_src = get_raw("origem")
 
     # Profissional
-    agent, agent_issues = _find_agent(db, raw_professional)
+    agent, agent_issues, match_status = _find_agent(db, raw_professional, preferred_user_id=raw_user_id)
     issues.extend(agent_issues)
     if agent is None and not agent_issues:
         issues.append("Profissional inválido")
@@ -336,9 +362,11 @@ def _validate_row(
 
     # Data
     parsed_date = _parse_date(raw_date_str)
+    parse_status = "ok"
     if parsed_date is None:
         issues.append(f"Data inválida ou ausente: '{raw_date_str}'")
         fatal = True
+        parse_status = "invalid"
 
     # Horas
     t_start: Optional[time] = None
@@ -354,9 +382,11 @@ def _validate_row(
     if t_start is None:
         issues.append(f"Hora inicial inválida ou ausente: '{raw_start}'")
         fatal = True
+        parse_status = "invalid"
     if t_end is None:
         issues.append(f"Hora final inválida ou ausente: '{raw_end}'")
         fatal = True
+        parse_status = "invalid"
 
     # Normalização
     normalized_start = normalized_end = None
@@ -389,6 +419,32 @@ def _validate_row(
             fatal = True
 
     row_status = RowStatus.INVALID if fatal else (RowStatus.WARNING if issues else RowStatus.VALID)
+    validation_status = (
+        "invalid" if row_status == RowStatus.INVALID
+        else "warning" if row_status == RowStatus.WARNING
+        else "valid"
+    )
+    if parse_status == "ok" and row_status == RowStatus.WARNING:
+        parse_status = "warning"
+
+    confidence_score = 0.0
+    if raw_professional:
+        confidence_score += 0.2
+    if parsed_date:
+        confidence_score += 0.25
+    if t_start:
+        confidence_score += 0.2
+    if t_end:
+        confidence_score += 0.2
+    if agent is not None:
+        confidence_score += 0.15
+    if match_status == "resolved_by_user_id":
+        confidence_score += 0.05
+    if match_status == "ambiguous_name":
+        confidence_score -= 0.2
+    if fatal:
+        confidence_score = min(confidence_score, 0.35)
+    confidence_score = max(0.0, min(1.0, round(confidence_score, 2)))
 
     return {
         "row_number": row_num,
@@ -406,6 +462,10 @@ def _validate_row(
         "is_overnight": is_overnight,
         "is_standard_shift": is_standard,
         "row_status": row_status,
+        "confidence_score": confidence_score,
+        "parse_status": parse_status,
+        "match_status": match_status,
+        "validation_status": validation_status,
         "issues": json.dumps(issues) if issues else None,
         "is_duplicate": False,
         "has_overlap": False,
@@ -430,6 +490,7 @@ def _detect_duplicates_and_overlaps(validated: List[Dict[str, Any]]) -> List[Dic
         key = (aid, s, e)
         if key in seen:
             row["is_duplicate"] = True
+            row["validation_status"] = "warning"
             issues_list = json.loads(row["issues"]) if row["issues"] else []
             issues_list.append(f"Possível duplicata da linha {seen[key]}")
             row["issues"] = json.dumps(issues_list)
@@ -453,6 +514,7 @@ def _detect_duplicates_and_overlaps(validated: List[Dict[str, Any]]) -> List[Dic
                 if a["normalized_start"] < b["normalized_end"] and b["normalized_start"] < a["normalized_end"]:
                     for row in (a, b):
                         row["has_overlap"] = True
+                        row["validation_status"] = "conflict"
                         issues_list = json.loads(row["issues"]) if row["issues"] else []
                         msg = "Sobreposição de turno detectada com outra linha do mesmo agente neste lote"
                         if msg not in issues_list:
@@ -471,6 +533,8 @@ def _append_issue(row: ScheduleImportRow, message: str) -> None:
         row.issues = json.dumps(issues_list)
     if row.row_status == RowStatus.VALID:
         row.row_status = RowStatus.WARNING
+    if row.validation_status in {"pending", "valid"}:
+        row.validation_status = "warning"
 
 
 def _status_equals(raw_status: Any, expected: RowStatus) -> bool:
@@ -478,6 +542,27 @@ def _status_equals(raw_status: Any, expected: RowStatus) -> bool:
         return raw_status == expected
     status_text = str(raw_status).lower()
     return status_text == expected.value or status_text.endswith(f".{expected.value}")
+
+
+def _refresh_ocr_counters_for_import(db: Session, schedule_import: ScheduleImport) -> None:
+    if not schedule_import.source_description or "ocr_import_id:" not in schedule_import.source_description:
+        return
+
+    marker = schedule_import.source_description.split("ocr_import_id:")[-1].split("]")[0].strip()
+    ocr_import = db.query(OcrImport).filter(OcrImport.id == marker).first()
+    if not ocr_import:
+        return
+
+    rows = db.query(ScheduleImportRow).filter(ScheduleImportRow.import_id == schedule_import.id).all()
+    ocr_import.extracted_lines = len(rows)
+    ocr_import.valid_lines = sum(
+        1 for row in rows
+        if _status_equals(row.row_status, RowStatus.VALID) and row.agent_id is not None
+    )
+    ocr_import.ambiguous_lines = sum(
+        1 for row in rows if "ambiguous" in (row.match_status or "") or row.agent_id is None
+    )
+    ocr_import.conflict_lines = sum(1 for row in rows if row.has_overlap or row.is_duplicate)
 
 
 def _apply_schedule_validation_to_staging(db: Session, import_id: int) -> None:
@@ -540,10 +625,14 @@ def _apply_schedule_validation_to_staging(db: Session, import_id: int) -> None:
         if shift_id in row_id_map:
             row = row_id_map[shift_id]
             row.has_overlap = row.has_overlap or code == "OVERLAPPING_SHIFTS"
+            if code == "OVERLAPPING_SHIFTS":
+                row.validation_status = "conflict"
             _append_issue(row, f"[{code}] {message}")
         if other_shift_id in row_id_map:
             row = row_id_map[other_shift_id]
             row.has_overlap = row.has_overlap or code == "OVERLAPPING_SHIFTS"
+            if code == "OVERLAPPING_SHIFTS":
+                row.validation_status = "conflict"
             _append_issue(row, f"[{code}] {message}")
 
         if code in {"DAILY_HOURS_EXCEEDED", "WEEKLY_HOURS_EXCEEDED"}:
@@ -589,10 +678,13 @@ def process_import_file(
             headers, raw_rows = read_file(file_content, filename)
 
         if is_ocr_upload:
+            parse_errors_by_line = {err.get("line") for err in (ocr_meta.get("errors") or [])}
             ocr_import = OcrImport(
                 status="draft",
                 file_name=filename,
                 file_type="pdf" if fn_lower.endswith(".pdf") else "image",
+                source_origin=source_description,
+                processing_strategy="pypdf-extract-text" if fn_lower.endswith(".pdf") else "pytesseract-ocr",
                 raw_payload={"text": ocr_meta.get("raw_text", "")},
                 parsed_rows=[
                     {
@@ -605,13 +697,18 @@ def process_import_file(
                         "start_time": row.get("hora_inicio"),
                         "end_time": row.get("hora_fim"),
                         "location": None,
-                        "row_status": "warning",
+                        "row_status": "warning" if str(idx) in parse_errors_by_line else "valid",
+                        "confidence_score": 0.5 if str(idx) in parse_errors_by_line else 0.75,
+                        "parse_status": "warning" if str(idx) in parse_errors_by_line else "ok",
+                        "match_status": "pending",
+                        "validation_status": "pending",
                     }
                     for idx, row in enumerate(raw_rows, start=1)
                 ],
                 errors=ocr_meta.get("errors", []),
                 action_log=[],
                 created_by=imported_by_id,
+                extracted_lines=len(raw_rows),
             )
             db.add(ocr_import)
             db.flush()
@@ -683,6 +780,7 @@ def process_import_file(
     schedule_import.invalid_rows = sum(1 for r in rows_after_validation if _status_equals(r.row_status, RowStatus.INVALID))
     if ocr_import:
         ocr_import.status = "draft"
+    _refresh_ocr_counters_for_import(db, schedule_import)
 
     db.commit()
     db.refresh(schedule_import)
@@ -735,6 +833,7 @@ def confirm_import(
         )
         if validation_errors:
             row.has_overlap = True
+            row.validation_status = "conflict"
             issues_list = json.loads(row.issues) if row.issues else []
             for error in validation_errors:
                 issues_list.append(error.get("message", "Erro de validação de escala"))
@@ -773,6 +872,7 @@ def confirm_import(
             ocr_import.status = "confirmed"
             ocr_import.confirmed_by = confirmed_by_id
             ocr_import.confirmed_at = datetime.utcnow()
+    _refresh_ocr_counters_for_import(db, schedule_import)
 
     db.commit()
     db.refresh(schedule_import)
@@ -790,6 +890,7 @@ def validate_import_staging(db: Session, import_id: int) -> ScheduleImport:
     schedule_import.warning_rows = sum(1 for r in rows if _status_equals(r.row_status, RowStatus.WARNING))
     schedule_import.invalid_rows = sum(1 for r in rows if _status_equals(r.row_status, RowStatus.INVALID))
     schedule_import.duplicate_rows = sum(1 for r in rows if r.is_duplicate)
+    _refresh_ocr_counters_for_import(db, schedule_import)
     db.commit()
     db.refresh(schedule_import)
     return schedule_import
