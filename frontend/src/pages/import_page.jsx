@@ -91,7 +91,7 @@ function UploadForm({
             <input
               id="import-file"
               type="file"
-              accept=".csv,.xlsx"
+              accept=".csv,.xlsx,.xls,.pdf,.png,.jpg,.jpeg,.webp,.tiff"
               required
               onChange={onFileChange}
               className="block w-full text-sm text-gray-700
@@ -100,7 +100,7 @@ function UploadForm({
                 hover:file:bg-blue-100 cursor-pointer"
             />
             <p className="text-xs text-gray-400 mt-1">
-              Formatos aceitos: .csv (separador , ou ;) e .xlsx
+              Formatos aceitos: .csv, .xlsx, .pdf e imagens (.png/.jpg/.webp/.tiff)
             </p>
           </div>
 
@@ -168,7 +168,7 @@ function UploadForm({
 
 // ─── Painel de revisão do staging ─────────────────────────────────────────────
 
-function ReviewPanel({ summary, importDetail, isConfirming, error, onConfirm, onReset }) {
+function ReviewPanel({ summary, importDetail, isConfirming, error, onConfirm, onValidate, onReset }) {
   const rows = importDetail?.rows ?? []
   const hasImportable = summary.importable_rows > 0
   const isAlreadyConfirmed = summary.confirmed
@@ -245,6 +245,14 @@ function ReviewPanel({ summary, importDetail, isConfirming, error, onConfirm, on
       {/* Ação de confirmação — oculta se já confirmado */}
       {!isAlreadyConfirmed && (
         <div className="flex items-center gap-4">
+          <button
+            onClick={onValidate}
+            disabled={isConfirming}
+            className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium
+              hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Revalidar staging
+          </button>
           <button
             onClick={onConfirm}
             disabled={!hasImportable || isConfirming}
@@ -377,6 +385,25 @@ function ImportPage() {
     }
   }
 
+  const handleValidate = async () => {
+    if (!summary?.import_id) return
+    setError('')
+    setPageState(STATE.CONFIRMING)
+
+    try {
+      const { data: summaryData } = await api.post(`/schedule-imports/${summary.import_id}/validate`)
+      setSummary(summaryData)
+      const { data: detailData } = await api.get(`/schedule-imports/${summary.import_id}`)
+      setImportDetail(detailData)
+      setPageState(STATE.REVIEWING)
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : 'Erro ao revalidar o staging.'
+      setError(msg)
+      setPageState(STATE.REVIEWING)
+    }
+  }
+
   // Descarta o staging e volta ao estado inicial para novo upload
   const handleReset = () => {
     setPageState(STATE.IDLE)
@@ -409,6 +436,7 @@ function ImportPage() {
         isConfirming={pageState === STATE.CONFIRMING}
         error={error}
         onConfirm={handleConfirm}
+        onValidate={handleValidate}
         onReset={handleReset}
       />
     )

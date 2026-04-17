@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..config.database import get_db
 from ..models.models import RowStatus, ScheduleImport, ScheduleImportRow
-from ..services.import_service import confirm_import, export_issues_csv, process_import_file
+from ..services.import_service import confirm_import, export_issues_csv, process_import_file, validate_import_staging
 from ..utils.dependencies import require_admin
 from .import_schemas import (
     ScheduleImportDetailResponse,
@@ -32,7 +32,7 @@ router = APIRouter(prefix="/schedule-imports", tags=["Importação de Escala"])
     summary="Importar arquivo de escala base (admin)",
 )
 async def upload_schedule(
-    file: UploadFile = File(..., description="Arquivo CSV ou XLSX com a escala anterior"),
+    file: UploadFile = File(..., description="Arquivo CSV, XLSX, PDF (OCR) ou imagem (OCR) com a escala anterior"),
     reference_period: Optional[str] = Form(None, description="Período de referência, ex.: '2026-03'"),
     source_description: Optional[str] = Form(None, description="Descrição da origem do arquivo"),
     db: Session = Depends(get_db),
@@ -49,13 +49,20 @@ async def upload_schedule(
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "application/vnd.ms-excel",
         "application/octet-stream",
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/tiff",
     }
     content_type = (file.content_type or "").split(";")[0].strip()
     filename = file.filename or "upload"
-    if content_type not in allowed and not (filename.endswith(".csv") or filename.endswith(".xlsx")):
+    if content_type not in allowed and not filename.lower().endswith(
+        (".csv", ".xlsx", ".xls", ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".tiff")
+    ):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Somente arquivos CSV e XLSX são aceitos",
+            detail="Somente arquivos CSV, XLSX, PDF ou imagem são aceitos",
         )
 
     content = await file.read()
@@ -74,6 +81,21 @@ async def upload_schedule(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
 
+    return _to_summary(sched_import)
+
+
+@router.post(
+    "/{import_id}/validate",
+    response_model=ScheduleImportSummary,
+    summary="Revalidar staging de uma importação (admin)",
+)
+def validate_schedule_import(
+    import_id: int,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin),
+):
+    _assert_import_exists(db, import_id)
+    sched_import = validate_import_staging(db, import_id)
     return _to_summary(sched_import)
 
 

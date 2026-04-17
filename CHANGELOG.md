@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.4.0] - 2026-04-16 — Fase 4 concluída (OCR + pipeline seguro)
+
+### Adicionado
+- OCR integrado ao fluxo de importação administrativa com suporte a PDF e imagens, sempre enviando para staging.
+- Parser pós-OCR para estrutura intermediária (`nome`, `data`, `hora_inicio`, `hora_fim`, `raw`) com marcação explícita de linhas ambíguas.
+- Revalidação explícita do staging via `POST /schedule-imports/{import_id}/validate`.
+- Auditoria básica com persistência de payload OCR bruto, linhas parseadas e erros no modelo `ocr_imports`.
+- Fluxo frontend mínimo para upload OCR e revisão/revalidação antes da confirmação.
+
+### Alterado
+- pipeline de importação passou a aplicar validação centralizada (`validate_schedule`) também no staging, antes da confirmação.
+- versionamento atualizado para `v1.4.0` em backend/frontend.
+
+### Limitações conhecidas
+- OCR de PDF depende de texto extraível; PDFs escaneados com baixa qualidade podem gerar linhas ambíguas.
+- OCR de imagem depende de dependências opcionais (`Pillow` + `pytesseract`) no ambiente.
+
 ## [1.3.1] - 2026-04-16 — Robustez operacional de migrations
 
 ### Corrigido
