@@ -50,6 +50,59 @@ imports_failure_total = Counter(
     "Total de tentativas de importação com falha",
 )
 
+# Métricas OCR (fase operacional 1.5.1 consolidada)
+ocr_requests_total = Counter(
+    "ocr_requests_total",
+    "Total de execuções OCR por estratégia efetivamente utilizada",
+    ["strategy"],
+)
+
+ocr_api_success_total = Counter(
+    "ocr_api_success_total",
+    "Total de chamadas OCR via API externa concluídas com sucesso",
+)
+
+ocr_api_failure_total = Counter(
+    "ocr_api_failure_total",
+    "Total de chamadas OCR via API externa com falha",
+)
+
+ocr_fallback_used_total = Counter(
+    "ocr_fallback_used_total",
+    "Total de vezes em que o fallback OCR local foi acionado",
+    ["fallback_type"],
+)
+
+ocr_api_latency_seconds = Histogram(
+    "ocr_api_latency_seconds",
+    "Latência da chamada OCR na API externa (segundos)",
+)
+
+
+def record_ocr_request(strategy: str) -> None:
+    """Registra execução OCR por estratégia com cardinalidade controlada."""
+    normalized = "fallback_local" if strategy == "fallback_local" else "api"
+    ocr_requests_total.labels(normalized).inc()
+
+
+def record_ocr_api_success(latency_seconds: float) -> None:
+    """Registra sucesso e latência de OCR externo."""
+    ocr_api_success_total.inc()
+    ocr_api_latency_seconds.observe(max(0.0, float(latency_seconds)))
+
+
+def record_ocr_api_failure(latency_seconds: float | None = None) -> None:
+    """Registra falha da OCR API e latência quando disponível."""
+    ocr_api_failure_total.inc()
+    if latency_seconds is not None:
+        ocr_api_latency_seconds.observe(max(0.0, float(latency_seconds)))
+
+
+def record_ocr_fallback_used(fallback_type: str) -> None:
+    """Registra uso de fallback OCR local com tipos controlados."""
+    normalized = fallback_type if fallback_type in {"local_pdf", "local_image"} else "local_unknown"
+    ocr_fallback_used_total.labels(normalized).inc()
+
 
 def refresh_domain_gauges(db: Session | None = None) -> None:
     """Atualiza gauges de contagem total sem impactar o fluxo de API."""

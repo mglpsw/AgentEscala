@@ -18,6 +18,7 @@ import json
 import logging
 import re
 from datetime import date, datetime, time, timedelta
+from time import perf_counter
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import httpx
@@ -34,6 +35,12 @@ from ..models.models import (
     User,
 )
 from ..models.ocr_import import OcrImport
+from ..observability import (
+    record_ocr_api_failure,
+    record_ocr_api_success,
+    record_ocr_fallback_used,
+    record_ocr_request,
+)
 
 from .schedule_validation_service import validate_schedule, validate_shift
 
@@ -283,6 +290,7 @@ def _read_ocr_via_api(content: bytes, filename: str) -> Tuple[List[str], List[Di
 
     for endpoint in endpoint_candidates:
         target_url = f"{base_url}{endpoint}"
+        started_at = perf_counter()
         try:
             with httpx.Client(timeout=timeout, verify=settings.OCR_API_VERIFY_SSL) as client:
                 response = client.post(
@@ -297,10 +305,29 @@ def _read_ocr_via_api(content: bytes, filename: str) -> Tuple[List[str], List[Di
                     "OCR API retornou payload sem conteúdo textual reconhecível; acionando fallback local."
                 )
             headers, rows, errors = _parse_ocr_text_to_rows(raw_text)
-            return headers, rows, {"raw_text": raw_text, "errors": errors, "source": target_url}
+            latency_seconds = perf_counter() - started_at
+            record_ocr_api_success(latency_seconds)
+            logger.info(
+                "ocr_execution strategy=api status=success api_url=%s latency_ms=%.2f",
+                target_url,
+                latency_seconds * 1000,
+            )
+            return headers, rows, {
+                "raw_text": raw_text,
+                "errors": errors,
+                "source": target_url,
+                "api_latency_seconds": latency_seconds,
+            }
         except Exception as exc:  # pragma: no cover - integração externa
+            latency_seconds = perf_counter() - started_at
+            record_ocr_api_failure(latency_seconds)
             last_error = exc
-            logger.warning("Falha OCR API em %s: %s", target_url, exc)
+            logger.warning(
+                "ocr_execution strategy=api status=failure api_url=%s latency_ms=%.2f reason=%s",
+                target_url,
+                latency_seconds * 1000,
+                exc,
+            )
 
     raise ValueError(f"OCR API indisponível em {base_url}: {last_error}")
 
@@ -731,9 +758,12 @@ def process_import_file(
         if fn_lower.endswith(".pdf"):
             try:
                 headers, raw_rows, ocr_meta = _read_ocr_via_api(file_content, filename)
+                record_ocr_request("api")
             except Exception as api_exc:
+                record_ocr_fallback_used("local_pdf")
+                record_ocr_request("fallback_local")
                 logger.warning(
-                    "OCR API indisponível para '%s'; usando fallback calibrado local. Motivo: %s",
+                    "ocr_execution strategy=fallback_local status=success fallback_type=local_pdf file=%s reason=%s",
                     filename,
                     api_exc,
                 )
@@ -742,9 +772,12 @@ def process_import_file(
         elif fn_lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".tiff")):
             try:
                 headers, raw_rows, ocr_meta = _read_ocr_via_api(file_content, filename)
+                record_ocr_request("api")
             except Exception as api_exc:
+                record_ocr_fallback_used("local_image")
+                record_ocr_request("fallback_local")
                 logger.warning(
-                    "OCR API indisponível para '%s'; usando fallback calibrado local. Motivo: %s",
+                    "ocr_execution strategy=fallback_local status=success fallback_type=local_image file=%s reason=%s",
                     filename,
                     api_exc,
                 )
