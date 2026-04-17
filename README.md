@@ -9,13 +9,13 @@ O AgentEscala é composto por:
 - **Frontend React/Vite** (login/logout, calendário, trocas e painel admin de usuários).
 - **PostgreSQL + Alembic** para persistência e versionamento de schema.
 
-Na **Fase 3 (validação de escala + base para OCR/AI)**, o sistema adiciona validação centralizada de conflitos e carga horária antes de gravações, além de endpoint de preview administrativo para validar lotes sem persistência.
+Na **Fase 4 (OCR + integração com pipeline existente)**, o sistema adiciona OCR como entrada de dados para importação administrativa, mantendo staging obrigatório e validação centralizada antes de qualquer gravação definitiva de turnos.
 
 ## Funcionalidades
 
 - **Gestão de Turnos**: criar, atualizar e gerenciar turnos de trabalho para agentes
 - **Validação de Escala (Fase 3)**: bloqueio de sobreposição por usuário, validação de faixa de horário e limites de carga diária/semanal configuráveis
-- **Importação de Escala Base**: importar escala do mês anterior via CSV ou XLSX com normalização e validação automáticas
+- **Importação de Escala Base**: importar escala via CSV, XLSX, PDF (OCR) e imagem (OCR), com normalização e validação automáticas
 - **Fluxo de Trocas**: solicitar, listar e cancelar trocas de turnos via interface web (/swaps), com aprovação obrigatória do administrador
 - **Minha Escala**: página `/my-schedule` para o usuário autenticado visualizar e exportar apenas seus próprios plantões
 ## Frontend
@@ -212,6 +212,22 @@ Essas funções retornam **lista de erros estruturados** (sem exceções silenci
 - Entrada: lista de plantões (`shifts`) + flag `preview`.
 - Saída: `valid`, `errors`, `total_shifts`, `preview`.
 - Não grava nada no banco (modo preview), servindo como base segura para futuras automações OCR/AI.
+
+### Fluxo OCR (Fase 4)
+
+O fluxo OCR foi integrado ao pipeline de importação existente sem bypass:
+
+1. Upload administrativo de arquivo (`CSV/XLSX/PDF/imagem`) em `/schedule-imports/`.
+2. Se OCR: extração de texto e parser para estrutura intermediária (`nome`, `data`, `hora_inicio`, `hora_fim`, campo bruto).
+3. Persistência em **staging** (`schedule_import_rows`) com status por linha (válida, alerta, inválida).
+4. Validação obrigatória de conflitos e carga horária com `validate_schedule` antes da confirmação.
+5. Revisão/admin no frontend e confirmação explícita em `/schedule-imports/{id}/confirm`.
+6. Somente após confirmação os turnos são criados em `shifts`.
+
+#### Limitações conhecidas do OCR
+
+- PDFs com texto não extraível (scan de baixa qualidade) podem gerar linhas ambíguas para revisão manual.
+- OCR de imagem depende de `Pillow` + `pytesseract` disponíveis no ambiente de execução.
 
 ## Endpoints da API
 

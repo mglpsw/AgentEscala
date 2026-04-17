@@ -16,6 +16,7 @@ import csv
 import io
 import json
 import logging
+import re
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -30,8 +31,9 @@ from ..models.models import (
     Shift,
     User,
 )
+from ..models.ocr_import import OcrImport
 
-from .schedule_validation_service import validate_shift
+from .schedule_validation_service import validate_schedule, validate_shift
 
 logger = logging.getLogger("agentescala.import_service")
 
@@ -150,6 +152,94 @@ def _read_excel(content: bytes) -> Tuple[List[str], List[Dict[str, Any]]]:
         rows.append(dict(zip(headers, row)))
     wb.close()
     return headers, rows
+
+
+_DATE_PATTERN = re.compile(r"\b(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b")
+_TIME_PATTERN = re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\b")
+_OCR_SPLIT_PATTERN = re.compile(r"[|;,\t]| {2,}")
+
+
+def _parse_ocr_line(raw_line: str) -> Tuple[Dict[str, Any], Optional[str]]:
+    line = raw_line.strip()
+    if not line:
+        return {}, None
+
+    date_match = _DATE_PATTERN.search(line)
+    time_matches = _TIME_PATTERN.findall(line)
+
+    parsed_date = date_match.group(0) if date_match else None
+    parsed_start = time_matches[0] if len(time_matches) >= 1 else None
+    parsed_end = time_matches[1] if len(time_matches) >= 2 else None
+
+    parts = [p.strip() for p in _OCR_SPLIT_PATTERN.split(line) if p and p.strip()]
+    name = None
+    for part in parts:
+        if part == parsed_date:
+            continue
+        if part in time_matches:
+            continue
+        if any(ch.isalpha() for ch in part):
+            name = part
+            break
+
+    row = {
+        "profissional": name,
+        "data": parsed_date,
+        "hora_inicio": parsed_start,
+        "hora_fim": parsed_end,
+        "observacoes": f"OCR raw: {line}",
+        "origem": "ocr",
+    }
+    parse_error = None
+    if not name or not parsed_date or not parsed_start or not parsed_end:
+        parse_error = f"Linha OCR ambígua: '{line}'"
+    return row, parse_error
+
+
+def _parse_ocr_text_to_rows(raw_text: str) -> Tuple[List[str], List[Dict[str, Any]], List[Dict[str, str]]]:
+    headers = ["profissional", "data", "hora_inicio", "hora_fim", "observacoes", "origem"]
+    rows: List[Dict[str, Any]] = []
+    errors: List[Dict[str, str]] = []
+
+    for idx, line in enumerate(raw_text.splitlines(), start=1):
+        parsed, parse_error = _parse_ocr_line(line)
+        if not parsed:
+            continue
+        rows.append(parsed)
+        if parse_error:
+            errors.append({"code": "OCR_PARSE_AMBIGUOUS", "message": parse_error, "line": str(idx)})
+
+    return headers, rows, errors
+
+
+def _read_pdf_ocr(content: bytes) -> Tuple[List[str], List[Dict[str, Any]], Dict[str, Any]]:
+    try:
+        from pypdf import PdfReader
+    except ImportError as exc:  # pragma: no cover - depende de ambiente
+        raise ValueError("Leitura OCR de PDF indisponível: instale a dependência 'pypdf'.") from exc
+
+    reader = PdfReader(io.BytesIO(content))
+    page_texts: List[str] = []
+    for page in reader.pages:
+        page_texts.append(page.extract_text() or "")
+    full_text = "\n".join(page_texts).strip()
+    headers, rows, errors = _parse_ocr_text_to_rows(full_text)
+    return headers, rows, {"raw_text": full_text, "errors": errors}
+
+
+def _read_image_ocr(content: bytes) -> Tuple[List[str], List[Dict[str, Any]], Dict[str, Any]]:
+    try:
+        import pytesseract  # type: ignore
+        from PIL import Image  # type: ignore
+    except ImportError as exc:  # pragma: no cover - depende de ambiente com OCR nativo
+        raise ValueError(
+            "OCR de imagem indisponível neste ambiente (dependências Pillow/pytesseract ausentes)."
+        ) from exc
+
+    image = Image.open(io.BytesIO(content))
+    raw_text = pytesseract.image_to_string(image, lang="por+eng")
+    headers, rows, errors = _parse_ocr_text_to_rows(raw_text)
+    return headers, rows, {"raw_text": raw_text, "errors": errors}
 
 
 def read_file(content: bytes, filename: str) -> Tuple[List[str], List[Dict[str, Any]]]:
@@ -374,6 +464,95 @@ def _detect_duplicates_and_overlaps(validated: List[Dict[str, Any]]) -> List[Dic
     return validated
 
 
+def _append_issue(row: ScheduleImportRow, message: str) -> None:
+    issues_list = json.loads(row.issues) if row.issues else []
+    if message not in issues_list:
+        issues_list.append(message)
+        row.issues = json.dumps(issues_list)
+    if row.row_status == RowStatus.VALID:
+        row.row_status = RowStatus.WARNING
+
+
+def _status_equals(raw_status: Any, expected: RowStatus) -> bool:
+    if isinstance(raw_status, RowStatus):
+        return raw_status == expected
+    status_text = str(raw_status).lower()
+    return status_text == expected.value or status_text.endswith(f".{expected.value}")
+
+
+def _apply_schedule_validation_to_staging(db: Session, import_id: int) -> None:
+    rows = db.query(ScheduleImportRow).filter(
+        ScheduleImportRow.import_id == import_id,
+        ScheduleImportRow.row_status != RowStatus.INVALID,
+    ).all()
+
+    candidate_rows = [
+        row for row in rows
+        if row.agent_id is not None and row.normalized_start is not None and row.normalized_end is not None
+    ]
+
+    if not candidate_rows:
+        return
+
+    existing_by_agent: Dict[int, List[Dict[str, Any]]] = {}
+    for row in candidate_rows:
+        if row.agent_id in existing_by_agent:
+            continue
+        existing_shifts = db.query(Shift).filter(Shift.agent_id == row.agent_id).all()
+        existing_by_agent[row.agent_id] = [
+            {
+                "id": shift.id,
+                "agent_id": shift.agent_id,
+                "start_time": shift.start_time,
+                "end_time": shift.end_time,
+            }
+            for shift in existing_shifts
+        ]
+
+    payload: List[Dict[str, Any]] = []
+    included_existing_agents: set[int] = set()
+    row_id_map: Dict[str, ScheduleImportRow] = {}
+    for row in candidate_rows:
+        row_key = f"import_row_{row.id}"
+        row_id_map[row_key] = row
+        if row.agent_id not in included_existing_agents:
+            payload.extend(existing_by_agent[row.agent_id])
+            included_existing_agents.add(row.agent_id)
+        payload.append(
+            {
+                "id": row_key,
+                "agent_id": row.agent_id,
+                "start_time": row.normalized_start,
+                "end_time": row.normalized_end,
+            }
+        )
+
+    errors = validate_schedule(payload)
+    if not errors:
+        return
+
+    for error in errors:
+        code = error.get("code")
+        message = error.get("message", "Erro de validação de escala")
+        shift_id = error.get("shift_id")
+        other_shift_id = error.get("other_shift_id")
+
+        if shift_id in row_id_map:
+            row = row_id_map[shift_id]
+            row.has_overlap = row.has_overlap or code == "OVERLAPPING_SHIFTS"
+            _append_issue(row, f"[{code}] {message}")
+        if other_shift_id in row_id_map:
+            row = row_id_map[other_shift_id]
+            row.has_overlap = row.has_overlap or code == "OVERLAPPING_SHIFTS"
+            _append_issue(row, f"[{code}] {message}")
+
+        if code in {"DAILY_HOURS_EXCEEDED", "WEEKLY_HOURS_EXCEEDED"}:
+            agent_id = error.get("agent_id")
+            for row in candidate_rows:
+                if row.agent_id == agent_id:
+                    _append_issue(row, f"[{code}] {message}")
+
+
 # ─── Persistência ─────────────────────────────────────────────────────────────
 
 def process_import_file(
@@ -396,11 +575,55 @@ def process_import_file(
     db.add(schedule_import)
     db.flush()  # obtém ID antes de inserir as linhas
 
+    fn_lower = filename.lower()
+    is_ocr_upload = fn_lower.endswith(".pdf") or fn_lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".tiff"))
+    ocr_import: Optional[OcrImport] = None
+
     try:
-        headers, raw_rows = read_file(file_content, filename)
+        ocr_meta: Dict[str, Any] = {}
+        if fn_lower.endswith(".pdf"):
+            headers, raw_rows, ocr_meta = _read_pdf_ocr(file_content)
+        elif fn_lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".tiff")):
+            headers, raw_rows, ocr_meta = _read_image_ocr(file_content)
+        else:
+            headers, raw_rows = read_file(file_content, filename)
+
+        if is_ocr_upload:
+            ocr_import = OcrImport(
+                status="draft",
+                file_name=filename,
+                file_type="pdf" if fn_lower.endswith(".pdf") else "image",
+                raw_payload={"text": ocr_meta.get("raw_text", "")},
+                parsed_rows=[
+                    {
+                        "row_id": str(idx),
+                        "raw_text": row.get("observacoes", ""),
+                        "parsed_name": row.get("profissional"),
+                        "matched_user_id": None,
+                        "match_score": None,
+                        "candidates": [],
+                        "start_time": row.get("hora_inicio"),
+                        "end_time": row.get("hora_fim"),
+                        "location": None,
+                        "row_status": "warning",
+                    }
+                    for idx, row in enumerate(raw_rows, start=1)
+                ],
+                errors=ocr_meta.get("errors", []),
+                action_log=[],
+                created_by=imported_by_id,
+            )
+            db.add(ocr_import)
+            db.flush()
+            schedule_import.source_description = (
+                (source_description or "").strip() + f" [ocr_import_id:{ocr_import.id}]"
+            ).strip()
     except Exception as exc:
         logger.exception("Falha ao ler arquivo de importação: %s", filename)
         schedule_import.status = ImportStatus.FAILED
+        if ocr_import:
+            ocr_import.status = "discarded"
+            ocr_import.errors = (ocr_import.errors or []) + [{"code": "OCR_READ_ERROR", "message": str(exc)}]
         db.commit()
         raise ValueError(f"Não foi possível ler o arquivo '{filename}': {exc}") from exc
 
@@ -438,6 +661,7 @@ def process_import_file(
     for row_data in validated:
         db_row = ScheduleImportRow(**row_data)
         db.add(db_row)
+    db.flush()
 
     # Atualizar contadores
     total = len(validated)
@@ -452,6 +676,13 @@ def process_import_file(
     schedule_import.invalid_rows = invalid
     schedule_import.duplicate_rows = duplicate
     schedule_import.status = ImportStatus.COMPLETED
+    _apply_schedule_validation_to_staging(db, schedule_import.id)
+    rows_after_validation = db.query(ScheduleImportRow).filter(ScheduleImportRow.import_id == schedule_import.id).all()
+    schedule_import.valid_rows = sum(1 for r in rows_after_validation if _status_equals(r.row_status, RowStatus.VALID))
+    schedule_import.warning_rows = sum(1 for r in rows_after_validation if _status_equals(r.row_status, RowStatus.WARNING))
+    schedule_import.invalid_rows = sum(1 for r in rows_after_validation if _status_equals(r.row_status, RowStatus.INVALID))
+    if ocr_import:
+        ocr_import.status = "draft"
 
     db.commit()
     db.refresh(schedule_import)
@@ -534,9 +765,34 @@ def confirm_import(
 
     schedule_import.confirmed_at = datetime.utcnow()
     schedule_import.confirmed_by = confirmed_by_id
+
+    if schedule_import.source_description and "ocr_import_id:" in schedule_import.source_description:
+        marker = schedule_import.source_description.split("ocr_import_id:")[-1].split("]")[0].strip()
+        ocr_import = db.query(OcrImport).filter(OcrImport.id == marker).first()
+        if ocr_import:
+            ocr_import.status = "confirmed"
+            ocr_import.confirmed_by = confirmed_by_id
+            ocr_import.confirmed_at = datetime.utcnow()
+
     db.commit()
     db.refresh(schedule_import)
     return schedule_import, shifts_created
+
+
+def validate_import_staging(db: Session, import_id: int) -> ScheduleImport:
+    schedule_import = db.query(ScheduleImport).filter(ScheduleImport.id == import_id).first()
+    if not schedule_import:
+        raise ValueError(f"Importação {import_id} não encontrada")
+
+    _apply_schedule_validation_to_staging(db, import_id)
+    rows = db.query(ScheduleImportRow).filter(ScheduleImportRow.import_id == import_id).all()
+    schedule_import.valid_rows = sum(1 for r in rows if _status_equals(r.row_status, RowStatus.VALID))
+    schedule_import.warning_rows = sum(1 for r in rows if _status_equals(r.row_status, RowStatus.WARNING))
+    schedule_import.invalid_rows = sum(1 for r in rows if _status_equals(r.row_status, RowStatus.INVALID))
+    schedule_import.duplicate_rows = sum(1 for r in rows if r.is_duplicate)
+    db.commit()
+    db.refresh(schedule_import)
+    return schedule_import
 
 
 # ─── Relatório de inconsistências ─────────────────────────────────────────────
