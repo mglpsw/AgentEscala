@@ -15,6 +15,7 @@ ENV/
 infra/.env.homelab
 .env.*
 !.env.example
+!infra/.env.homelab.example
 
 # IDE
 .vscode/

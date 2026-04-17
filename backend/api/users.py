@@ -274,8 +274,16 @@ def admin_update_user_status(
 def admin_list_user_audit_logs(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
+    action: str | None = Query(default=None, min_length=1, max_length=64),
+    target_user_id: int | None = Query(default=None, ge=1),
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
     """Lista eventos recentes de auditoria de administração de usuários."""
-    return AdminAuditService.list_user_audit_logs(db, skip=skip, limit=limit)
+    return AdminAuditService.list_user_audit_logs(
+        db,
+        skip=skip,
+        limit=limit,
+        action=action,
+        target_user_id=target_user_id,
+    )

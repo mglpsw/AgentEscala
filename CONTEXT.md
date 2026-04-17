@@ -19,6 +19,21 @@ AgentEscala está estável em operação com:
 - endpoint de login permanece público e compatível em dois caminhos: `/auth/login` e `/api/auth/login`.
 - área administrativa de usuários reforçada com endpoint dedicado de status (`PATCH /admin/users/{id}/status`), protegido por dependência admin no backend.
 - frontend passou a considerar `role=admin` **ou** `is_admin=true` para renderização/guarda de rotas administrativas.
+- deploy homelab consolidado com arquivos reais: `infra/docker-compose.homelab.yml`, `infra/.env.homelab` e `infra/scripts/couple_to_homelab.sh`.
+- endpoint `GET /admin/audit/users` agora aceita filtros opcionais `action` e `target_user_id` (sem quebra de contrato e sem alteração de schema).
+
+## Deploy real (CT 102)
+
+- Compose homelab usa caminho relativo (portável), sem hardcode de `/root/AgentEscala`.
+- Script de deploy detecta `docker compose` **ou** `docker-compose`.
+- Template `infra/.env.homelab.example` define todas as variáveis obrigatórias para subida previsível.
+
+## Limpeza conservadora de artefatos
+
+- Arquivos históricos de suporte foram movidos para `infra/legacy/` (não removidos definitivamente):
+  - `docker-compose.homelab.yml.bak`
+  - `COMMIT_MSG_fallback_spa_nginx.txt`
+  - `COMMIT_MSG_nginx_9443_spa.txt`
 
 ## OCR em produção (como funciona hoje)
 

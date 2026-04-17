@@ -48,7 +48,7 @@ O script valida variáveis, verifica conflito de porta, valida o compose e sobe 
 
 4. **Verificar status**
 ```bash
-docker-compose -p agentescala -f docker-compose.homelab.yml ps
+docker compose -p agentescala -f infra/docker-compose.homelab.yml --env-file infra/.env.homelab ps
 ```
 Containers devem estar `Up` e backend com healthcheck `healthy`.
 
@@ -67,7 +67,7 @@ docker-compose -p agentescala -f docker-compose.homelab.yml exec backend python 
 - Para validar o runtime HTTP fim a fim:
 ```bash
 docker-compose -p agentescala -f docker-compose.homelab.yml exec backend \
-	env AGENTESCALA_BASE_URL=http://127.0.0.1:8000 python -m backend.validate
+	env AGENTESCALA_BASE_URL=http://127.0.0.1:18000 python -m backend.validate
 ```
 
 ## Operação
