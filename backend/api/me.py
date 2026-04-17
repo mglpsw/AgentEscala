@@ -34,7 +34,7 @@ def get_me(current_user: User = Depends(get_current_user)):
         "phone": current_user.phone,
         "specialty": current_user.specialty,
         "profile_notes": current_user.profile_notes,
-        "avatar_url": f"/media/avatars/{current_user.avatar_path}" if current_user.avatar_path else None,
+        "avatar_url": f"/api/media/avatars/{current_user.avatar_path}" if current_user.avatar_path else None,
     }
 
 
@@ -96,7 +96,7 @@ async def upload_my_avatar(
     db.refresh(current_user)
 
     return {
-        "avatar_url": f"/media/avatars/{filename}",
+        "avatar_url": f"/api/media/avatars/{filename}",
         "max_size_bytes": max_size,
     }
 

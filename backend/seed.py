@@ -33,7 +33,8 @@ def ensure_primary_admin(db) -> None:
         generated = os.urandom(12).hex()
         initial_password = generated
         print("AGENTESCALA_PRIMARY_ADMIN_PASSWORD não definido; senha temporária segura gerada.")
-        print("Altere a senha após o primeiro login via fluxo de gestão de usuários.")
+        print(f"Senha temporária do admin principal ({PRIMARY_ADMIN_EMAIL}): {generated}")
+        print("Altere a senha imediatamente após o primeiro login via fluxo de gestão de usuários.")
 
     primary_admin = User(
         email=PRIMARY_ADMIN_EMAIL,
@@ -56,11 +57,10 @@ def seed_database():
     db = SessionLocal()
 
     try:
-        ensure_primary_admin(db)
-
         # Verifica se já existem dados
         existing_users = db.query(User).count()
         if existing_users > 0:
+            ensure_primary_admin(db)
             print(f"O banco já contém {existing_users} usuários. Pulando seed.")
             return
 
@@ -194,6 +194,7 @@ def seed_database():
 
         db.commit()
         print("Criadas 3 solicitações de troca (2 pendentes, 1 aprovada)")
+        ensure_primary_admin(db)
 
         print("\n=== Seed concluído ===")
         print("\nCredenciais de exemplo:")

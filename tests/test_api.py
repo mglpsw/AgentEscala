@@ -212,7 +212,7 @@ def test_me_profile_update_and_avatar_upload(client, agent_headers):
         files={"file": ("avatar.png", fake_png, "image/png")},
     )
     assert avatar_response.status_code == 200
-    assert avatar_response.json()["avatar_url"].startswith("/media/avatars/")
+    assert avatar_response.json()["avatar_url"].startswith("/api/media/avatars/")
 
     refreshed = client.get("/me", headers=agent_headers)
     assert refreshed.status_code == 200

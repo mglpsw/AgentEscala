@@ -181,6 +181,7 @@ _AVATAR_DIR = Path((os.getenv("AGENTESCALA_AVATAR_DIR", "backend/uploads/avatars
 if _AVATAR_DIR.is_dir() or not _AVATAR_DIR.exists():
     _AVATAR_DIR.mkdir(parents=True, exist_ok=True)
     app.mount("/media/avatars", StaticFiles(directory=str(_AVATAR_DIR)), name="avatars_media")
+    app.mount("/api/media/avatars", StaticFiles(directory=str(_AVATAR_DIR)), name="avatars_media_api")
 
 if _FRONTEND_DIST.is_dir():
     _frontend_logger.info("Servindo frontend buildado em %s", _FRONTEND_DIST)
