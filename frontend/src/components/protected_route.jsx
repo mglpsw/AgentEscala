@@ -22,15 +22,7 @@ function ProtectedRoute({ requiredRole }) {
   }
 
   if (requiredRole === 'admin' && !isAdmin) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <h1 className="text-6xl font-bold text-gray-300 mb-4">403</h1>
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Acesso restrito a administradores</h2>
-          <p className="text-gray-500">Você não tem permissão para acessar esta página.</p>
-        </div>
-      </div>
-    )
+    return <Navigate to="/calendar" replace />
   }
 
   return <Outlet />

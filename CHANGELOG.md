@@ -14,6 +14,11 @@
 - cobertura para login público em `/api/auth/login`.
 - cobertura para patch de status administrativo e validação de `403` para usuário não-admin.
 
+### Frontend (hardening admin)
+- rota administrativa no frontend agora redireciona usuário autenticado sem privilégio para `/calendar`, evitando exposição da tela administrativa por URL direta.
+- navegação admin permanece visível somente para usuários com `role=admin` ou `is_admin=true`.
+- suíte de testes frontend ampliada com cenários de autorização admin (visibilidade de menu, bloqueio/redirecionamento por URL, renderização de página admin e não regressão do fluxo de login).
+
 ## [1.5.1] - 2026-04-17
 
 ### Consolidado (operação segura OCR)
