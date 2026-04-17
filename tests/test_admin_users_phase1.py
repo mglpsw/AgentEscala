@@ -58,6 +58,30 @@ def test_admin_cannot_delete_self(client: TestClient, admin_headers):
     assert response.status_code == 400
 
 
+def test_admin_patch_status_updates_user(client: TestClient, admin_headers):
+    target = client.get('/users', headers=admin_headers).json()[1]
+    user_id = target['id']
+    current_status = target['is_active']
+
+    response = client.patch(
+        f'/admin/users/{user_id}/status',
+        headers=admin_headers,
+        json={'is_active': (not current_status)},
+    )
+    assert response.status_code == 200
+    assert response.json()['is_active'] is (not current_status)
+
+
+def test_non_admin_cannot_patch_status(client: TestClient, agent_headers, admin_headers):
+    target = client.get('/users', headers=admin_headers).json()[0]
+    response = client.patch(
+        f"/admin/users/{target['id']}/status",
+        headers=agent_headers,
+        json={'is_active': False},
+    )
+    assert response.status_code == 403
+
+
 def test_logout_accepts_missing_or_invalid_token(client: TestClient):
     response = client.post('/auth/logout', json={})
     assert response.status_code == 200

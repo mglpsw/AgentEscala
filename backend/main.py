@@ -97,15 +97,21 @@ async def http_observability_middleware(request: Request, call_next):
 
     return response
 
-# Inclui os routers
-app.include_router(auth.router)
-app.include_router(users.router)
-app.include_router(shifts.router)
-app.include_router(swaps.router)
-app.include_router(schedule_imports.router)
-app.include_router(medical_profiles.router)
-app.include_router(me.router)
-app.include_router(admin_schedule.router)
+def _include_api_routers(prefix: str = "") -> None:
+    """Registrar routers da API com prefixo opcional para compatibilidade."""
+    app.include_router(auth.router, prefix=prefix)
+    app.include_router(users.router, prefix=prefix)
+    app.include_router(shifts.router, prefix=prefix)
+    app.include_router(swaps.router, prefix=prefix)
+    app.include_router(schedule_imports.router, prefix=prefix)
+    app.include_router(medical_profiles.router, prefix=prefix)
+    app.include_router(me.router, prefix=prefix)
+    app.include_router(admin_schedule.router, prefix=prefix)
+
+
+# Rotas canônicas sem prefixo + alias /api para ambientes com reverse proxy.
+_include_api_routers()
+_include_api_routers("/api")
 
 
 @app.on_event("startup")

@@ -8,7 +8,7 @@ from ..models import User, UserRole
 from ..services import UserService
 from ..utils.auth import get_password_hash
 from ..utils.dependencies import get_current_user, require_admin
-from .schemas import AdminUserCreate, AdminUserUpdate, UserCreate, UserResponse
+from .schemas import AdminUserCreate, AdminUserStatusUpdate, AdminUserUpdate, UserCreate, UserResponse
 
 router = APIRouter(tags=["Usuários"])
 
@@ -175,3 +175,24 @@ def admin_delete_user(
     db.delete(user)
     db.commit()
     return None
+
+
+@router.patch("/admin/users/{user_id}/status", response_model=UserResponse)
+def admin_update_user_status(
+    user_id: int,
+    payload: AdminUserStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Ativa/desativa usuário via endpoint administrativo dedicado."""
+    if current_user.id == user_id and not payload.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não é permitido desativar o próprio usuário",
+        )
+
+    updated_user = UserService.update_user(db, user_id, is_active=payload.is_active)
+    if updated_user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+
+    return updated_user

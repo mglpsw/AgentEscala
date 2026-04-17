@@ -109,6 +109,20 @@ function UsersAdminPage() {
     }
   }
 
+  const handleToggleStatus = async (user) => {
+    setError('')
+    try {
+      await api.patch(`/admin/users/${user.id}/status`, { is_active: !user.is_active })
+      await loadUsers()
+    } catch (err) {
+      if (err?.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError('Não foi possível atualizar o status do usuário.')
+      }
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -220,6 +234,13 @@ function UsersAdminPage() {
                         className="px-3 py-1 rounded bg-amber-100 text-amber-800"
                       >
                         Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(user)}
+                        className="px-3 py-1 rounded bg-sky-100 text-sky-800"
+                      >
+                        {user.is_active ? 'Desativar' : 'Ativar'}
                       </button>
                       <button
                         type="button"

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.2] - 2026-04-17
+
+### Corrigido
+- compatibilidade de login público adicionada para `/api/auth/login` (além de `/auth/login`), evitando bloqueio indevido em ambientes com proxy/prefixo `/api`.
+- rotas existentes continuam protegidas por JWT (`401/403`) sem abrir endpoints administrativos.
+
+### Adicionado
+- endpoint administrativo `PATCH /admin/users/{id}/status` para ativar/desativar usuários com validação de segurança (sem auto-desativação do admin autenticado).
+- ajuste de controle de acesso no frontend para considerar também `is_admin`, além de `role=admin`.
+
+### Testes
+- cobertura para login público em `/api/auth/login`.
+- cobertura para patch de status administrativo e validação de `403` para usuário não-admin.
+
 ## [1.5.1] - 2026-04-17
 
 ### Consolidado (operação segura OCR)

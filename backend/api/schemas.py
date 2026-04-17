@@ -34,6 +34,10 @@ class AdminUserUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
+class AdminUserStatusUpdate(BaseModel):
+    is_active: bool
+
+
 class UserResponse(UserBase):
     id: int
     role: UserRole
