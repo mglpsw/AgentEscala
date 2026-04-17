@@ -1,58 +1,149 @@
-# Guia Operacional do AgentEscala
+# Guia Operacional Do AgentEscala
 
-Este guia resume a operação mínima do AgentEscala no CT 102, com foco em isolamento, rollback e convivência segura com os demais stacks do host.
+Este guia resume a operação diária do AgentEscala no CT 102. Ele reflete a
+arquitetura canônica validada em abril de 2026.
 
-## Recursos usados pelo AgentEscala
-- Projeto Compose: `agentescala`
+## Recursos Ativos
+
+- Clone ativo: `/opt/repos/AgentEscala`
+- Projeto Compose: `agentescala_official`
 - Compose file: `infra/docker-compose.homelab.yml`
-- Porta local sugerida do backend: `127.0.0.1:18000`
-- Rede interna sugerida: `agentescala_internal`
-- Volume Postgres sugerido: `agentescala_postgres_data`
+- Env file: `infra/.env.homelab`
+- Backend no host CT 102: `192.168.3.155:18000`
+- Porta interna do backend: `8030`
+- Rede Docker: `agentescala_official_internal`
+- Volume Postgres: `agentescala_postgres_data_official18000`
+- Domínio público: `https://escala.ks-sm.net:9443`
 
-## Subida segura
-```bash
-cd /root/AgentEscala/infra
-cp .env.homelab.example .env.homelab
-nano .env.homelab
-./scripts/couple_to_homelab.sh --dry-run
-./scripts/couple_to_homelab.sh --build
+## Regra De Rede
+
+Dentro do CT 102, o Nginx Proxy Manager escuta em `443`. A porta `9443` é
+externa ao CT e vem do roteador/firewall:
+
+```text
+externo :9443 -> CT 102:443 -> NPM -> 192.168.3.155:18000 -> container:8030
 ```
 
-## Validação mínima após subida
+Por isso:
+
+- navegador externo usa `https://escala.ks-sm.net:9443`;
+- NPM interno é validado por `https://escala.ks-sm.net`;
+- backend direto é validado por `http://192.168.3.155:18000`.
+
+## Atualização Segura
+
 ```bash
-curl -sf http://127.0.0.1:18000/health
-curl -sf http://127.0.0.1:18000/metrics | grep agentescala_http_requests_total
-docker-compose -p agentescala -f docker-compose.homelab.yml exec backend python -m backend.seed
-docker-compose -p agentescala -f docker-compose.homelab.yml exec backend \
-  env AGENTESCALA_BASE_URL=http://127.0.0.1:8000 python -m backend.validate
+cd /opt/repos/AgentEscala
+git fetch origin main
+git merge --ff-only FETCH_HEAD
+
+DEBUG=false docker-compose -p agentescala_official \
+  -f infra/docker-compose.homelab.yml \
+  --env-file infra/.env.homelab \
+  up -d --build --force-recreate backend
 ```
 
-## Logs e troubleshooting
+Use `DEBUG=false` para impedir que variáveis exportadas no shell do CT, como
+`DEBUG=release`, sejam injetadas no backend.
+
+## Validação Mínima
+
 ```bash
-docker-compose -p agentescala -f infra/docker-compose.homelab.yml logs -f backend
-docker-compose -p agentescala -f infra/docker-compose.homelab.yml ps
+docker-compose -p agentescala_official \
+  -f infra/docker-compose.homelab.yml \
+  --env-file infra/.env.homelab ps
+
+curl -sf http://192.168.3.155:18000/health
+curl -kfsS https://escala.ks-sm.net/health
+curl -kfsS https://escala.ks-sm.net/api/v1/info
+curl -kfsS https://escala.ks-sm.net/metrics | grep agentescala_http_requests_total
 ```
 
-## Rollback do stack do AgentEscala
+Validar login e CORS externo:
+
 ```bash
-docker-compose -p agentescala -f infra/docker-compose.homelab.yml down
+curl -k -X OPTIONS https://escala.ks-sm.net/api/auth/login \
+  -H 'Origin: https://escala.ks-sm.net:9443' \
+  -H 'Access-Control-Request-Method: POST' \
+  -H 'Access-Control-Request-Headers: content-type' \
+  -D -
+
+curl -k -X POST https://escala.ks-sm.net/api/auth/login \
+  -H 'Origin: https://escala.ks-sm.net:9443' \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@agentescala.com","password":"admin"}'
 ```
 
-Esse rollback remove apenas containers e rede do AgentEscala. O volume do banco permanece preservado.
+## Logs E Troubleshooting
 
-## Publicação via NPM
 ```bash
-./infra/scripts/plan_npm_publish.sh
+docker-compose -p agentescala_official \
+  -f infra/docker-compose.homelab.yml \
+  --env-file infra/.env.homelab logs -f backend
+
+docker-compose -p agentescala_official \
+  -f infra/docker-compose.homelab.yml \
+  --env-file infra/.env.homelab ps
 ```
 
-Use o plano gerado para criar manualmente o Proxy Host no NPM sem tocar em hosts existentes.
+Inspecionar NPM:
+
+```bash
+docker exec npm sqlite3 /data/database.sqlite \
+  "select id, domain_names, forward_scheme, forward_host, forward_port, enabled from proxy_host where domain_names like '%escala%';"
+```
+
+Esperado:
+
+```text
+id=8 enabled=1 forward_host=192.168.3.155 forward_port=18000
+id=7 enabled=0 duplicata preservada
+```
+
+## Backup
+
+```bash
+./infra/scripts/backup_postgres.sh --env-file infra/.env.homelab
+```
+
+Antes de alterar NPM:
+
+```bash
+TS=$(date -u +%Y%m%dT%H%M%SZ)
+docker exec npm cp /data/database.sqlite /data/database.sqlite.bak_${TS}_manual
+docker cp npm:/data/database.sqlite /root/agentescala_backups/npm_database_${TS}.sqlite
+```
+
+## Rollback
+
+Rollback do stack oficial:
+
+```bash
+docker-compose -p agentescala_official \
+  -f infra/docker-compose.homelab.yml \
+  --env-file infra/.env.homelab down
+```
+
+O volume do banco permanece preservado.
+
+O stack legado em `/root/AgentEscala` está fora da arquitetura ativa. Só usar em
+emergência, após revisar portas, volume e NPM.
 
 ## Integração Prometheus
+
 Exemplo de job de scrape:
+
 - `infra/examples/prometheus/agentescala-scrape.yml`
 
-## Backup e restore
+O target canônico é:
+
+```text
+192.168.3.155:18000
+```
+
+## Backup E Restore
+
 - Backup: `infra/scripts/backup_postgres.sh`
 - Restore: `infra/scripts/restore_postgres.sh`
 
-Os detalhes operacionais estão em `docs/backup_restore.md`.
+Detalhes em `docs/backup_restore.md`.

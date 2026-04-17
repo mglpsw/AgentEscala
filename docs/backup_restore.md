@@ -63,7 +63,13 @@ Esse fluxo é destrutivo apenas para os dados atuais do AgentEscala. Nenhum outr
 
 ## Validação pós-restore
 ```bash
-curl -sf http://127.0.0.1:18000/health
-docker-compose -p agentescala -f infra/docker-compose.homelab.yml exec backend \
-  env AGENTESCALA_BASE_URL=http://127.0.0.1:8000 python -m backend.validate
+curl -sf http://192.168.3.155:18000/health
+curl -kfsS https://escala.ks-sm.net/health
+docker-compose -p agentescala_official \
+  -f infra/docker-compose.homelab.yml \
+  --env-file infra/.env.homelab exec backend \
+  env AGENTESCALA_BASE_URL=http://127.0.0.1:8030 python -m backend.validate
 ```
+
+Observação: dentro do CT 102 o NPM escuta em `443`. A porta `9443` é externa e
+vem do roteador/firewall.
