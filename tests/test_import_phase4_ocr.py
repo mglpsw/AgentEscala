@@ -74,3 +74,30 @@ def test_read_ocr_via_api_uses_response_payload(monkeypatch):
     assert len(rows) == 1
     assert "Alice Silva" in (rows[0]["profissional"] or "")
     assert "source" in meta
+
+
+def test_read_ocr_via_api_raises_when_payload_has_no_text(monkeypatch):
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"result": {"unexpected": "shape"}}
+
+    class _FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, *_args, **_kwargs):
+            return _FakeResponse()
+
+    monkeypatch.setattr(import_service.httpx, "Client", lambda **_kwargs: _FakeClient())
+
+    try:
+        import_service._read_ocr_via_api(b"pdf", "escala.pdf")
+        assert False, "Era esperado ValueError para payload OCR vazio"
+    except ValueError as exc:
+        assert "payload sem conteúdo textual" in str(exc)

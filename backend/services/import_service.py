@@ -292,6 +292,10 @@ def _read_ocr_via_api(content: bytes, filename: str) -> Tuple[List[str], List[Di
             response.raise_for_status()
             payload = response.json()
             raw_text = _extract_text_from_ocr_payload(payload if isinstance(payload, dict) else {})
+            if not raw_text.strip():
+                raise ValueError(
+                    "OCR API retornou payload sem conteúdo textual reconhecível; acionando fallback local."
+                )
             headers, rows, errors = _parse_ocr_text_to_rows(raw_text)
             return headers, rows, {"raw_text": raw_text, "errors": errors, "source": target_url}
         except Exception as exc:  # pragma: no cover - integração externa

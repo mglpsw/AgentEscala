@@ -6,12 +6,16 @@ sem alterar o fluxo de negócio existente.
 
 from __future__ import annotations
 
+import logging
+
 from prometheus_client import Counter, Gauge, Histogram
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .config.database import SessionLocal
 from .models.models import ImportStatus, ScheduleImport, Shift, SwapRequest
+
+logger = logging.getLogger("agentescala.observability")
 
 request_counter = Counter(
     "agentescala_http_requests_total",
@@ -53,10 +57,16 @@ def refresh_domain_gauges(db: Session | None = None) -> None:
     session = db or SessionLocal()
 
     try:
-        shift_total = session.query(Shift.id).count()
-        swap_total = session.query(SwapRequest.id).count()
-        shift_total_gauge.set(float(shift_total))
-        swap_total_gauge.set(float(swap_total))
+        try:
+            shift_total = session.query(Shift.id).count()
+            swap_total = session.query(SwapRequest.id).count()
+            shift_total_gauge.set(float(shift_total))
+            swap_total_gauge.set(float(swap_total))
+        except Exception as exc:
+            logger.warning(
+                "Falha ao atualizar gauges de domínio; mantendo último valor publicado. erro=%s",
+                exc,
+            )
     finally:
         if owns_session:
             session.close()
