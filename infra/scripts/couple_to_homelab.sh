@@ -48,6 +48,17 @@ set +a
 
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-agentescala}"
 
+compose_cmd() {
+    if command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    elif command -v docker >/dev/null 2>&1; then
+        docker compose "$@"
+    else
+        echo "Erro: Docker Compose não encontrado (docker compose ou docker-compose)." >&2
+        exit 1
+    fi
+}
+
 require_var() {
     local var_name="$1"
     if [[ -z "${!var_name:-}" ]]; then
@@ -70,7 +81,7 @@ rollback_stack() {
     if [[ "$rollback_on_error" == true ]]; then
         echo ""
         echo "Falha detectada. Revertendo apenas o stack do AgentEscala..."
-        docker-compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down || true
+        compose_cmd -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down || true
     fi
 }
 
@@ -103,7 +114,7 @@ echo ""
 check_port_free "$BACKEND_HOST_PORT"
 
 echo "Validando compose do AgentEscala..."
-docker-compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config >/dev/null
+compose_cmd -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" config >/dev/null
 
 # Constrói ou baixa a imagem
 echo "Construindo/baixando imagem do AgentEscala..."
@@ -129,7 +140,7 @@ echo ""
 echo "Fazendo deploy do AgentEscala..."
 cd "$INFRA_DIR"
 rollback_on_error=true
-docker-compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
+compose_cmd -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d
 rollback_on_error=false
 
 echo ""

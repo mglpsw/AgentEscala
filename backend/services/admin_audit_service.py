@@ -34,10 +34,22 @@ class AdminAuditService:
         return entry
 
     @staticmethod
-    def list_user_audit_logs(db: Session, *, skip: int = 0, limit: int = 50) -> List[AdminUserAuditLog]:
+    def list_user_audit_logs(
+        db: Session,
+        *,
+        skip: int = 0,
+        limit: int = 50,
+        action: str | None = None,
+        target_user_id: int | None = None,
+    ) -> List[AdminUserAuditLog]:
         capped_limit = max(1, min(limit, 200))
+        query = db.query(AdminUserAuditLog)
+        if action is not None:
+            query = query.filter(AdminUserAuditLog.action == action)
+        if target_user_id is not None:
+            query = query.filter(AdminUserAuditLog.target_user_id == target_user_id)
         return (
-            db.query(AdminUserAuditLog)
+            query
             .order_by(AdminUserAuditLog.created_at.desc(), AdminUserAuditLog.id.desc())
             .offset(skip)
             .limit(capped_limit)

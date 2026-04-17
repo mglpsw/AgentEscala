@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.5.4] - 2026-04-17
+
+### Adicionado
+- filtros opcionais `action` e `target_user_id` no endpoint admin-only `GET /admin/audit/users`, mantendo total compatibilidade de contrato.
+- cobertura de testes para filtros de auditoria por ação, por usuário-alvo, paginação e restrição admin-only.
+- template versionado `infra/.env.homelab.example` com variáveis obrigatórias do deploy CT 102.
+
+### Alterado
+- `infra/docker-compose.homelab.yml` agora usa caminhos relativos e portáveis (sem hardcode de `/root/AgentEscala`), reduzindo falhas de bootstrap em novos hosts.
+- serviço `backend` no compose homelab passa a declarar `image` + `build` de forma explícita para fluxo previsível de build/tag.
+- script `infra/scripts/couple_to_homelab.sh` passou a detectar automaticamente `docker compose` ou `docker-compose`.
+- README e CONTEXT atualizados com instrução oficial de deploy, validações mínimas e arquitetura real do stack.
+
+### Limpeza (sem remoção destrutiva)
+- arquivos antigos/confusos movidos para `infra/legacy/`:
+  - `docker-compose.homelab.yml.bak`
+  - `COMMIT_MSG_fallback_spa_nginx.txt`
+  - `COMMIT_MSG_nginx_9443_spa.txt`
+
 ## [1.5.3] - 2026-04-17
 
 ### Adicionado
