@@ -82,6 +82,16 @@ def test_login_retorna_access_e_refresh_tokens(client):
     assert data["user_email"] == "medico@agentescala.com"
 
 
+def test_login_em_api_auth_sem_token_funciona(client):
+    """Compatibilidade: /api/auth/login deve permanecer público."""
+    response = client.post(
+        "/api/auth/login",
+        json={"email": "medico@agentescala.com", "password": "CHANGE_ME_TEST_PASSWORD"},
+    )
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+
+
 def test_login_com_senha_incorreta_retorna_401(client):
     response = client.post("/auth/login", json={"email": "medico@agentescala.com", "password": "CHANGE_ME_WRONG_PASSWORD"})
     assert response.status_code == 401

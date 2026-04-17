@@ -128,7 +128,7 @@ export function AuthProvider({ children }) {
     user,
     isLoading,
     isAuthenticated: user !== null,
-    isAdmin: user?.role === 'admin',
+    isAdmin: user?.role === 'admin' || user?.is_admin === true,
     login,
     logout,
     refreshUser: fetchCurrentUser,

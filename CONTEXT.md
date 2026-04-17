@@ -11,6 +11,12 @@ AgentEscala está estável em operação com:
 - observabilidade via `/health`, `/metrics` e `/api/v1/info`;
 - OCR integrado ao fluxo de importação para PDF/imagem.
 
+## Atualização operacional (2026-04-17)
+
+- endpoint de login permanece público e compatível em dois caminhos: `/auth/login` e `/api/auth/login`.
+- área administrativa de usuários reforçada com endpoint dedicado de status (`PATCH /admin/users/{id}/status`), protegido por dependência admin no backend.
+- frontend passou a considerar `role=admin` **ou** `is_admin=true` para renderização/guarda de rotas administrativas.
+
 ## OCR em produção (como funciona hoje)
 
 - Prioriza a API externa `https://api.ks-sm.net:9443`.

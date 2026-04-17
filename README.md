@@ -18,7 +18,9 @@ Hospitais e clínicas precisam reduzir conflitos de plantão, evitar sobreposiç
 ## Funcionalidades atuais
 
 - Autenticação JWT (login, refresh e rotas protegidas por perfil).
+- Login público disponível em `/auth/login` e alias compatível `/api/auth/login` (sem token).
 - Gestão de usuários, plantões e solicitações de troca.
+- Área administrativa de usuários (somente admin) com listagem, criação, edição e ativação/desativação.
 - Importação de escala com staging e validação.
 - Observabilidade com `/health`, `/metrics` e `/api/v1/info`.
 - Frontend React com login, calendário e fluxo de trocas.
