@@ -262,3 +262,5 @@ class HealthResponse(BaseModel):
     status: str
     timestamp: datetime
     version: str
+    database: str
+    ocr: str

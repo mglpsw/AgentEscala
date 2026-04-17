@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .config.database import init_db
 from .config.settings import settings
@@ -18,6 +18,13 @@ from .api.schemas import HealthResponse
 from .models import User
 from .services.terminal_action_service import TerminalActionExecutor
 from .utils.dependencies import require_admin
+from .observability import (
+    bootstrap_import_counters,
+    check_database_status,
+    refresh_domain_gauges,
+    request_counter,
+    request_duration,
+)
 
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
@@ -25,16 +32,6 @@ logging.basicConfig(
 )
 
 request_logger = logging.getLogger("agentescala.http")
-request_counter = Counter(
-    "agentescala_http_requests_total",
-    "Total de requisições HTTP processadas pelo AgentEscala",
-    ["method", "path", "status_code"],
-)
-request_duration = Histogram(
-    "agentescala_http_request_duration_seconds",
-    "Latência das requisições HTTP do AgentEscala",
-    ["method", "path"],
-)
 
 # Inicializa o app FastAPI
 app = FastAPI(
@@ -113,23 +110,37 @@ app.include_router(admin_schedule.router)
 
 @app.on_event("startup")
 async def startup_event():
-    """Inicializar o banco de dados na inicialização"""
+    """Inicializar o banco de dados e métricas na inicialização"""
     init_db()
+    bootstrap_import_counters()
+    refresh_domain_gauges()
+    request_logger.info(
+        "ocr_integration enabled=%s base_url=%s timeout_s=%.1f",
+        settings.OCR_API_ENABLED,
+        settings.OCR_API_BASE_URL,
+        settings.OCR_API_TIMEOUT_SECONDS,
+    )
 
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Endpoint de verificação de saúde"""
+    db_status = check_database_status()
+    app_status = "healthy" if db_status == "up" else "degraded"
+    ocr_status = "enabled" if settings.OCR_API_ENABLED else "disabled"
     return {
-        "status": "healthy",
+        "status": app_status,
         "timestamp": datetime.utcnow(),
-        "version": settings.APP_VERSION
+        "version": settings.APP_VERSION,
+        "database": db_status,
+        "ocr": ocr_status,
     }
 
 
 if settings.METRICS_ENABLED:
     @app.get("/metrics", include_in_schema=False)
     async def metrics():
+        refresh_domain_gauges()
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
@@ -149,7 +160,11 @@ async def api_info():
             "medical_profiles": "/api/v1/medical-profiles",
             "me": "/me",
             "admin_schedule_validation": "/admin/schedule/validate",
-        }
+        },
+        "ocr": {
+            "api_enabled": settings.OCR_API_ENABLED,
+            "api_base_url": settings.OCR_API_BASE_URL,
+        },
     }
 
 

@@ -9,13 +9,14 @@ from backend.models import User, Shift, SwapRequest, UserRole, SwapStatus
 from backend.utils.auth import get_password_hash
 
 PRIMARY_ADMIN_EMAIL = "mf.soares@ks-sm.net"
+PRIMARY_ADMIN_DEFAULT_PASSWORD = "password"
 
 
 def ensure_primary_admin(db) -> None:
     """Garante usuário admin principal de forma idempotente."""
     existing = db.query(User).filter(User.email == PRIMARY_ADMIN_EMAIL).first()
     desired_name = os.getenv("AGENTESCALA_PRIMARY_ADMIN_NAME", "Administrador Principal")
-    initial_password = os.getenv("AGENTESCALA_PRIMARY_ADMIN_PASSWORD")
+    initial_password = os.getenv("AGENTESCALA_PRIMARY_ADMIN_PASSWORD", PRIMARY_ADMIN_DEFAULT_PASSWORD)
 
     if existing:
         existing.role = UserRole.ADMIN
@@ -28,13 +29,6 @@ def ensure_primary_admin(db) -> None:
         db.commit()
         print(f"Admin principal ajustado: {PRIMARY_ADMIN_EMAIL}")
         return
-
-    if not initial_password:
-        generated = os.urandom(12).hex()
-        initial_password = generated
-        print("AGENTESCALA_PRIMARY_ADMIN_PASSWORD não definido; senha temporária segura gerada.")
-        print(f"Senha temporária do admin principal ({PRIMARY_ADMIN_EMAIL}): {generated}")
-        print("Altere a senha imediatamente após o primeiro login via fluxo de gestão de usuários.")
 
     primary_admin = User(
         email=PRIMARY_ADMIN_EMAIL,

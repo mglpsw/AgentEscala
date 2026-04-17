@@ -1,4 +1,5 @@
-from backend.services.import_service import _parse_ocr_text_to_rows
+from backend.services import import_service
+from backend.services.import_service import _extract_text_from_ocr_payload, _parse_ocr_text_to_rows
 
 
 def test_parse_ocr_text_to_rows_extracts_structured_fields():
@@ -40,3 +41,36 @@ def test_validate_import_endpoint_revalidates_staging(client, admin_headers):
     assert "parse_status" in row
     assert "match_status" in row
     assert "validation_status" in row
+
+
+def test_extract_text_from_ocr_payload_supports_nested_result():
+    payload = {"result": {"lines": ["Alice Silva 01/04/2026 08:00 20:00"]}}
+    text = _extract_text_from_ocr_payload(payload)
+    assert "Alice Silva" in text
+
+
+def test_read_ocr_via_api_uses_response_payload(monkeypatch):
+    class _FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"data": {"raw_text": "Alice Silva 01/04/2026 08:00 20:00"}}
+
+    class _FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, *_args, **_kwargs):
+            return _FakeResponse()
+
+    monkeypatch.setattr(import_service.httpx, "Client", lambda **_kwargs: _FakeClient())
+    headers, rows, meta = import_service._read_ocr_via_api(b"pdf", "escala.pdf")
+
+    assert headers[:4] == ["profissional", "data", "hora_inicio", "hora_fim"]
+    assert len(rows) == 1
+    assert "Alice Silva" in (rows[0]["profissional"] or "")
+    assert "source" in meta

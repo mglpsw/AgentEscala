@@ -15,6 +15,7 @@ from ..config.database import get_db
 from ..models.models import RowStatus, ScheduleImport, ScheduleImportRow
 from ..services.import_service import confirm_import, export_issues_csv, process_import_file, validate_import_staging
 from ..utils.dependencies import require_admin
+from ..observability import imports_failure_total, imports_success_total
 from .import_schemas import (
     ScheduleImportDetailResponse,
     ScheduleImportResponse,
@@ -67,6 +68,7 @@ async def upload_schedule(
 
     content = await file.read()
     if not content:
+        imports_failure_total.inc()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Arquivo vazio")
 
     try:
@@ -79,7 +81,13 @@ async def upload_schedule(
             imported_by_id=current_user.id,
         )
     except ValueError as exc:
+        imports_failure_total.inc()
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+    if sched_import.status.value == "completed":
+        imports_success_total.inc()
+    elif sched_import.status.value == "failed":
+        imports_failure_total.inc()
 
     return _to_summary(sched_import)
 
