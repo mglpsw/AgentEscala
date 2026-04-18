@@ -146,3 +146,26 @@ def test_document_import_route_still_works(client, admin_headers):
     }
     response = client.post("/admin/imports/parse-ocr-payload", headers=admin_headers, json=payload)
     assert response.status_code == 201
+
+
+def test_recurring_confirm_rejects_repeat_confirmation(client, admin_headers):
+    db = SessionLocal()
+    alice = db.query(User).filter(User.email == "alice@agentescala.com").first()
+    preview_resp = client.post("/admin/recurring-shifts/preview", headers=admin_headers, json=_payload(alice.id, months_ahead=1))
+    assert preview_resp.status_code == 200
+    batch_id = preview_resp.json()["batch_id"]
+
+    first = client.post(
+        "/admin/recurring-shifts/confirm",
+        headers=admin_headers,
+        json={**_payload(alice.id, months_ahead=1), "batch_id": batch_id},
+    )
+    assert first.status_code == 200
+
+    second = client.post(
+        "/admin/recurring-shifts/confirm",
+        headers=admin_headers,
+        json={**_payload(alice.id, months_ahead=1), "batch_id": batch_id},
+    )
+    assert second.status_code == 409
+    db.close()

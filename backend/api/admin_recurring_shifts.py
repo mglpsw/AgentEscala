@@ -91,7 +91,8 @@ def confirm_recurring_shifts(
             batch_id=body.batch_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        status_code = 409 if "já confirmado" in str(exc).lower() else 422
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
     total_generated = len(db.query(RecurringShiftBatchItem).filter(RecurringShiftBatchItem.batch_id == batch.id).all())
     return RecurringShiftBatchResult(

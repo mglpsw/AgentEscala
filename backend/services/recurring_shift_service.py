@@ -169,6 +169,8 @@ def confirm_batch(
         batch = db.query(RecurringShiftBatch).filter(RecurringShiftBatch.id == batch_id).first()
         if not batch:
             raise ValueError("Batch de recorrência não encontrado")
+        if batch.status == RecurringBatchStatus.CONFIRMED:
+            raise ValueError("Batch de recorrência já confirmado")
         items = db.query(RecurringShiftBatchItem).filter(RecurringShiftBatchItem.batch_id == batch.id).all()
     else:
         batch, items = build_preview(db, payload, created_by)
@@ -179,6 +181,9 @@ def confirm_batch(
     duplicates = 0
 
     for item in items:
+        if item.created_shift_id or item.decision_status == RecurringItemDecisionStatus.CREATED:
+            skipped += 1
+            continue
         if item.duplicate_status:
             duplicates += 1
             if not include_duplicates:

@@ -41,7 +41,7 @@ _COL_SYNONYMS: Dict[str, List[str]] = {
 
 _PHONE_RE = re.compile(r"(?:\+?55\s*)?(?:\(?\d{2}\)?\s*)?\d{4,5}[-\s]?\d{4}")
 _CRM_RE = re.compile(r"\bCRM\s*[:\-/]?\s*([A-Z]{0,2})\s*(\d{3,8})\b", re.IGNORECASE)
-_DATE_RE = re.compile(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b")
+_DATE_RE = re.compile(r"^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?$")
 _TIME_RE = re.compile(r"(\d{1,2})(?::|h)?(\d{2})?")
 
 
@@ -105,6 +105,11 @@ def _clean_professional(value: Optional[str]) -> Tuple[str, Optional[str], List[
 def _parse_date_with_context(raw_date: Optional[str], month: Optional[int], year: Optional[int]) -> Optional[date]:
     if raw_date:
         raw_date = _normalize_text(raw_date)
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M"):
+            try:
+                return datetime.strptime(raw_date, fmt).date()
+            except ValueError:
+                pass
         for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%d/%m/%y"):
             try:
                 parsed = datetime.strptime(raw_date, fmt).date()
@@ -113,7 +118,7 @@ def _parse_date_with_context(raw_date: Optional[str], month: Optional[int], year
                 return parsed
             except ValueError:
                 pass
-        m = _DATE_RE.search(raw_date)
+        m = _DATE_RE.fullmatch(raw_date)
         if m:
             d = int(m.group(1))
             mm = int(m.group(2))

@@ -155,11 +155,23 @@ def apply_to_staging(
         date_value = row.get("date_iso") or row.get("date_raw") or ""
         if date_value and "T" in date_value:
             date_value = date_value.split("T")[0]
+        start_time_value = row.get("start_time_raw") or ""
+        end_time_value = row.get("end_time_raw") or ""
+        if (not start_time_value) and row.get("start_datetime"):
+            try:
+                start_time_value = datetime.fromisoformat(row["start_datetime"]).strftime("%H:%M")
+            except (ValueError, TypeError):
+                start_time_value = ""
+        if (not end_time_value) and row.get("end_datetime"):
+            try:
+                end_time_value = datetime.fromisoformat(row["end_datetime"]).strftime("%H:%M")
+            except (ValueError, TypeError):
+                end_time_value = ""
         writer.writerow([
             row.get("professional_name_normalized") or row.get("professional_name_raw") or "",
             date_value,
-            row.get("start_time_raw") or "",
-            row.get("end_time_raw") or "",
+            start_time_value,
+            end_time_value,
             row.get("duration_hours") or "",
             " | ".join(row.get("validation_messages") or []),
             f"document-import:{import_id}",
@@ -201,6 +213,9 @@ def create_missing_users(
     if not ocr_import:
         raise HTTPException(status_code=404, detail="Importação documental não encontrada")
     rows = (ocr_import.raw_payload or {}).get("rows") or []
+
+    if body.create_for_row_indexes is not None and len(body.create_for_row_indexes) == 0:
+        return CreateMissingUsersResponse(created_user_ids=[], skipped_rows=[])
 
     allowed_indexes = set(body.create_for_row_indexes or [])
     created: List[int] = []
@@ -281,7 +296,10 @@ def confirm_document_import(
     if not schedule_import:
         raise HTTPException(status_code=404, detail="Staging vinculado não encontrado")
 
-    _, created = confirm_import(db, linked_schedule_id, current_user.id)
+    try:
+        _, created = confirm_import(db, linked_schedule_id, current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return ConfirmDocumentImportResponse(
         document_import_id=import_id,
         schedule_import_id=linked_schedule_id,
