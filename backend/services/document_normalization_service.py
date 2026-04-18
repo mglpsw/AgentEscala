@@ -230,6 +230,10 @@ def _parse_time_window(start_raw: Optional[str], end_raw: Optional[str], shift_l
         return (0, 0), (0, 0), "twenty_four"
     if "noite" in cmp or "noturno" in cmp:
         return (20, 0), (8, 0), "night"
+    if "manha" in cmp:
+        return (8, 0), (14, 0), "day"
+    if "tarde" in cmp:
+        return (14, 0), (20, 0), "custom"
     if "dia" in cmp:
         return (8, 0), (20, 0), "day"
     return None, None, "custom"
@@ -672,15 +676,16 @@ def normalize_ocr_payload_document(db: Session, payload: Dict[str, Any], source_
                             values[canonical] = _normalize_text(str(cell))
                     candidate_rows = [values]
 
-                for values in candidate_rows:
+                for cidx, values in enumerate(candidate_rows):
                     parsed_date = _parse_date_with_context(values.get("date"), month, year)
                     day_group_id = parsed_date.isoformat() if parsed_date else f"page-{page_number}-row-{idx}"
+                    source_row_index = idx if len(candidate_rows) == 1 else (idx * 100 + cidx)
                     row = _build_row_from_values(
                         db,
                         values,
                         f"page-{page_number}",
                         int(page_number) if page_number else None,
-                        idx,
+                        source_row_index,
                         month,
                         year,
                         layout_type,

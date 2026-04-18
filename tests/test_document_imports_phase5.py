@@ -228,3 +228,102 @@ def test_grouped_day_validation_and_metadata_counts():
     assert doc["metadata"]["layout_counts"]["pa24h_block"] >= 1
     assert any("CRM ausente" in item for item in doc["rows"][0]["grouped_day_validation"])
     db.close()
+
+
+def test_shift_label_fallback_supports_manha_and_tarde():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Turno"],
+                        "rows": [
+                            ["Alice Silva", "15/04/2026", "MANHÃ"],
+                            ["Bob Santos", "15/04/2026", "TARDE"],
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "fallback_labels.pdf")
+    assert doc["rows"][0]["start_datetime"] is not None
+    assert doc["rows"][0]["end_datetime"] is not None
+    assert doc["rows"][1]["start_datetime"] is not None
+    assert doc["rows"][1]["end_datetime"] is not None
+    db.close()
+
+
+def test_pa24h_split_rows_have_unique_source_row_index():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "PA 24H",
+                        "headers": ["DATA", "DIA", "PLANTÃO", "CRM", "NOME COMPLETO"],
+                        "rows": [["16/04/2026", "QUI", "12H NOITE", "55597 e 42143", "LETICIA E JEAN"]],
+                    }
+                ],
+            }
+        ]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "split_index.pdf")
+    indexes = [row["source_row_index"] for row in doc["rows"]]
+    assert len(indexes) == len(set(indexes))
+    db.close()
+
+
+def test_apply_to_staging_respects_preview_edits(client, admin_headers):
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Entrada", "Saída"],
+                        "rows": [["Alice Silva", "18/04/2026", "08:00", "20:00"]],
+                    }
+                ],
+            }
+        ]
+    }
+    parse_resp = client.post(
+        "/admin/imports/parse-ocr-payload",
+        headers=admin_headers,
+        json={"source_filename": "edited_preview.json", "payload": payload},
+    )
+    assert parse_resp.status_code == 201
+    import_id = parse_resp.json()["document_import_id"]
+
+    preview_resp = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers)
+    row_index = preview_resp.json()["rows"][0]["source_row_index"]
+
+    staging_resp = client.post(
+        f"/admin/imports/{import_id}/apply-to-staging",
+        headers=admin_headers,
+        json={
+            "edited_rows": [
+                {
+                    "source_row_index": row_index,
+                    "professional_name_raw": "Alice Silva Corrigida",
+                    "start_time_raw": "10:00",
+                    "end_time_raw": "22:00",
+                }
+            ]
+        },
+    )
+    assert staging_resp.status_code == 200
+    schedule_import_id = staging_resp.json()["schedule_import_id"]
+    rows_resp = client.get(f"/schedule-imports/{schedule_import_id}/rows", headers=admin_headers)
+    assert rows_resp.status_code == 200
+    imported_row = rows_resp.json()[0]
+    assert imported_row["raw_professional"] == "Alice Silva Corrigida"
+    assert imported_row["raw_start_time"] == "10:00"
+    assert imported_row["raw_end_time"] == "22:00"

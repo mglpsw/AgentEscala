@@ -291,7 +291,19 @@ function ImportPage() {
     if (!docImportId) return
     setPageState(STATE.UPLOADING)
     try {
-      const { data: applyResult } = await api.post(`/admin/imports/${docImportId}/apply-to-staging`)
+      const editedRows = ocrPreviewRows.map((row) => ({
+        source_row_index: row.source_row_index,
+        professional_name_raw: row.professional_name_raw,
+        professional_name_normalized: row.professional_name_normalized,
+        canonical_name: row.canonical_name,
+        start_time_raw: row.start_time_raw,
+        end_time_raw: row.end_time_raw,
+        shift_kind: row.shift_kind,
+        crm_detected: row.crm_detected,
+        matched_user_id: row.matched_user_id,
+        suggested_existing_user_id: row.suggested_existing_user_id,
+      }))
+      const { data: applyResult } = await api.post(`/admin/imports/${docImportId}/apply-to-staging`, { edited_rows: editedRows })
       const { data: summaryData } = await api.get(`/schedule-imports/${applyResult.schedule_import_id}/summary`)
       const { data: detailData } = await api.get(`/schedule-imports/${applyResult.schedule_import_id}`)
       setSummary(summaryData)

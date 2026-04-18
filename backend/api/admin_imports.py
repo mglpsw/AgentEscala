@@ -8,7 +8,7 @@ import secrets
 from datetime import datetime
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from ..config.database import get_db
@@ -19,6 +19,7 @@ from ..utils.auth import get_password_hash
 from ..utils.dependencies import require_admin
 from .admin_import_schemas import (
     ApplyToStagingResponse,
+    ApplyToStagingRequest,
     ConfirmDocumentImportResponse,
     CreateMissingUsersRequest,
     CreateMissingUsersResponse,
@@ -135,6 +136,7 @@ def get_normalized_preview(
 @router.post("/{import_id}/apply-to-staging", response_model=ApplyToStagingResponse)
 def apply_to_staging(
     import_id: str,
+    body: ApplyToStagingRequest | None = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
@@ -143,6 +145,45 @@ def apply_to_staging(
         raise HTTPException(status_code=404, detail="Importação documental não encontrada")
     doc = ocr_import.raw_payload or {}
     rows = doc.get("rows") or []
+    edits = (body.edited_rows if body else [])
+    edited_by_row_index = {int(item.source_row_index): item for item in edits}
+    shift_time_map = {
+        "day": ("08:00", "20:00"),
+        "intermediate": ("10:00", "22:00"),
+        "night": ("20:00", "08:00"),
+        "twenty_four": ("00:00", "00:00"),
+    }
+    if edited_by_row_index:
+        for row in rows:
+            edit = edited_by_row_index.get(int(row.get("source_row_index") or -1))
+            if not edit:
+                continue
+            payload = edit.model_dump(exclude_unset=True)
+            if "professional_name_raw" in payload:
+                row["professional_name_raw"] = payload["professional_name_raw"]
+                row["professional_name_normalized"] = payload.get("professional_name_normalized") or payload["professional_name_raw"]
+            for key in ("professional_name_normalized", "canonical_name", "start_time_raw", "end_time_raw", "shift_kind", "crm_detected", "matched_user_id", "suggested_existing_user_id"):
+                if key in payload:
+                    row[key] = payload[key]
+            if row.get("shift_kind") in shift_time_map:
+                mapped_start, mapped_end = shift_time_map[row["shift_kind"]]
+                if not row.get("start_time_raw"):
+                    row["start_time_raw"] = mapped_start
+                if not row.get("end_time_raw"):
+                    row["end_time_raw"] = mapped_end
+            row.setdefault("validation_messages", []).append("Linha ajustada manualmente no preview OCR")
+        doc["rows"] = rows
+        ocr_import.raw_payload = doc
+        ocr_import.parsed_rows = rows
+        ocr_import.action_log = list(ocr_import.action_log or []) + [
+            {
+                "type": "apply_preview_edits",
+                "edited_rows": sorted(edited_by_row_index.keys()),
+                "at": datetime.utcnow().isoformat(),
+                "by": current_user.id,
+            }
+        ]
+
     if not rows:
         raise HTTPException(status_code=422, detail="Importação documental sem linhas")
 

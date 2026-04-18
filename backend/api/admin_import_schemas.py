@@ -99,6 +99,23 @@ class ApplyToStagingResponse(BaseModel):
     duplicate_rows: int
 
 
+class ApplyToStagingRowEdit(BaseModel):
+    source_row_index: int
+    professional_name_raw: Optional[str] = None
+    professional_name_normalized: Optional[str] = None
+    canonical_name: Optional[str] = None
+    start_time_raw: Optional[str] = None
+    end_time_raw: Optional[str] = None
+    shift_kind: Optional[str] = None
+    crm_detected: Optional[str] = None
+    matched_user_id: Optional[int] = None
+    suggested_existing_user_id: Optional[int] = None
+
+
+class ApplyToStagingRequest(BaseModel):
+    edited_rows: List[ApplyToStagingRowEdit] = Field(default_factory=list)
+
+
 class CreateMissingUsersRequest(BaseModel):
     create_for_row_indexes: Optional[List[int]] = None
     default_password: str = "Alterar123!"

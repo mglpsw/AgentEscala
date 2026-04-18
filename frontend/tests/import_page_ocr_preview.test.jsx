@@ -58,4 +58,57 @@ describe('ImportPage OCR preview agrupada por dia', () => {
     expect(screen.getByText(/Linhas ambíguas/i)).toBeInTheDocument()
     expect(screen.getByDisplayValue('LETICIA E JEAN')).toBeInTheDocument()
   })
+
+  it('envia edições inline no apply-to-staging', async () => {
+    api.post
+      .mockResolvedValueOnce({ data: { document_import_id: 'abc-2' } })
+      .mockResolvedValueOnce({ data: { schedule_import_id: 77 } })
+    api.get
+      .mockResolvedValueOnce({
+        data: {
+          rows: [
+            {
+              source_row_index: 22,
+              day_group_id: '2026-04-11',
+              date_iso: '2026-04-11',
+              source_layout_type: 'generic_table',
+              professional_name_raw: 'NOME ORIGINAL',
+              professional_name_normalized: 'Nome Original',
+              canonical_name: 'Nome Original',
+              start_time_raw: '08:00',
+              end_time_raw: '20:00',
+              shift_kind: 'day',
+              confidence: 0.9,
+              match_status: 'matched',
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({ data: { import_id: 77, total_rows: 1, valid_rows: 1, warning_rows: 0, invalid_rows: 0, duplicate_rows: 0, importable_rows: 1 } })
+      .mockResolvedValueOnce({ data: { rows: [] } })
+
+    render(<ImportPage />)
+    fireEvent.change(screen.getByPlaceholderText(/{"pages":/i), {
+      target: { value: JSON.stringify({ pages: [{ page_number: 1, tables: [] }] }) },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /parse \+ preview ocr/i }))
+    await waitFor(() => expect(screen.getByDisplayValue('NOME ORIGINAL')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByDisplayValue('NOME ORIGINAL'), { target: { value: 'NOME EDITADO' } })
+    fireEvent.click(screen.getByRole('button', { name: /apply to staging/i }))
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/admin/imports/abc-2/apply-to-staging',
+        expect.objectContaining({
+          edited_rows: expect.arrayContaining([
+            expect.objectContaining({
+              source_row_index: 22,
+              professional_name_raw: 'NOME EDITADO',
+            }),
+          ]),
+        }),
+      )
+    })
+  })
 })
