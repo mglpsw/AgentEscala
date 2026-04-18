@@ -1,5 +1,6 @@
 from backend.services.document_normalization_service import _parse_date_with_context, normalize_ocr_payload_document
 from backend.config.database import SessionLocal
+from backend.models import OcrImport
 
 
 def _sample_payload():
@@ -16,6 +17,23 @@ def _sample_payload():
                             ["Carlos Silva Faturamento", "01/03/2026", "20:00", "08:00", "12"],
                         ],
                         "confidence": 0.93,
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def _single_row_payload(name="Alice Silva", start_time="08:00", end_time="20:00"):
+    return {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Entrada", "Saída"],
+                        "rows": [[name, "18/04/2026", start_time, end_time]],
                     }
                 ],
             }
@@ -394,3 +412,120 @@ def test_apply_to_staging_uses_source_row_key_to_avoid_cross_page_collisions(cli
     imported_names = {row["raw_professional"] for row in rows_resp.json()}
     assert "Alice P2 Corrigida" in imported_names
     assert "Alice P1" in imported_names
+
+
+def test_apply_to_staging_audit_records_name_edit(client, admin_headers):
+    parse_resp = client.post(
+        "/admin/imports/parse-ocr-payload",
+        headers=admin_headers,
+        json={"source_filename": "audit_name.json", "payload": _single_row_payload()},
+    )
+    import_id = parse_resp.json()["document_import_id"]
+    preview_resp = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers)
+    row_index = preview_resp.json()["rows"][0]["source_row_index"]
+
+    apply_resp = client.post(
+        f"/admin/imports/{import_id}/apply-to-staging",
+        headers=admin_headers,
+        json={"edited_rows": [{"source_row_index": row_index, "professional_name_raw": "Alice Auditada"}]},
+    )
+    assert apply_resp.status_code == 200
+
+    preview_after = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers).json()
+    audit_items = preview_after["metadata"]["preview_edit_audit"]
+    assert len(audit_items) >= 1
+    last = audit_items[-1]
+    assert last["source_row_index"] == row_index
+    assert "professional_name_raw" in last["changed_fields"]
+    assert last["field_changes"]["professional_name_raw"]["original_value"] == "Alice Silva"
+    assert last["field_changes"]["professional_name_raw"]["edited_value"] == "Alice Auditada"
+    assert last["edit_origin"] == "manual/admin-preview"
+    assert isinstance(last["timestamp"], str) and last["timestamp"]
+
+
+def test_apply_to_staging_audit_records_time_edit(client, admin_headers):
+    parse_resp = client.post(
+        "/admin/imports/parse-ocr-payload",
+        headers=admin_headers,
+        json={"source_filename": "audit_time.json", "payload": _single_row_payload()},
+    )
+    import_id = parse_resp.json()["document_import_id"]
+    row_index = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers).json()["rows"][0]["source_row_index"]
+
+    apply_resp = client.post(
+        f"/admin/imports/{import_id}/apply-to-staging",
+        headers=admin_headers,
+        json={"edited_rows": [{"source_row_index": row_index, "start_time_raw": "10:00", "end_time_raw": "22:00"}]},
+    )
+    assert apply_resp.status_code == 200
+
+    audit_items = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers).json()["metadata"]["preview_edit_audit"]
+    last = audit_items[-1]
+    assert "start_time_raw" in last["changed_fields"]
+    assert "end_time_raw" in last["changed_fields"]
+    assert last["field_changes"]["start_time_raw"]["original_value"] == "08:00"
+    assert last["field_changes"]["start_time_raw"]["edited_value"] == "10:00"
+    assert last["field_changes"]["end_time_raw"]["original_value"] == "20:00"
+    assert last["field_changes"]["end_time_raw"]["edited_value"] == "22:00"
+
+
+def test_apply_to_staging_audit_records_shift_kind_edit(client, admin_headers):
+    parse_resp = client.post(
+        "/admin/imports/parse-ocr-payload",
+        headers=admin_headers,
+        json={"source_filename": "audit_shift.json", "payload": _single_row_payload(start_time="", end_time="")},
+    )
+    import_id = parse_resp.json()["document_import_id"]
+    row_index = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers).json()["rows"][0]["source_row_index"]
+
+    apply_resp = client.post(
+        f"/admin/imports/{import_id}/apply-to-staging",
+        headers=admin_headers,
+        json={"edited_rows": [{"source_row_index": row_index, "shift_kind": "night"}]},
+    )
+    assert apply_resp.status_code == 200
+
+    audit_items = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers).json()["metadata"]["preview_edit_audit"]
+    last = audit_items[-1]
+    assert "shift_kind" in last["changed_fields"]
+    assert last["field_changes"]["shift_kind"]["edited_value"] == "night"
+
+
+def test_apply_to_staging_audit_records_multiple_edits_same_row_in_action_log(client, admin_headers):
+    parse_resp = client.post(
+        "/admin/imports/parse-ocr-payload",
+        headers=admin_headers,
+        json={"source_filename": "audit_multiple.json", "payload": _single_row_payload()},
+    )
+    import_id = parse_resp.json()["document_import_id"]
+    row_index = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers).json()["rows"][0]["source_row_index"]
+
+    apply_resp = client.post(
+        f"/admin/imports/{import_id}/apply-to-staging",
+        headers=admin_headers,
+        json={
+            "edited_rows": [
+                {
+                    "source_row_index": row_index,
+                    "professional_name_raw": "Alice Múltipla",
+                    "start_time_raw": "09:00",
+                    "end_time_raw": "21:00",
+                    "shift_kind": "intermediate",
+                }
+            ]
+        },
+    )
+    assert apply_resp.status_code == 200
+
+    db = SessionLocal()
+    try:
+        ocr_import = db.query(OcrImport).filter(OcrImport.id == import_id).first()
+        assert ocr_import is not None
+        action = next((item for item in reversed(ocr_import.action_log or []) if item.get("type") == "apply_preview_edits"), None)
+        assert action is not None
+        assert action["edited_rows_count"] == 1
+        assert len(action["row_edit_audit"]) == 1
+        changed_fields = set(action["row_edit_audit"][0]["changed_fields"])
+        assert {"professional_name_raw", "start_time_raw", "end_time_raw", "shift_kind"}.issubset(changed_fields)
+    finally:
+        db.close()
