@@ -18,10 +18,8 @@ import json
 import logging
 import re
 from datetime import date, datetime, time, timedelta
-from time import perf_counter
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-import httpx
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
@@ -41,6 +39,7 @@ from ..observability import (
     record_ocr_fallback_used,
     record_ocr_request,
 )
+from .ocr.agent_router_client import OcrAgentRouterError, extract_text_via_agent_router
 
 from .schedule_validation_service import validate_schedule, validate_shift
 
@@ -284,52 +283,33 @@ def _read_ocr_via_api(content: bytes, filename: str) -> Tuple[List[str], List[Di
     if not settings.OCR_API_ENABLED or not base_url:
         raise ValueError("OCR API desabilitada por configuração.")
 
-    endpoint_candidates = ("/ocr/extract", "/api/ocr/extract", "/extract")
-    timeout = settings.OCR_API_TIMEOUT_SECONDS
-    last_error: Optional[Exception] = None
+    try:
+        result = extract_text_via_agent_router(
+            file_content=content,
+            filename=filename,
+            base_url=base_url,
+            timeout_seconds=settings.OCR_API_TIMEOUT_SECONDS,
+            verify_ssl=settings.OCR_API_VERIFY_SSL,
+        )
+    except OcrAgentRouterError as exc:
+        record_ocr_api_failure(0)
+        raise ValueError(str(exc)) from exc
 
-    for endpoint in endpoint_candidates:
-        target_url = f"{base_url}{endpoint}"
-        started_at = perf_counter()
-        try:
-            with httpx.Client(timeout=timeout, verify=settings.OCR_API_VERIFY_SSL) as client:
-                response = client.post(
-                    target_url,
-                    files={"file": (filename, content, "application/octet-stream")},
-                )
-            response.raise_for_status()
-            payload = response.json()
-            raw_text = _extract_text_from_ocr_payload(payload if isinstance(payload, dict) else {})
-            if not raw_text.strip():
-                raise ValueError(
-                    "OCR API retornou payload sem conteúdo textual reconhecível; acionando fallback local."
-                )
-            headers, rows, errors = _parse_ocr_text_to_rows(raw_text)
-            latency_seconds = perf_counter() - started_at
-            record_ocr_api_success(latency_seconds)
-            logger.info(
-                "ocr_execution strategy=api status=success api_url=%s latency_ms=%.2f",
-                target_url,
-                latency_seconds * 1000,
-            )
-            return headers, rows, {
-                "raw_text": raw_text,
-                "errors": errors,
-                "source": target_url,
-                "api_latency_seconds": latency_seconds,
-            }
-        except Exception as exc:  # pragma: no cover - integração externa
-            latency_seconds = perf_counter() - started_at
-            record_ocr_api_failure(latency_seconds)
-            last_error = exc
-            logger.warning(
-                "ocr_execution strategy=api status=failure api_url=%s latency_ms=%.2f reason=%s",
-                target_url,
-                latency_seconds * 1000,
-                exc,
-            )
-
-    raise ValueError(f"OCR API indisponível em {base_url}: {last_error}")
+    raw_text = result["raw_text"]
+    headers, rows, errors = _parse_ocr_text_to_rows(raw_text)
+    latency_seconds = float(result.get("latency_seconds") or 0)
+    record_ocr_api_success(latency_seconds)
+    logger.info(
+        "ocr_execution strategy=api status=success api_url=%s latency_ms=%.2f",
+        result.get("source"),
+        latency_seconds * 1000,
+    )
+    return headers, rows, {
+        "raw_text": raw_text,
+        "errors": errors,
+        "source": result.get("source"),
+        "api_latency_seconds": latency_seconds,
+    }
 
 
 def read_file(content: bytes, filename: str) -> Tuple[List[str], List[Dict[str, Any]]]:
@@ -756,49 +736,57 @@ def process_import_file(
     try:
         ocr_meta: Dict[str, Any] = {}
         if fn_lower.endswith(".pdf"):
-            try:
+            if settings.FEATURE_OCR_REMOTE_IMPORT:
                 headers, raw_rows, ocr_meta = _read_ocr_via_api(file_content, filename)
                 record_ocr_request("api")
-            except Exception as api_exc:
-                record_ocr_fallback_used("local_pdf")
-                record_ocr_request("fallback_local")
+            else:
                 try:
-                    headers, raw_rows, ocr_meta = _read_pdf_ocr(file_content)
-                    logger.warning(
-                        "ocr_execution strategy=fallback_local status=success fallback_type=local_pdf file=%s reason=%s",
-                        filename,
-                        api_exc,
-                    )
-                except Exception as fallback_exc:
-                    logger.error(
-                        "ocr_execution strategy=fallback_local status=failure fallback_type=local_pdf file=%s reason=%s",
-                        filename,
-                        fallback_exc,
-                    )
-                    raise
-                ocr_meta["fallback"] = "local_pdf"
+                    headers, raw_rows, ocr_meta = _read_ocr_via_api(file_content, filename)
+                    record_ocr_request("api")
+                except Exception as api_exc:
+                    record_ocr_fallback_used("local_pdf")
+                    record_ocr_request("fallback_local")
+                    try:
+                        headers, raw_rows, ocr_meta = _read_pdf_ocr(file_content)
+                        logger.warning(
+                            "ocr_execution strategy=fallback_local status=success fallback_type=local_pdf file=%s reason=%s",
+                            filename,
+                            api_exc,
+                        )
+                    except Exception as fallback_exc:
+                        logger.error(
+                            "ocr_execution strategy=fallback_local status=failure fallback_type=local_pdf file=%s reason=%s",
+                            filename,
+                            fallback_exc,
+                        )
+                        raise
+                    ocr_meta["fallback"] = "local_pdf"
         elif fn_lower.endswith((".png", ".jpg", ".jpeg", ".webp", ".tiff")):
-            try:
+            if settings.FEATURE_OCR_REMOTE_IMPORT:
                 headers, raw_rows, ocr_meta = _read_ocr_via_api(file_content, filename)
                 record_ocr_request("api")
-            except Exception as api_exc:
-                record_ocr_fallback_used("local_image")
-                record_ocr_request("fallback_local")
+            else:
                 try:
-                    headers, raw_rows, ocr_meta = _read_image_ocr(file_content)
-                    logger.warning(
-                        "ocr_execution strategy=fallback_local status=success fallback_type=local_image file=%s reason=%s",
-                        filename,
-                        api_exc,
-                    )
-                except Exception as fallback_exc:
-                    logger.error(
-                        "ocr_execution strategy=fallback_local status=failure fallback_type=local_image file=%s reason=%s",
-                        filename,
-                        fallback_exc,
-                    )
-                    raise
-                ocr_meta["fallback"] = "local_image"
+                    headers, raw_rows, ocr_meta = _read_ocr_via_api(file_content, filename)
+                    record_ocr_request("api")
+                except Exception as api_exc:
+                    record_ocr_fallback_used("local_image")
+                    record_ocr_request("fallback_local")
+                    try:
+                        headers, raw_rows, ocr_meta = _read_image_ocr(file_content)
+                        logger.warning(
+                            "ocr_execution strategy=fallback_local status=success fallback_type=local_image file=%s reason=%s",
+                            filename,
+                            api_exc,
+                        )
+                    except Exception as fallback_exc:
+                        logger.error(
+                            "ocr_execution strategy=fallback_local status=failure fallback_type=local_image file=%s reason=%s",
+                            filename,
+                            fallback_exc,
+                        )
+                        raise
+                    ocr_meta["fallback"] = "local_image"
         else:
             headers, raw_rows = read_file(file_content, filename)
 
@@ -851,6 +839,10 @@ def process_import_file(
             ocr_import.status = "discarded"
             ocr_import.errors = (ocr_import.errors or []) + [{"code": "OCR_READ_ERROR", "message": str(exc)}]
         db.commit()
+        if is_ocr_upload:
+            raise ValueError(
+                "Falha ao processar OCR do arquivo enviado. Verifique o arquivo e tente novamente."
+            ) from exc
         raise ValueError(f"Não foi possível ler o arquivo '{filename}': {exc}") from exc
 
     if not raw_rows:

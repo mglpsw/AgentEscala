@@ -67,7 +67,8 @@ def test_read_ocr_via_api_uses_response_payload(monkeypatch):
         def post(self, *_args, **_kwargs):
             return _FakeResponse()
 
-    monkeypatch.setattr(import_service.httpx, "Client", lambda **_kwargs: _FakeClient())
+    import backend.services.ocr.agent_router_client as client_mod
+    monkeypatch.setattr(client_mod.httpx, "Client", lambda **_kwargs: _FakeClient())
     headers, rows, meta = import_service._read_ocr_via_api(b"pdf", "escala.pdf")
 
     assert headers[:4] == ["profissional", "data", "hora_inicio", "hora_fim"]
@@ -94,10 +95,46 @@ def test_read_ocr_via_api_raises_when_payload_has_no_text(monkeypatch):
         def post(self, *_args, **_kwargs):
             return _FakeResponse()
 
-    monkeypatch.setattr(import_service.httpx, "Client", lambda **_kwargs: _FakeClient())
+    import backend.services.ocr.agent_router_client as client_mod
+    monkeypatch.setattr(client_mod.httpx, "Client", lambda **_kwargs: _FakeClient())
 
     try:
         import_service._read_ocr_via_api(b"pdf", "escala.pdf")
         assert False, "Era esperado ValueError para payload OCR vazio"
     except ValueError as exc:
-        assert "payload sem conteúdo textual" in str(exc)
+        assert "payload sem texto" in str(exc)
+
+
+def test_process_import_file_ocr_error_is_sanitized(monkeypatch):
+    """Erros técnicos de OCR não devem vazar para o usuário final."""
+    from backend.config.database import SessionLocal
+    from backend.models import User
+
+    monkeypatch.setattr(import_service.settings, "FEATURE_OCR_REMOTE_IMPORT", True)
+
+    def _raise_ocr(*_args, **_kwargs):
+        raise ValueError("dependências Pillow/pytesseract ausentes")
+
+    monkeypatch.setattr(import_service, "_read_ocr_via_api", _raise_ocr)
+
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter(User.email == "admin@agentescala.com").first()
+        assert admin is not None
+        try:
+            import_service.process_import_file(
+                db=db,
+                file_content=b"fake-image-content",
+                filename="escala.jpeg",
+                reference_period="2026-04",
+                source_description="teste",
+                imported_by_id=admin.id,
+            )
+            assert False, "Era esperado ValueError para falha OCR"
+        except ValueError as exc:
+            message = str(exc)
+            assert "Falha ao processar OCR" in message
+            assert "Pillow" not in message
+            assert "pytesseract" not in message
+    finally:
+        db.close()

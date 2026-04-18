@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     OCR_API_TIMEOUT_SECONDS: float = 20.0
     OCR_API_ENABLED: bool = True
     OCR_API_VERIFY_SSL: bool = True
+    FEATURE_OCR_REMOTE_IMPORT: bool = False
 
     SCHEDULE_MAX_DAILY_HOURS: float = 12.0
     SCHEDULE_MAX_WEEKLY_HOURS: float = 60.0
