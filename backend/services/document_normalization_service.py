@@ -48,6 +48,9 @@ NAME_ALIASES = {
     "jean pierri": "Jean Pierre Dosciatti",
     "leticia leonarda g.cravo": "Leticia Leonarda",
     "joel dahne": "Joel Soares Dahne",
+    "leticia leonarda": "Leticia Leonarda",
+    "leticia": "Leticia Leonarda",
+    "jean": "Jean Pierre Dosciatti",
 }
 
 SHIFT_KIND_COLORS = {
@@ -63,6 +66,10 @@ _CRM_RE = re.compile(r"\bCRM\s*[:\-/]?\s*([A-Z]{0,2})\s*(\d{3,8})\b", re.IGNOREC
 _CRM_NUMERIC_RE = re.compile(r"\b(\d{4,8})(?:\s*e\s*(\d{3,8}))?\b", re.IGNORECASE)
 _DATE_RE = re.compile(r"^(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?$")
 _TIME_RE = re.compile(r"(\d{1,2})(?::|h)?(\d{2})?")
+_OPERATIONAL_SUFFIX_RE = re.compile(
+    r"\b(?:faturamento|apoio|coringa|extra|plantao extra|disponivel|cobertura|troca|folga)\b.*$",
+    re.IGNORECASE,
+)
 
 
 _NORMALIZATION_CACHE: dict[str, str] = {}
@@ -114,7 +121,7 @@ def _split_compound_values(value: Optional[str]) -> List[str]:
     clean = _normalize_text(value)
     if not clean:
         return []
-    pieces = re.split(r"\s+e\s+|\s*/\s*|\s*\+\s*", clean, flags=re.IGNORECASE)
+    pieces = re.split(r"\s+e\s+|\s*/\s*|\s*\+\s*|\s*&\s*|\s*;\s*|\s*,\s*", clean, flags=re.IGNORECASE)
     return [_normalize_text(piece) for piece in pieces if _normalize_text(piece)]
 
 
@@ -133,7 +140,7 @@ def _clean_professional(value: Optional[str]) -> Tuple[str, Optional[str], List[
         raw = _CRM_RE.sub("", raw)
 
     cleaned = _PHONE_RE.sub("", raw)
-    cleaned = re.sub(r"\bfaturamento\b.*$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = _OPERATIONAL_SUFFIX_RE.sub("", cleaned)
     cleaned = re.sub(r"\(.*?\)", "", cleaned)
     cleaned = re.sub(r"[^\wÀ-ÿ.\-\s]", " ", cleaned)
     cleaned = _normalize_text(cleaned)
@@ -190,11 +197,20 @@ def _parse_date_with_context(raw_date: Optional[str], month: Optional[int], year
 def _parse_hour(raw: Optional[str]) -> Optional[Tuple[int, int]]:
     if not raw:
         return None
-    m = _TIME_RE.search(_comparable_text(raw))
+    normalized_raw = _comparable_text(raw)
+    m = _TIME_RE.search(normalized_raw)
     if not m:
         return None
     h = int(m.group(1))
     mm = int(m.group(2) or 0)
+    if m.group(2) is None:
+        compact = re.search(r"\b(\d{3,4})\b", normalized_raw)
+        if compact:
+            digits = compact.group(1)
+            if len(digits) == 3:
+                h, mm = int(digits[0]), int(digits[1:])
+            else:
+                h, mm = int(digits[:2]), int(digits[2:])
     if h > 23 or mm > 59:
         return None
     return h, mm
@@ -220,7 +236,7 @@ def _parse_time_window(start_raw: Optional[str], end_raw: Optional[str], shift_l
         return start, end, _classify_shift_kind(start, end, shift_label)
 
     label = _normalize_text(shift_label)
-    m = re.search(r"(\d{1,2}(?::\d{2}|h\d{2})?)\s*(?:-|às|as|a)\s*(\d{1,2}(?::\d{2}|h\d{2})?)", label, re.IGNORECASE)
+    m = re.search(r"(\d{1,2}(?::\d{2}|h\d{0,2})?)\s*(?:-|às|as|a)\s*(\d{1,2}(?::\d{2}|h\d{0,2})?)", label, re.IGNORECASE)
     if m:
         start = _parse_hour(m.group(1))
         end = _parse_hour(m.group(2))
@@ -296,6 +312,9 @@ def _resolve_user_match(db: Session, name: str, canonical_name: str, crm: Option
 
     if not name:
         return "invalid", None, ["Nome obrigatório"], 0.0, None, {}, None
+    if len(_normalize_text(name).split()) < 2:
+        notes.append("Nome incompleto para match automático")
+        return "new_user_candidate", None, notes, 0.35, None, {"name": 0.0, "alias": 0.0, "crm": 0.0, "pattern": 0.0, "shift": 0.0}, None
 
     normalized = _comparable_text(canonical_name or name)
     profile_by_crm = {str(p.crm_numero): p for p in profiles if p.crm_numero}

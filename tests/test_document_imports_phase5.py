@@ -275,6 +275,126 @@ def test_shift_label_fallback_supports_manha_and_tarde():
     db.close()
 
 
+def test_name_cleaning_removes_operational_suffix_and_keeps_safe_match_fallback():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Entrada", "Saída"],
+                        "rows": [["Fulano Apoio Cobertura", "15/04/2026", "08:00", "20:00"]],
+                    }
+                ],
+            }
+        ]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "suffix_noise.pdf")
+    row = doc["rows"][0]
+    assert row["professional_name_normalized"] == "Fulano"
+    assert row["match_status"] == "new_user_candidate"
+    assert any("Nome incompleto para match automático" in msg for msg in row["validation_messages"])
+    db.close()
+
+
+def test_split_multiple_professionals_with_ampersand_and_comma():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "PA 24H",
+                        "headers": ["DATA", "DIA", "PLANTÃO", "CRM", "NOME COMPLETO"],
+                        "rows": [["17/04/2026", "SEX", "12H NOITE", "55597, 42143", "LETICIA & JEAN"]],
+                    }
+                ],
+            }
+        ]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "pa24h_symbols.pdf")
+    assert len(doc["rows"]) == 2
+    assert {row["canonical_name"] for row in doc["rows"]} == {"Leticia Leonarda", "Jean Pierre Dosciatti"}
+    assert len({row["source_row_index"] for row in doc["rows"]}) == 2
+    db.close()
+
+
+def test_shift_label_fallback_supports_noite_without_explicit_times():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Turno"],
+                        "rows": [["Alice Silva", "15/04/2026", "NOITE"]],
+                    }
+                ],
+            }
+        ]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "fallback_noite.pdf")
+    row = doc["rows"][0]
+    assert row["shift_kind"] == "night"
+    assert row["start_datetime"].endswith("20:00:00")
+    assert row["end_datetime"].endswith("08:00:00")
+    db.close()
+
+
+def test_parse_irregular_compact_time_format():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Entrada", "Saída"],
+                        "rows": [["Alice Silva", "15/04/2026", "0800", "2000"]],
+                    }
+                ],
+            }
+        ]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "compact_time.pdf")
+    row = doc["rows"][0]
+    assert row["start_time_raw"] == "0800"
+    assert row["end_time_raw"] == "2000"
+    assert row["start_datetime"] is not None
+    assert row["end_datetime"] is not None
+    assert row["shift_kind"] == "day"
+    db.close()
+
+
+def test_invalid_or_incomplete_time_remains_invalid_with_message():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Entrada", "Saída"],
+                        "rows": [["Alice Silva", "15/04/2026", "25:00", ""]],
+                    }
+                ],
+            }
+        ]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "invalid_time.pdf")
+    row = doc["rows"][0]
+    assert row["match_status"] == "invalid"
+    assert any("Horário/turno incompreensível" in msg for msg in row["validation_messages"])
+    db.close()
+
+
 def test_pa24h_split_rows_have_unique_source_row_index():
     db = SessionLocal()
     payload = {
