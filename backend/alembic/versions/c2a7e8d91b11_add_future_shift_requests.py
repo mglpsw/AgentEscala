@@ -7,6 +7,7 @@ Create Date: 2026-04-18
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision = 'c2a7e8d91b11'
@@ -15,7 +16,12 @@ branch_labels = None
 depends_on = None
 
 
-future_request_status = sa.Enum('ACTIVE', 'CANCELLED', name='futureshiftrequeststatus')
+future_request_status = postgresql.ENUM(
+    'ACTIVE',
+    'CANCELLED',
+    name='futureshiftrequeststatus',
+    create_type=False,
+)
 
 
 def upgrade() -> None:
