@@ -7,7 +7,6 @@ on:
     types: [created]
 
 jobs:
-  # ── Review automático em todo PR ─────────────────────────────────────────
   pr-review:
     name: Code Review via Agent-Router
     if: github.event_name == 'pull_request'
@@ -15,71 +14,166 @@ jobs:
     permissions:
       pull-requests: write
       contents: read
-
+    env:
+      AGENT_URL: ${{ secrets.AGENT_ROUTER_URL || 'https://api.ks-sm.net:9443' }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get diff
-        id: diff
+      - name: Validate prerequisites
         run: |
-          git fetch origin ${{ github.base_ref }}
-          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD --stat | head -30)
-          DIFF_FULL=$(git diff origin/${{ github.base_ref }}...HEAD | head -300)
-          echo "stat<<EOF" >> $GITHUB_OUTPUT
-          echo "$DIFF" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "full<<EOF" >> $GITHUB_OUTPUT
-          echo "$DIFF_FULL" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          for bin in jq curl git; do
+            command -v "$bin" >/dev/null 2>&1 || { echo "::error::$bin ausente no runner"; exit 1; }
+          done
 
-      - name: Call agent-router
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend deps
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Collect PR metadata and diff
+        id: collect
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/agent"
+          git fetch --no-tags --depth=1 origin "$BASE_REF" >/dev/null 2>&1 || true
+          git diff --stat "origin/${BASE_REF}...HEAD" > "$RUNNER_TEMP/agent/stat.txt" \
+            || echo "(diff-stat indisponivel)" > "$RUNNER_TEMP/agent/stat.txt"
+          git diff "origin/${BASE_REF}...HEAD" > "$RUNNER_TEMP/agent/diff.txt" \
+            || echo "(diff indisponivel)" > "$RUNNER_TEMP/agent/diff.txt"
+          head -c 80000 "$RUNNER_TEMP/agent/diff.txt" > "$RUNNER_TEMP/agent/diff.trunc.txt"
+          printf '%s\n' "$PR_TITLE" > "$RUNNER_TEMP/agent/title.txt"
+          printf '%s\n' "$HEAD_REF" > "$RUNNER_TEMP/agent/head.txt"
+          printf '%s\n' "$BASE_REF" > "$RUNNER_TEMP/agent/base.txt"
+          echo "Diff bytes: $(wc -c < "$RUNNER_TEMP/agent/diff.txt")"
+
+      - name: Run local validations (honest report)
+        id: checks
+        run: |
+          set -uo pipefail
+          REPORT="$RUNNER_TEMP/agent/checks.txt"
+          : > "$REPORT"
+          record() { printf -- '- %s: %s\n' "$1" "$2" >> "$REPORT"; }
+          run_check() {
+            local label="$1"; shift
+            if "$@" >/dev/null 2>&1; then
+              record "$label" "OK"
+            else
+              record "$label" "FALHOU"
+            fi
+          }
+          run_check "pytest"         bash -c 'pytest -q'
+          run_check "alembic heads"  bash -c 'cd backend && alembic heads'
+          run_check "eslint"         bash -c 'cd frontend && npm run -s lint'
+          run_check "vitest"         bash -c 'cd frontend && npm test --silent'
+          run_check "vite build"     bash -c 'cd frontend && npm run -s build'
+          echo "----- checks report -----"
+          cat "$REPORT"
+          echo "-------------------------"
+
+      - name: Build prompt file (no shell expansion)
+        id: prompt
+        run: |
+          set -euo pipefail
+          PF="$RUNNER_TEMP/agent/prompt.txt"
+          cat > "$PF" <<'PROMPT_EOF'
+          Você é um revisor de código especializado no projeto AgentEscala (FastAPI + React + PostgreSQL).
+
+          PROMPT_EOF
+          {
+            printf 'PR: '      ; cat "$RUNNER_TEMP/agent/title.txt"
+            printf 'Branch: '  ; tr -d '\n' < "$RUNNER_TEMP/agent/head.txt"
+            printf ' -> '      ; cat "$RUNNER_TEMP/agent/base.txt"
+            printf '\nValidações locais executadas neste runner:\n'
+            cat "$RUNNER_TEMP/agent/checks.txt"
+            printf '\nArquivos alterados:\n'
+            cat "$RUNNER_TEMP/agent/stat.txt"
+            printf '\nDiff (pode estar truncado a 80KB):\n'
+            printf '```diff\n'
+            cat "$RUNNER_TEMP/agent/diff.trunc.txt"
+            printf '\n```\n\n'
+            printf 'Faça uma revisão de código concisa em português do Brasil.\n'
+            printf 'Foque em: bugs, segurança, performance, convenções do projeto.\n'
+            printf 'Formato: use markdown com seções curtas. Máximo 400 palavras.\n'
+          } >> "$PF"
+          echo "prompt_file=$PF" >> "$GITHUB_OUTPUT"
+          echo "Prompt size: $(wc -c < "$PF") bytes"
+
+      - name: Call Agent Router
         id: review
         env:
-          AGENT_URL: ${{ secrets.AGENT_ROUTER_URL || 'https://api.ks-sm.net:9443' }}
+          PROMPT_FILE: ${{ steps.prompt.outputs.prompt_file }}
         run: |
-          PROMPT="Você é um revisor de código especializado no projeto AgentEscala (FastAPI + React + PostgreSQL).
-
-          PR: ${{ github.event.pull_request.title }}
-          Branch: ${{ github.head_ref }} → ${{ github.base_ref }}
-
-          Arquivos alterados:
-          ${{ steps.diff.outputs.stat }}
-
-          Diff:
-          ${{ steps.diff.outputs.full }}
-
-          Faça uma revisão de código concisa em português do Brasil.
-          Foque em: bugs, segurança, performance, convenções do projeto.
-          Formato: use markdown com seções curtas. Máximo 400 palavras."
-
-          RESPONSE=$(curl -sf --max-time 60 \
-            "${AGENT_URL}/v1/chat/completions" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg model "agent-router:aiops" \
-              --arg prompt "$PROMPT" \
-              '{model: $model, messages: [{role: "user", content: $prompt}], max_tokens: 800}'
-            )" | jq -r '.choices[0].message.content // "Revisão indisponível."')
-
-          echo "response<<EOF" >> $GITHUB_OUTPUT
-          echo "$RESPONSE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          BODY="$RUNNER_TEMP/agent/body.json"
+          RESP="$RUNNER_TEMP/agent/response.json"
+          jq -n \
+            --arg model "agent-router:aiops" \
+            --rawfile prompt "$PROMPT_FILE" \
+            '{model: $model, messages: [{role:"user", content:$prompt}], max_tokens: 800}' \
+            > "$BODY"
+          HTTP_CODE=$(curl -sS --max-time 60 --fail-with-body \
+            -o "$RESP" -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            --data-binary @"$BODY" \
+            "${AGENT_URL}/v1/chat/completions") || {
+              echo "::warning::Agent Router falhou. HTTP=${HTTP_CODE:-?}"
+              echo "---- response body ----"
+              sed -n '1,200p' "$RESP" || true
+              echo "-----------------------"
+              {
+                echo 'response<<AGENT_EOF'
+                echo "Revisão indisponível (HTTP ${HTTP_CODE:-erro de rede})."
+                echo 'AGENT_EOF'
+              } >> "$GITHUB_OUTPUT"
+              exit 0
+            }
+          CONTENT=$(jq -r '.choices[0].message.content // "Revisão indisponível."' "$RESP")
+          {
+            echo 'response<<AGENT_EOF'
+            printf '%s\n' "$CONTENT"
+            echo 'AGENT_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Post review comment
         uses: actions/github-script@v7
+        env:
+          REVIEW_TEXT: ${{ steps.review.outputs.response }}
         with:
           script: |
-            const review = `## 🤖 Agent Review (AIOps)\n\n${{ steps.review.outputs.response }}\n\n---\n_Revisão automática via agent-router local. Não usa créditos GitHub._`;
-            github.rest.issues.createComment({
+            const review = `## 🤖 Agent Review (AIOps)\n\n${process.env.REVIEW_TEXT}\n\n---\n_Revisão automática via agent-router local. Não usa créditos GitHub._`;
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: review
+              body: review,
             });
 
-  # ── Comando via comentário: /agent <prompt> ───────────────────────────────
   on-demand:
     name: Agent on Demand
     if: |
@@ -90,50 +184,105 @@ jobs:
       issues: write
       pull-requests: write
       contents: read
-
+    env:
+      AGENT_URL: ${{ secrets.AGENT_ROUTER_URL || 'https://api.ks-sm.net:9443' }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract prompt
-        id: prompt
+      - name: Validate prerequisites
         run: |
-          COMMENT="${{ github.event.comment.body }}"
-          PROMPT="${COMMENT#/agent }"
-          echo "prompt=$PROMPT" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          for bin in jq curl python3; do
+            command -v "$bin" >/dev/null 2>&1 || { echo "::error::$bin ausente"; exit 1; }
+          done
 
-      - name: Call agent-router
+      - name: Extract prompt to file
+        id: prompt
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/agent"
+          PF="$RUNNER_TEMP/agent/prompt.txt"
+          python3 - "$PF" <<'PY'
+          import os, sys, re
+          out = sys.argv[1]
+          body = os.environ.get("COMMENT_BODY", "")
+          stripped = re.sub(r"^/agent\s*", "", body, count=1)
+          with open(out, "w", encoding="utf-8") as f:
+              f.write(stripped)
+          PY
+          echo "prompt_file=$PF" >> "$GITHUB_OUTPUT"
+          echo "Prompt size: $(wc -c < "$PF") bytes"
+
+      - name: Call Agent Router
         id: agent
         env:
-          AGENT_URL: ${{ secrets.AGENT_ROUTER_URL || 'https://api.ks-sm.net:9443' }}
+          PROMPT_FILE: ${{ steps.prompt.outputs.prompt_file }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          CONTEXT="Projeto AgentEscala (FastAPI + React + PostgreSQL, homelab CT102).
-          Repositório: ${{ github.repository }}. Branch padrão: main."
-
-          RESPONSE=$(curl -sf --max-time 60 \
-            "${AGENT_URL}/v1/chat/completions" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg model "agent-router:aiops" \
-              --arg ctx "$CONTEXT" \
-              --arg prompt "${{ steps.prompt.outputs.prompt }}" \
-              '{model: $model, messages: [
-                {role: "system", content: $ctx},
-                {role: "user", content: $prompt}
-              ], max_tokens: 800}'
-            )" | jq -r '.choices[0].message.content // "Agente indisponível."')
-
-          echo "response<<EOF" >> $GITHUB_OUTPUT
-          echo "$RESPONSE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          BODY="$RUNNER_TEMP/agent/body.json"
+          RESP="$RUNNER_TEMP/agent/response.json"
+          CTX_FILE="$RUNNER_TEMP/agent/ctx.txt"
+          cat > "$CTX_FILE" <<'CTX_EOF'
+          Projeto AgentEscala (FastAPI + React + PostgreSQL, homelab CT102).
+          Branch padrão: main.
+          CTX_EOF
+          jq -n \
+            --arg model "agent-router:aiops" \
+            --arg repo  "$GH_REPO" \
+            --rawfile ctx    "$CTX_FILE" \
+            --rawfile prompt "$PROMPT_FILE" \
+            '{model: $model, messages: [
+              {role:"system", content: ($ctx + "\nRepositório: " + $repo + ".")},
+              {role:"user",   content: $prompt}
+            ], max_tokens: 800}' \
+            > "$BODY"
+          HTTP_CODE=$(curl -sS --max-time 60 --fail-with-body \
+            -o "$RESP" -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            --data-binary @"$BODY" \
+            "${AGENT_URL}/v1/chat/completions") || {
+              echo "::warning::Agent Router falhou. HTTP=${HTTP_CODE:-?}"
+              sed -n '1,200p' "$RESP" || true
+              {
+                echo 'response<<AGENT_EOF'
+                echo "Agente indisponível (HTTP ${HTTP_CODE:-erro de rede})."
+                echo 'AGENT_EOF'
+              } >> "$GITHUB_OUTPUT"
+              exit 0
+            }
+          CONTENT=$(jq -r '.choices[0].message.content // "Agente indisponível."' "$RESP")
+          {
+            echo 'response<<AGENT_EOF'
+            printf '%s\n' "$CONTENT"
+            echo 'AGENT_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Post response
         uses: actions/github-script@v7
+        env:
+          AGENT_RESPONSE: ${{ steps.agent.outputs.response }}
+          ORIGINAL_COMMENT: ${{ github.event.comment.body }}
         with:
           script: |
-            const body = `## 🤖 Agent Response\n\n**Prompt:** \`${{ steps.prompt.outputs.prompt }}\`\n\n${{ steps.agent.outputs.response }}\n\n---\n_via agent-router local (AIOps)_`;
-            github.rest.issues.createComment({
+            const body = [
+              `## 🤖 Agent Response`,
+              ``,
+              `**Comentário original:**`,
+              '```',
+              process.env.ORIGINAL_COMMENT,
+              '```',
+              ``,
+              process.env.AGENT_RESPONSE,
+              ``,
+              `---`,
+              `_via agent-router local (AIOps)_`,
+            ].join("\n");
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: body
+              body: body,
             });
