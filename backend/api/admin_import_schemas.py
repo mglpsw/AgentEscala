@@ -19,12 +19,18 @@ class NormalizedShiftRowResponse(BaseModel):
     source_sheet: Optional[str] = None
     source_page: Optional[int] = None
     source_row_index: int
+    source_layout_type: Optional[str] = None
+    day_group_id: Optional[str] = None
     competency_month: Optional[int] = None
     competency_year: Optional[int] = None
     professional_name_raw: Optional[str] = None
     professional_name_normalized: Optional[str] = None
+    canonical_name: Optional[str] = None
+    alias_applied: bool = False
     crm_raw: Optional[str] = None
     crm_normalized: Optional[str] = None
+    crm_detected: Optional[str] = None
+    crm_confidence: float = 0.0
     specialty_raw: Optional[str] = None
     location_raw: Optional[str] = None
     unit_raw: Optional[str] = None
@@ -32,6 +38,8 @@ class NormalizedShiftRowResponse(BaseModel):
     date_iso: Optional[str] = None
     weekday_raw: Optional[str] = None
     shift_label_raw: Optional[str] = None
+    shift_kind: Optional[str] = None
+    schedule_pattern_type: Optional[str] = None
     start_time_raw: Optional[str] = None
     end_time_raw: Optional[str] = None
     start_datetime: Optional[str] = None
@@ -42,6 +50,11 @@ class NormalizedShiftRowResponse(BaseModel):
     confidence: float = 0.0
     match_status: str
     matched_user_id: Optional[int] = None
+    suggested_existing_user_id: Optional[int] = None
+    suggested_profile_enrichment: Optional[Dict[str, Any]] = None
+    multiple_professionals_detected: bool = False
+    grouped_day_validation: List[str] = Field(default_factory=list)
+    llm_fallback_recommended: bool = False
     validation_messages: List[str] = Field(default_factory=list)
 
 
@@ -84,6 +97,23 @@ class ApplyToStagingResponse(BaseModel):
     warning_rows: int
     invalid_rows: int
     duplicate_rows: int
+
+
+class ApplyToStagingRowEdit(BaseModel):
+    source_row_index: int
+    professional_name_raw: Optional[str] = None
+    professional_name_normalized: Optional[str] = None
+    canonical_name: Optional[str] = None
+    start_time_raw: Optional[str] = None
+    end_time_raw: Optional[str] = None
+    shift_kind: Optional[str] = None
+    crm_detected: Optional[str] = None
+    matched_user_id: Optional[int] = None
+    suggested_existing_user_id: Optional[int] = None
+
+
+class ApplyToStagingRequest(BaseModel):
+    edited_rows: List[ApplyToStagingRowEdit] = Field(default_factory=list)
 
 
 class CreateMissingUsersRequest(BaseModel):

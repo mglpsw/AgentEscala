@@ -150,3 +150,180 @@ def test_apply_to_staging_uses_inferred_times(client, admin_headers):
     staging_resp = client.post(f"/admin/imports/{import_id}/apply-to-staging", headers=admin_headers)
     assert staging_resp.status_code == 200
     assert staging_resp.json()["invalid_rows"] == 0
+
+
+def test_detects_avive_layout_ignores_initial_zeros_and_classifies_shift():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Cidade", "Estado", "Empresa", "Unidade", "Especialidade", "Profissional", "Data", "Dia", "H1", "H2", "H3", "H4"],
+                        "rows": [
+                            ["POA", "RS", "Avive", "PA", "Clinico", "Joel Dahne 51 99911-6562", "10/04/2026", "SEX", "00:00", "00:00", "10:00", "22:00"],
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+    doc = normalize_ocr_payload_document(db, payload, "avive.pdf")
+    row = doc["rows"][0]
+    assert row["source_layout_type"] == "avive_tabular"
+    assert row["start_time_raw"] == "10:00"
+    assert row["end_time_raw"] == "22:00"
+    assert row["shift_kind"] == "intermediate"
+    assert row["canonical_name"] == "Joel Soares Dahne"
+    db.close()
+
+
+def test_detects_pa24h_and_splits_multiple_professionals_and_crm():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "PA 24H",
+                        "headers": ["DATA", "DIA", "PLANTÃO", "CRM", "NOME COMPLETO"],
+                        "rows": [["11/04/2026", "SAB", "12H NOITE", "55597 e 42143", "LETICIA E JEAN"]],
+                    }
+                ],
+            }
+        ]
+    }
+
+    doc = normalize_ocr_payload_document(db, payload, "pa24h.pdf")
+    assert len(doc["rows"]) == 2
+    assert all(row["source_layout_type"] == "pa24h_block" for row in doc["rows"])
+    assert all(row["multiple_professionals_detected"] for row in doc["rows"])
+    assert {row["crm_detected"] for row in doc["rows"]} == {"55597", "42143"}
+    assert len({row["day_group_id"] for row in doc["rows"]}) == 1
+    db.close()
+
+
+def test_name_cleaning_removes_faturamento_and_phone():
+    db = SessionLocal()
+    payload = {
+        "pages": [{"page_number": 1, "tables": [{"title": "ABRIL/2026", "headers": ["Profissional", "Data", "Entrada", "Saída"], "rows": [["Daniel Pires 51 99140-4656 Faturamento", "12/04/2026", "08:00", "20:00"]]}]}]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "noise.pdf")
+    row = doc["rows"][0]
+    assert row["professional_name_normalized"] == "Daniel Pires"
+    assert row["canonical_name"] == "Daniel Pires"
+    db.close()
+
+
+def test_grouped_day_validation_and_metadata_counts():
+    db = SessionLocal()
+    payload = {
+        "pages": [{"page_number": 1, "tables": [{"title": "ABRIL/2026", "headers": ["DATA", "DIA", "PLANTÃO", "CRM", "NOME COMPLETO"], "rows": [["14/04/2026", "TER", "12H DIA", "", "HELENE E ???"]]}]}]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "grouped.pdf")
+    assert doc["metadata"]["layout_counts"]["pa24h_block"] >= 1
+    assert any("CRM ausente" in item for item in doc["rows"][0]["grouped_day_validation"])
+    db.close()
+
+
+def test_shift_label_fallback_supports_manha_and_tarde():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Turno"],
+                        "rows": [
+                            ["Alice Silva", "15/04/2026", "MANHÃ"],
+                            ["Bob Santos", "15/04/2026", "TARDE"],
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "fallback_labels.pdf")
+    assert doc["rows"][0]["start_datetime"] is not None
+    assert doc["rows"][0]["end_datetime"] is not None
+    assert doc["rows"][1]["start_datetime"] is not None
+    assert doc["rows"][1]["end_datetime"] is not None
+    db.close()
+
+
+def test_pa24h_split_rows_have_unique_source_row_index():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "PA 24H",
+                        "headers": ["DATA", "DIA", "PLANTÃO", "CRM", "NOME COMPLETO"],
+                        "rows": [["16/04/2026", "QUI", "12H NOITE", "55597 e 42143", "LETICIA E JEAN"]],
+                    }
+                ],
+            }
+        ]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "split_index.pdf")
+    indexes = [row["source_row_index"] for row in doc["rows"]]
+    assert len(indexes) == len(set(indexes))
+    db.close()
+
+
+def test_apply_to_staging_respects_preview_edits(client, admin_headers):
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Entrada", "Saída"],
+                        "rows": [["Alice Silva", "18/04/2026", "08:00", "20:00"]],
+                    }
+                ],
+            }
+        ]
+    }
+    parse_resp = client.post(
+        "/admin/imports/parse-ocr-payload",
+        headers=admin_headers,
+        json={"source_filename": "edited_preview.json", "payload": payload},
+    )
+    assert parse_resp.status_code == 201
+    import_id = parse_resp.json()["document_import_id"]
+
+    preview_resp = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers)
+    row_index = preview_resp.json()["rows"][0]["source_row_index"]
+
+    staging_resp = client.post(
+        f"/admin/imports/{import_id}/apply-to-staging",
+        headers=admin_headers,
+        json={
+            "edited_rows": [
+                {
+                    "source_row_index": row_index,
+                    "professional_name_raw": "Alice Silva Corrigida",
+                    "start_time_raw": "10:00",
+                    "end_time_raw": "22:00",
+                }
+            ]
+        },
+    )
+    assert staging_resp.status_code == 200
+    schedule_import_id = staging_resp.json()["schedule_import_id"]
+    rows_resp = client.get(f"/schedule-imports/{schedule_import_id}/rows", headers=admin_headers)
+    assert rows_resp.status_code == 200
+    imported_row = rows_resp.json()[0]
+    assert imported_row["raw_professional"] == "Alice Silva Corrigida"
+    assert imported_row["raw_start_time"] == "10:00"
+    assert imported_row["raw_end_time"] == "22:00"

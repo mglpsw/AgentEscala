@@ -9,9 +9,10 @@ import { listFutureShiftRequests } from '../src/api/future_shift_requests.js'
 import { listShiftRequests } from '../src/api/shift_requests.js'
 
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ events }) => (
+  default: ({ events, dayCellContent }) => (
     <div data-testid="calendar">
       Calendário renderizado · {events.length} evento(s)
+      <span data-testid="day-cell-handler">{typeof dayCellContent}</span>
     </div>
   ),
 }))
@@ -92,6 +93,7 @@ describe('CalendarPage', () => {
     await waitFor(() => {
       expect(screen.getByTestId('calendar')).toHaveTextContent('1 evento')
     })
+    expect(screen.getByTestId('day-cell-handler')).toHaveTextContent('function')
 
     expect(api.get).toHaveBeenCalledWith(
       '/shifts/',

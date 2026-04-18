@@ -46,6 +46,19 @@ function map_shift_to_event(shift, currentUserId) {
   }
 }
 
+function compactName(name) {
+  const parts = (name || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) return parts[0] || '—'
+  return `${parts[0]} ${parts[1][0]}.`
+}
+
+function compactShiftLabel(shift) {
+  const start = new Date(shift.start_time)
+  const end = new Date(shift.end_time)
+  const s = `${String(start.getHours()).padStart(2, '0')}-${String(end.getHours()).padStart(2, '0')}`
+  return `${compactName(shift.agent?.name)} ${s}`
+}
+
 function inferPeriodFromShift(shift) {
   const start = new Date(shift.start_time)
   const end = new Date(shift.end_time)
@@ -105,6 +118,7 @@ function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [agents, setAgents] = useState([])
+  const [dayDetails, setDayDetails] = useState([])
 
   const [futureRequestForm, setFutureRequestForm] = useState({ requested_date: '', shift_period: SHIFT_PERIOD_OPTIONS[0], notes: '' })
   const [shiftRequestForm, setShiftRequestForm] = useState({ requested_date: '', shift_period: SHIFT_PERIOD_OPTIONS[0], note: '' })
@@ -173,6 +187,7 @@ function CalendarPage() {
 
         setFutureRequests(preRequests)
         setShiftRequests(requestFlow)
+        setDayDetails(shifts)
         if (isAdmin) {
           const agentList = responseData(unwrapSettled(agentsResp, null))
           setAgents(agentList)
@@ -254,6 +269,17 @@ function CalendarPage() {
   }
 
   const selectedSlots = selectedDate ? daySlotsMap[selectedDate] || [] : []
+  const daySummaryMap = useMemo(() => {
+    const grouped = {}
+    dayDetails.forEach((shift) => {
+      const key = (shift.start_time || '').slice(0, 10)
+      if (!key) return
+      grouped[key] = grouped[key] || []
+      grouped[key].push(shift)
+    })
+    return grouped
+  }, [dayDetails])
+  const selectedDayItems = selectedDate ? daySummaryMap[selectedDate] || [] : []
 
   return (
     <div className="space-y-6">
@@ -285,6 +311,14 @@ function CalendarPage() {
                 firstDay={1}
                 height="auto"
                 dayMaxEvents={3}
+                dayCellContent={(arg) => {
+                  const dateKey = arg.date.toISOString().slice(0, 10)
+                  const items = daySummaryMap[dateKey] || []
+                  if (items.length === 0) return { html: `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div>` }
+                  const lines = items.slice(0, 4).map((shift) => `<div class="text-[10px] leading-3 truncate">${compactShiftLabel(shift)}</div>`).join('')
+                  const more = items.length > 4 ? `<div class="text-[10px] text-gray-500">+${items.length - 4}</div>` : ''
+                  return { html: `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div><div>${lines}${more}</div>` }
+                }}
                 datesSet={handleDatesSet}
                 events={events}
                 dateClick={(info) => openDayActions(info.dateStr)}
@@ -295,7 +329,7 @@ function CalendarPage() {
       </section>
 
       {menuOpen ? (
-        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-4 fixed inset-x-2 bottom-2 top-20 overflow-y-auto z-20 md:static md:inset-auto">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-800">Ações do dia {selectedDate}</h3>
             <button type="button" className="rounded border px-2 py-1 text-sm" onClick={() => setMenuOpen(false)}>⋯</button>
@@ -313,6 +347,19 @@ function CalendarPage() {
                 </div>
               ))}
               {selectedSlots.length === 0 ? <p className="text-xs text-gray-500">Sem configuração para o dia selecionado.</p> : null}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+            <p className="text-xs font-semibold text-gray-700 mb-2">Escala completa do dia ({selectedDayItems.length})</p>
+            <div className="space-y-1">
+              {selectedDayItems.slice(0, 20).map((item) => (
+                <div key={item.id} className="rounded border border-gray-200 bg-white p-2 text-xs">
+                  <div className="font-medium text-gray-800">{item.agent?.name || 'Profissional'}</div>
+                  <div className="text-gray-600">{new Date(item.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(item.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · {inferPeriodFromShift(item)}</div>
+                </div>
+              ))}
+              {selectedDayItems.length === 0 ? <p className="text-xs text-gray-500">Sem plantonistas no dia.</p> : null}
             </div>
           </div>
 
