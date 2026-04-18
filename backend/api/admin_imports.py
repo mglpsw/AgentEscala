@@ -30,6 +30,18 @@ from .admin_import_schemas import (
 
 router = APIRouter(prefix="/admin/imports", tags=["Admin Document Imports"])
 
+_TRACKED_PREVIEW_EDIT_FIELDS = (
+    "professional_name_raw",
+    "professional_name_normalized",
+    "canonical_name",
+    "start_time_raw",
+    "end_time_raw",
+    "shift_kind",
+    "crm_detected",
+    "matched_user_id",
+    "suggested_existing_user_id",
+)
+
 
 def _row_key_from_parts(source_sheet: Any, source_page: Any, source_table_index: Any, source_row_index: Any) -> str:
     sheet = str(source_sheet or "").strip() or "no-sheet"
@@ -41,6 +53,18 @@ def _row_key_from_parts(source_sheet: Any, source_page: Any, source_table_index:
 
 def _row_key_from_payload(row: Dict[str, Any]) -> str:
     return _row_key_from_parts(row.get("source_sheet"), row.get("source_page"), row.get("source_table_index"), row.get("source_row_index"))
+
+
+def _collect_row_edit_changes(original_row: Dict[str, Any], updated_row: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    changes: Dict[str, Dict[str, Any]] = {}
+    for field in _TRACKED_PREVIEW_EDIT_FIELDS:
+        if original_row.get(field) == updated_row.get(field):
+            continue
+        changes[field] = {
+            "original_value": original_row.get(field),
+            "edited_value": updated_row.get(field),
+        }
+    return changes
 
 
 def _summarize_document(doc: Dict[str, Any], ocr_import_id: str) -> ParseDocumentResponse:
@@ -155,8 +179,8 @@ def apply_to_staging(
     ocr_import = db.query(OcrImport).filter(OcrImport.id == import_id).first()
     if not ocr_import:
         raise HTTPException(status_code=404, detail="Importação documental não encontrada")
-    doc = ocr_import.raw_payload or {}
-    rows = doc.get("rows") or []
+    doc = dict(ocr_import.raw_payload or {})
+    rows = list(doc.get("rows") or [])
     edits = (body.edited_rows if body else [])
     edited_by_row_key = {}
     edited_by_row_index = {}
@@ -174,6 +198,8 @@ def apply_to_staging(
         "twenty_four": ("00:00", "00:00"),
     }
     if edited_by_row_index or edited_by_row_key:
+        audit_timestamp = datetime.utcnow().isoformat()
+        row_edit_audit: List[Dict[str, Any]] = []
         for row in rows:
             row_key = _row_key_from_payload(row)
             edit = edited_by_row_key.get(row_key)
@@ -182,10 +208,11 @@ def apply_to_staging(
             if not edit:
                 continue
             payload = edit.model_dump(exclude_unset=True)
+            original_row = dict(row)
             if "professional_name_raw" in payload:
                 row["professional_name_raw"] = payload["professional_name_raw"]
                 row["professional_name_normalized"] = payload.get("professional_name_normalized") or payload["professional_name_raw"]
-            for key in ("professional_name_normalized", "canonical_name", "start_time_raw", "end_time_raw", "shift_kind", "crm_detected", "matched_user_id", "suggested_existing_user_id"):
+            for key in _TRACKED_PREVIEW_EDIT_FIELDS[1:]:
                 if key in payload:
                     row[key] = payload[key]
             if row.get("shift_kind") in shift_time_map:
@@ -195,14 +222,35 @@ def apply_to_staging(
                 if not row.get("end_time_raw"):
                     row["end_time_raw"] = mapped_end
             row.setdefault("validation_messages", []).append("Linha ajustada manualmente no preview OCR")
+            field_changes = _collect_row_edit_changes(original_row, row)
+            if field_changes:
+                row_edit_audit.append(
+                    {
+                        "source_row_index": row.get("source_row_index"),
+                        "source_row_key": row_key,
+                        "changed_fields": sorted(field_changes.keys()),
+                        "field_changes": field_changes,
+                        "timestamp": audit_timestamp,
+                        "edit_origin": "manual/admin-preview",
+                    }
+                )
         doc["rows"] = rows
+        metadata = dict(doc.get("metadata") or {})
+        if row_edit_audit:
+            preview_edit_audit = list(metadata.get("preview_edit_audit") or [])
+            preview_edit_audit.extend(row_edit_audit)
+            metadata["preview_edit_audit"] = preview_edit_audit
+            metadata["last_preview_edit_at"] = audit_timestamp
+        doc["metadata"] = metadata
         ocr_import.raw_payload = doc
         ocr_import.parsed_rows = rows
         ocr_import.action_log = list(ocr_import.action_log or []) + [
             {
                 "type": "apply_preview_edits",
                 "edited_rows": sorted(set(list(edited_by_row_index.keys()) + list(edited_by_row_key.keys()))),
-                "at": datetime.utcnow().isoformat(),
+                "edited_rows_count": len(row_edit_audit),
+                "row_edit_audit": row_edit_audit,
+                "at": audit_timestamp,
                 "by": current_user.id,
             }
         ]
