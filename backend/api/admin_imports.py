@@ -31,6 +31,18 @@ from .admin_import_schemas import (
 router = APIRouter(prefix="/admin/imports", tags=["Admin Document Imports"])
 
 
+def _row_key_from_parts(source_sheet: Any, source_page: Any, source_table_index: Any, source_row_index: Any) -> str:
+    sheet = str(source_sheet or "").strip() or "no-sheet"
+    page = str(source_page or "").strip() or "no-page"
+    table = str(source_table_index or "").strip() or "no-table"
+    row = str(source_row_index or "").strip() or "no-row"
+    return f"{sheet}::{page}::{table}::{row}"
+
+
+def _row_key_from_payload(row: Dict[str, Any]) -> str:
+    return _row_key_from_parts(row.get("source_sheet"), row.get("source_page"), row.get("source_table_index"), row.get("source_row_index"))
+
+
 def _summarize_document(doc: Dict[str, Any], ocr_import_id: str) -> ParseDocumentResponse:
     rows = doc.get("rows", [])
     return ParseDocumentResponse(
@@ -146,16 +158,27 @@ def apply_to_staging(
     doc = ocr_import.raw_payload or {}
     rows = doc.get("rows") or []
     edits = (body.edited_rows if body else [])
-    edited_by_row_index = {int(item.source_row_index): item for item in edits}
+    edited_by_row_key = {}
+    edited_by_row_index = {}
+    for item in edits:
+        payload = item.model_dump(exclude_unset=True)
+        explicit_key = payload.get("source_row_key")
+        if explicit_key:
+            edited_by_row_key[str(explicit_key)] = item
+        else:
+            edited_by_row_index[int(item.source_row_index)] = item
     shift_time_map = {
         "day": ("08:00", "20:00"),
         "intermediate": ("10:00", "22:00"),
         "night": ("20:00", "08:00"),
         "twenty_four": ("00:00", "00:00"),
     }
-    if edited_by_row_index:
+    if edited_by_row_index or edited_by_row_key:
         for row in rows:
-            edit = edited_by_row_index.get(int(row.get("source_row_index") or -1))
+            row_key = _row_key_from_payload(row)
+            edit = edited_by_row_key.get(row_key)
+            if not edit:
+                edit = edited_by_row_index.get(int(row.get("source_row_index") or -1))
             if not edit:
                 continue
             payload = edit.model_dump(exclude_unset=True)
@@ -178,7 +201,7 @@ def apply_to_staging(
         ocr_import.action_log = list(ocr_import.action_log or []) + [
             {
                 "type": "apply_preview_edits",
-                "edited_rows": sorted(edited_by_row_index.keys()),
+                "edited_rows": sorted(set(list(edited_by_row_index.keys()) + list(edited_by_row_key.keys()))),
                 "at": datetime.utcnow().isoformat(),
                 "by": current_user.id,
             }

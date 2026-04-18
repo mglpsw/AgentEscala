@@ -59,6 +59,15 @@ function compactShiftLabel(shift) {
   return `${compactName(shift.agent?.name)} ${s}`
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
 function inferPeriodFromShift(shift) {
   const start = new Date(shift.start_time)
   const end = new Date(shift.end_time)
@@ -314,10 +323,11 @@ function CalendarPage() {
                 dayCellContent={(arg) => {
                   const dateKey = arg.date.toISOString().slice(0, 10)
                   const items = daySummaryMap[dateKey] || []
-                  if (items.length === 0) return { html: `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div>` }
-                  const lines = items.slice(0, 4).map((shift) => `<div class="text-[10px] leading-3 truncate">${compactShiftLabel(shift)}</div>`).join('')
+                  const safeDayNumber = escapeHtml(arg.dayNumberText)
+                  if (items.length === 0) return { html: `<div class="fc-daygrid-day-number">${safeDayNumber}</div>` }
+                  const lines = items.slice(0, 4).map((shift) => `<div class="text-[10px] leading-3 truncate">${escapeHtml(compactShiftLabel(shift))}</div>`).join('')
                   const more = items.length > 4 ? `<div class="text-[10px] text-gray-500">+${items.length - 4}</div>` : ''
-                  return { html: `<div class="fc-daygrid-day-number">${arg.dayNumberText}</div><div>${lines}${more}</div>` }
+                  return { html: `<div class="fc-daygrid-day-number">${safeDayNumber}</div><div>${lines}${more}</div>` }
                 }}
                 datesSet={handleDatesSet}
                 events={events}

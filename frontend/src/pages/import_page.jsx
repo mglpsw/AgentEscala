@@ -12,6 +12,16 @@ const SHIFT_KIND_STYLES = {
   custom: 'bg-gray-100 text-gray-800 border-gray-200',
 }
 
+const EDITABLE_OCR_FIELDS = ['professional_name_raw', 'start_time_raw', 'end_time_raw', 'shift_kind']
+
+function buildOcrRowKey(row) {
+  const sheet = (row?.source_sheet || '').trim() || 'no-sheet'
+  const page = row?.source_page ?? 'no-page'
+  const table = row?.source_table_index ?? 'no-table'
+  const index = row?.source_row_index ?? 'no-row'
+  return `${sheet}::${page}::${table}::${index}`
+}
+
 function extractShiftsCreated(summary) {
   const match = summary?.source_description?.match(/Turnos criados nesta confirmação:\s*(\d+)/)
   return match ? parseInt(match[1], 10) : null
@@ -122,13 +132,13 @@ function OcrDayCards({ groupedDays, onInlineEdit }) {
             </div>
 
             <div className="space-y-2">
-              {day.rows.map((row, idx) => (
-                <div key={`${key}-${idx}`} className="rounded border border-gray-100 p-3 text-xs">
+              {day.rows.map((row) => (
+                <div key={row._ui_row_key || `${key}-${row.source_row_index}`} className={`rounded border p-3 text-xs ${row._ui_isAnomalous ? 'border-rose-200 bg-rose-50/30' : 'border-gray-100'}`}>
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
-                    <label className="space-y-1"><span className="text-gray-500">Nome bruto</span><input value={row.professional_name_raw || ''} onChange={(e) => onInlineEdit(row.source_row_index, 'professional_name_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
-                    <label className="space-y-1"><span className="text-gray-500">Horário início</span><input value={row.start_time_raw || ''} onChange={(e) => onInlineEdit(row.source_row_index, 'start_time_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
-                    <label className="space-y-1"><span className="text-gray-500">Horário fim</span><input value={row.end_time_raw || ''} onChange={(e) => onInlineEdit(row.source_row_index, 'end_time_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
-                    <label className="space-y-1"><span className="text-gray-500">Turno</span><select value={row.shift_kind || 'custom'} onChange={(e) => onInlineEdit(row.source_row_index, 'shift_kind', e.target.value)} className="w-full rounded border px-2 py-1"><option value="day">day</option><option value="intermediate">intermediate</option><option value="night">night</option><option value="twenty_four">twenty_four</option><option value="custom">custom</option></select></label>
+                    <label className="space-y-1"><span className="text-gray-500">Nome bruto</span><input value={row.professional_name_raw || ''} onChange={(e) => onInlineEdit(row._ui_row_key, 'professional_name_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
+                    <label className="space-y-1"><span className="text-gray-500">Horário início</span><input value={row.start_time_raw || ''} onChange={(e) => onInlineEdit(row._ui_row_key, 'start_time_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
+                    <label className="space-y-1"><span className="text-gray-500">Horário fim</span><input value={row.end_time_raw || ''} onChange={(e) => onInlineEdit(row._ui_row_key, 'end_time_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
+                    <label className="space-y-1"><span className="text-gray-500">Turno</span><select value={row.shift_kind || 'custom'} onChange={(e) => onInlineEdit(row._ui_row_key, 'shift_kind', e.target.value)} className="w-full rounded border px-2 py-1"><option value="day">day</option><option value="intermediate">intermediate</option><option value="night">night</option><option value="twenty_four">twenty_four</option><option value="custom">custom</option></select></label>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <span className={`px-2 py-1 rounded-full border ${SHIFT_KIND_STYLES[row.shift_kind] || SHIFT_KIND_STYLES.custom}`}>{row.shift_kind || 'custom'}</span>
@@ -137,7 +147,23 @@ function OcrDayCards({ groupedDays, onInlineEdit }) {
                     <span>CRM: <strong>{row.crm_detected || '—'}</strong></span>
                     <span>Score: <strong>{Math.round((row.confidence || 0) * 100)}%</strong></span>
                     <span>Status: <strong>{row.match_status}</strong></span>
+                    {row._ui_flags?.auto && <span className="px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">Reconhecido automaticamente</span>}
+                    {row._ui_flags?.manual && <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Corrigido manualmente</span>}
+                    {row._ui_flags?.suggested && <span className="px-2 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-200">Sugerido por alias/CRM</span>}
+                    {row._ui_isAnomalous && <span className="px-2 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">Anomalia detectada</span>}
                   </div>
+                  {row._ui_diffItems?.length > 0 && (
+                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5">
+                      <p className="text-[11px] font-semibold text-amber-800">Diff OCR → edição</p>
+                      <ul className="mt-1 space-y-0.5 text-[11px] text-amber-900">
+                        {row._ui_diffItems.map((item) => (
+                          <li key={`${row.source_row_index}-${item.field}`}>
+                            <strong>{item.label}:</strong> <span className="line-through opacity-80">{item.from || '—'}</span> → <span className="font-semibold">{item.to || '—'}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -198,12 +224,42 @@ function ImportPage() {
   const [ocrPayloadText, setOcrPayloadText] = useState('')
   const [docImportId, setDocImportId] = useState(null)
   const [ocrPreviewRows, setOcrPreviewRows] = useState([])
+  const [ocrOriginalRowsByKey, setOcrOriginalRowsByKey] = useState({})
+
+  const enhancedOcrPreviewRows = useMemo(() => {
+    const anomalyRegex = /conflito|ambígu|crm|duplicado|falt|erro|inconsist/i
+    return ocrPreviewRows.map((row) => {
+      const rowKey = buildOcrRowKey(row)
+      const original = ocrOriginalRowsByKey[rowKey] || {}
+      const diffItems = EDITABLE_OCR_FIELDS
+        .filter((field) => (original[field] || '') !== (row[field] || ''))
+        .map((field) => ({
+          field,
+          label: field === 'professional_name_raw' ? 'Nome' : field === 'start_time_raw' ? 'Início' : field === 'end_time_raw' ? 'Fim' : 'Turno',
+          from: original[field] || '',
+          to: row[field] || '',
+        }))
+      const suggested = Boolean(row.alias_applied || row.crm_detected || row.suggested_existing_user_id || row.suggested_profile_enrichment)
+      const isAnomalous = [...(row.grouped_day_validation || []), ...(row.validation_messages || [])].some((msg) => anomalyRegex.test(msg || ''))
+      return {
+        ...row,
+        _ui_row_key: rowKey,
+        _ui_diffItems: diffItems,
+        _ui_flags: {
+          auto: diffItems.length === 0,
+          manual: diffItems.length > 0,
+          suggested,
+        },
+        _ui_isAnomalous: isAnomalous,
+      }
+    })
+  }, [ocrOriginalRowsByKey, ocrPreviewRows])
 
   const groupedDays = useMemo(() => {
-    const base = groupRowsByDay(ocrPreviewRows)
+    const base = groupRowsByDay(enhancedOcrPreviewRows)
     Object.values(base).forEach((day) => { day.overallScore = day.rows.length ? day.rows.reduce((acc, row) => acc + (row.confidence || 0), 0) / day.rows.length : 0 })
     return base
-  }, [ocrPreviewRows])
+  }, [enhancedOcrPreviewRows])
 
   const handleFileChange = (e) => setSelectedFile(e.target.files[0] ?? null)
 
@@ -268,6 +324,7 @@ function ImportPage() {
     setDocImportId(null)
     setOcrPayloadText('')
     setOcrPreviewRows([])
+    setOcrOriginalRowsByKey({})
     setError('')
   }
 
@@ -279,7 +336,9 @@ function ImportPage() {
       const { data: parsed } = await api.post('/admin/imports/parse-ocr-payload', { source_filename: 'debug_ocr_payload.json', payload })
       setDocImportId(parsed.document_import_id)
       const { data: preview } = await api.get(`/admin/imports/${parsed.document_import_id}/normalized-preview`)
-      setOcrPreviewRows(preview.rows || [])
+      const rows = preview.rows || []
+      setOcrOriginalRowsByKey(Object.fromEntries(rows.map((row) => [buildOcrRowKey(row), { ...row }])))
+      setOcrPreviewRows(rows)
       setPageState(STATE.IDLE)
     } catch (err) {
       setError(typeof err?.response?.data?.detail === 'string' ? err.response.data.detail : 'Falha ao processar payload OCR.')
@@ -293,6 +352,7 @@ function ImportPage() {
     try {
       const editedRows = ocrPreviewRows.map((row) => ({
         source_row_index: row.source_row_index,
+        source_row_key: buildOcrRowKey(row),
         professional_name_raw: row.professional_name_raw,
         professional_name_normalized: row.professional_name_normalized,
         canonical_name: row.canonical_name,
@@ -315,8 +375,8 @@ function ImportPage() {
     }
   }
 
-  const onInlineEdit = (rowIndex, field, value) => {
-    setOcrPreviewRows((current) => current.map((row) => (row.source_row_index === rowIndex ? { ...row, [field]: value } : row)))
+  const onInlineEdit = (rowKey, field, value) => {
+    setOcrPreviewRows((current) => current.map((row) => (buildOcrRowKey(row) === rowKey ? { ...row, [field]: value } : row)))
   }
 
   if (pageState === STATE.CONFIRMED) return <ConfirmedView summary={confirmResult} shiftsCreated={extractShiftsCreated(confirmResult)} onReset={handleReset} />

@@ -80,6 +80,8 @@ describe('ImportPage OCR preview agrupada por dia', () => {
               shift_kind: 'day',
               confidence: 0.9,
               match_status: 'matched',
+              alias_applied: true,
+              validation_messages: ['Possível conflito de CRM'],
             },
           ],
         },
@@ -95,6 +97,9 @@ describe('ImportPage OCR preview agrupada por dia', () => {
     await waitFor(() => expect(screen.getByDisplayValue('NOME ORIGINAL')).toBeInTheDocument())
 
     fireEvent.change(screen.getByDisplayValue('NOME ORIGINAL'), { target: { value: 'NOME EDITADO' } })
+    expect(screen.getByText(/sugerido por alias\/crm/i)).toBeInTheDocument()
+    expect(screen.getByText(/anomalia detectada/i)).toBeInTheDocument()
+    expect(screen.getByText(/diff ocr → edição/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /apply to staging/i }))
 
     await waitFor(() => {
@@ -104,11 +109,112 @@ describe('ImportPage OCR preview agrupada por dia', () => {
           edited_rows: expect.arrayContaining([
             expect.objectContaining({
               source_row_index: 22,
+              source_row_key: expect.any(String),
               professional_name_raw: 'NOME EDITADO',
             }),
           ]),
         }),
       )
     })
+  })
+
+  it('edita apenas a linha alvo quando source_row_index se repete entre páginas', async () => {
+    api.post.mockResolvedValueOnce({ data: { document_import_id: 'abc-3' } })
+    api.get.mockResolvedValueOnce({
+      data: {
+        rows: [
+          {
+            source_page: 1,
+            source_row_index: 1,
+            day_group_id: '2026-04-12',
+            date_iso: '2026-04-12',
+            source_layout_type: 'generic_table',
+            professional_name_raw: 'DUPLICADO P1',
+            start_time_raw: '08:00',
+            end_time_raw: '20:00',
+            shift_kind: 'day',
+            confidence: 0.9,
+            match_status: 'matched',
+          },
+          {
+            source_page: 2,
+            source_row_index: 1,
+            day_group_id: '2026-04-12',
+            date_iso: '2026-04-12',
+            source_layout_type: 'generic_table',
+            professional_name_raw: 'DUPLICADO P2',
+            start_time_raw: '08:00',
+            end_time_raw: '20:00',
+            shift_kind: 'day',
+            confidence: 0.9,
+            match_status: 'matched',
+          },
+        ],
+      },
+    })
+
+    render(<ImportPage />)
+    fireEvent.change(screen.getByPlaceholderText(/{"pages":/i), {
+      target: { value: JSON.stringify({ pages: [{ page_number: 1, tables: [] }] }) },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /parse \+ preview ocr/i }))
+    await waitFor(() => expect(screen.getByDisplayValue('DUPLICADO P1')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByDisplayValue('DUPLICADO P2'), { target: { value: 'DUPLICADO P2 EDITADO' } })
+
+    expect(screen.getByDisplayValue('DUPLICADO P1')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('DUPLICADO P2 EDITADO')).toBeInTheDocument()
+  })
+
+  it('mantém baseline correto do diff quando há source_row_index repetido em tabelas diferentes', async () => {
+    api.post.mockResolvedValueOnce({ data: { document_import_id: 'abc-4' } })
+    api.get.mockResolvedValueOnce({
+      data: {
+        rows: [
+          {
+            source_page: 1,
+            source_table_index: 1,
+            source_row_index: 1,
+            day_group_id: '2026-04-13',
+            date_iso: '2026-04-13',
+            source_layout_type: 'generic_table',
+            professional_name_raw: 'BASE T1',
+            start_time_raw: '08:00',
+            end_time_raw: '20:00',
+            shift_kind: 'day',
+            confidence: 0.9,
+            match_status: 'matched',
+          },
+          {
+            source_page: 1,
+            source_table_index: 2,
+            source_row_index: 1,
+            day_group_id: '2026-04-13',
+            date_iso: '2026-04-13',
+            source_layout_type: 'generic_table',
+            professional_name_raw: 'BASE T2',
+            start_time_raw: '08:00',
+            end_time_raw: '20:00',
+            shift_kind: 'day',
+            confidence: 0.9,
+            match_status: 'matched',
+          },
+        ],
+      },
+    })
+
+    render(<ImportPage />)
+    fireEvent.change(screen.getByPlaceholderText(/{"pages":/i), {
+      target: { value: JSON.stringify({ pages: [{ page_number: 1, tables: [] }] }) },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /parse \+ preview ocr/i }))
+    await waitFor(() => expect(screen.getByDisplayValue('BASE T1')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByDisplayValue('BASE T2'), { target: { value: 'BASE T2 EDITADO' } })
+
+    expect(screen.getAllByText(/corrigido manualmente/i)).toHaveLength(1)
+    expect(screen.getAllByText(/diff ocr → edição/i)).toHaveLength(1)
+    expect(screen.getByDisplayValue('BASE T1')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('BASE T2 EDITADO')).toBeInTheDocument()
   })
 })
