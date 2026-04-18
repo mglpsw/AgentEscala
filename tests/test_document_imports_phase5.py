@@ -371,7 +371,8 @@ def test_apply_to_staging_uses_source_row_key_to_avoid_cross_page_collisions(cli
     target_row = next((row for row in rows if row["source_page"] == 2), rows[1])
     source_sheet = target_row.get("source_sheet") or "no-sheet"
     source_page = target_row.get("source_page") or "no-page"
-    source_row_key = f"{source_sheet}::{source_page}::{target_row['source_row_index']}"
+    source_table = target_row.get("source_table_index") or "no-table"
+    source_row_key = f"{source_sheet}::{source_page}::{source_table}::{target_row['source_row_index']}"
 
     staging_resp = client.post(
         f"/admin/imports/{import_id}/apply-to-staging",

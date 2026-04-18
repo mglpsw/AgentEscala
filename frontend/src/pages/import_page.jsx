@@ -17,8 +17,9 @@ const EDITABLE_OCR_FIELDS = ['professional_name_raw', 'start_time_raw', 'end_tim
 function buildOcrRowKey(row) {
   const sheet = (row?.source_sheet || '').trim() || 'no-sheet'
   const page = row?.source_page ?? 'no-page'
+  const table = row?.source_table_index ?? 'no-table'
   const index = row?.source_row_index ?? 'no-row'
-  return `${sheet}::${page}::${index}`
+  return `${sheet}::${page}::${table}::${index}`
 }
 
 function extractShiftsCreated(summary) {
@@ -223,13 +224,13 @@ function ImportPage() {
   const [ocrPayloadText, setOcrPayloadText] = useState('')
   const [docImportId, setDocImportId] = useState(null)
   const [ocrPreviewRows, setOcrPreviewRows] = useState([])
-  const [ocrOriginalRowsByIndex, setOcrOriginalRowsByIndex] = useState({})
+  const [ocrOriginalRowsByKey, setOcrOriginalRowsByKey] = useState({})
 
   const enhancedOcrPreviewRows = useMemo(() => {
     const anomalyRegex = /conflito|ambígu|crm|duplicado|falt|erro|inconsist/i
     return ocrPreviewRows.map((row) => {
       const rowKey = buildOcrRowKey(row)
-      const original = ocrOriginalRowsByIndex[rowKey] || {}
+      const original = ocrOriginalRowsByKey[rowKey] || {}
       const diffItems = EDITABLE_OCR_FIELDS
         .filter((field) => (original[field] || '') !== (row[field] || ''))
         .map((field) => ({
@@ -252,7 +253,7 @@ function ImportPage() {
         _ui_isAnomalous: isAnomalous,
       }
     })
-  }, [ocrOriginalRowsByIndex, ocrPreviewRows])
+  }, [ocrOriginalRowsByKey, ocrPreviewRows])
 
   const groupedDays = useMemo(() => {
     const base = groupRowsByDay(enhancedOcrPreviewRows)
@@ -323,7 +324,7 @@ function ImportPage() {
     setDocImportId(null)
     setOcrPayloadText('')
     setOcrPreviewRows([])
-    setOcrOriginalRowsByIndex({})
+    setOcrOriginalRowsByKey({})
     setError('')
   }
 
@@ -336,7 +337,7 @@ function ImportPage() {
       setDocImportId(parsed.document_import_id)
       const { data: preview } = await api.get(`/admin/imports/${parsed.document_import_id}/normalized-preview`)
       const rows = preview.rows || []
-      setOcrOriginalRowsByIndex(Object.fromEntries(rows.map((row) => [buildOcrRowKey(row), { ...row }])))
+      setOcrOriginalRowsByKey(Object.fromEntries(rows.map((row) => [buildOcrRowKey(row), { ...row }])))
       setOcrPreviewRows(rows)
       setPageState(STATE.IDLE)
     } catch (err) {

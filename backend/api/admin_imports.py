@@ -31,15 +31,16 @@ from .admin_import_schemas import (
 router = APIRouter(prefix="/admin/imports", tags=["Admin Document Imports"])
 
 
-def _row_key_from_parts(source_sheet: Any, source_page: Any, source_row_index: Any) -> str:
+def _row_key_from_parts(source_sheet: Any, source_page: Any, source_table_index: Any, source_row_index: Any) -> str:
     sheet = str(source_sheet or "").strip() or "no-sheet"
     page = str(source_page or "").strip() or "no-page"
+    table = str(source_table_index or "").strip() or "no-table"
     row = str(source_row_index or "").strip() or "no-row"
-    return f"{sheet}::{page}::{row}"
+    return f"{sheet}::{page}::{table}::{row}"
 
 
 def _row_key_from_payload(row: Dict[str, Any]) -> str:
-    return _row_key_from_parts(row.get("source_sheet"), row.get("source_page"), row.get("source_row_index"))
+    return _row_key_from_parts(row.get("source_sheet"), row.get("source_page"), row.get("source_table_index"), row.get("source_row_index"))
 
 
 def _summarize_document(doc: Dict[str, Any], ocr_import_id: str) -> ParseDocumentResponse:

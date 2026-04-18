@@ -359,6 +359,7 @@ def _build_row_from_values(
     values: Dict[str, Any],
     source_sheet: Optional[str],
     source_page: Optional[int],
+    source_table_index: Optional[int],
     row_index: int,
     month_ctx: Optional[int],
     year_ctx: Optional[int],
@@ -415,6 +416,7 @@ def _build_row_from_values(
     return {
         "source_sheet": source_sheet,
         "source_page": source_page,
+        "source_table_index": source_table_index,
         "source_row_index": row_index,
         "source_layout_type": source_layout_type,
         "day_group_id": day_group_id,
@@ -610,7 +612,7 @@ def normalize_xlsx_document(db: Session, content: bytes, filename: str) -> Dict[
                         values[canonical] = _normalize_text(str(val)) if val is not None else None
 
             day_group_id = f"{values.get('date') or offset}"
-            nrow = _build_row_from_values(db, values, ws.title, None, offset, month, year, layout_type, day_group_id, context=context)
+            nrow = _build_row_from_values(db, values, ws.title, None, None, offset, month, year, layout_type, day_group_id, context=context)
             rows.append(nrow)
 
     wb.close()
@@ -649,7 +651,7 @@ def normalize_ocr_payload_document(db: Session, payload: Dict[str, Any], source_
     pages = payload.get("pages") or []
     for page in pages:
         page_number = page.get("page_number")
-        for table in page.get("tables") or []:
+        for table_index, table in enumerate(page.get("tables") or [], start=1):
             title = _normalize_text(table.get("title"))
             month, year, conf = _extract_month_year(title)
             if month and year:
@@ -685,6 +687,7 @@ def normalize_ocr_payload_document(db: Session, payload: Dict[str, Any], source_
                         values,
                         f"page-{page_number}",
                         int(page_number) if page_number else None,
+                        table_index,
                         source_row_index,
                         month,
                         year,

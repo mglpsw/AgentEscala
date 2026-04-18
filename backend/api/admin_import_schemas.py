@@ -18,6 +18,7 @@ class DetectedMonth(BaseModel):
 class NormalizedShiftRowResponse(BaseModel):
     source_sheet: Optional[str] = None
     source_page: Optional[int] = None
+    source_table_index: Optional[int] = None
     source_row_index: int
     source_layout_type: Optional[str] = None
     day_group_id: Optional[str] = None
