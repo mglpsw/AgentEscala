@@ -169,3 +169,44 @@ def test_recurring_confirm_rejects_repeat_confirmation(client, admin_headers):
     )
     assert second.status_code == 409
     db.close()
+
+
+def test_recurring_confirm_supports_item_level_decisions(client, admin_headers):
+    db = SessionLocal()
+    alice = db.query(User).filter(User.email == "alice@agentescala.com").first()
+    preview = client.post(
+        "/admin/recurring-shifts/preview",
+        headers=admin_headers,
+        json=_payload(alice.id, months_ahead=1),
+    )
+    assert preview.status_code == 200
+    pdata = preview.json()
+    assert len(pdata["items"]) >= 2
+
+    first_item = pdata["items"][0]["batch_item_id"]
+    second_item = pdata["items"][1]["batch_item_id"]
+    before = db.query(Shift).filter(Shift.agent_id == alice.id).count()
+    confirm = client.post(
+        "/admin/recurring-shifts/confirm",
+        headers=admin_headers,
+        json={
+            **_payload(alice.id, months_ahead=1),
+            "batch_id": pdata["batch_id"],
+            "item_decisions": [
+                {"batch_item_id": first_item, "decision": "create", "notes": "Criar manualmente"},
+                {"batch_item_id": second_item, "decision": "skip", "notes": "Pular por decisão admin"},
+            ],
+        },
+    )
+    assert confirm.status_code == 200
+    after = db.query(Shift).filter(Shift.agent_id == alice.id).count()
+    assert after >= before + 1
+
+    detail = client.get(f"/admin/recurring-shifts/{pdata['batch_id']}", headers=admin_headers)
+    assert detail.status_code == 200
+    detail_data = detail.json()
+    assert detail_data["batch_id"] == pdata["batch_id"]
+    assert detail_data["status"] == "confirmed"
+    assert any(item.get("decision_action") == "skip" for item in detail_data["items"])
+    assert any(item.get("decision_action") == "create" for item in detail_data["items"])
+    db.close()

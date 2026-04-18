@@ -98,6 +98,7 @@ export default function AdminPlantoesPage() {
     notes: '',
   })
   const [recurringPreview, setRecurringPreview] = useState(null)
+  const [itemDecisions, setItemDecisions] = useState({})
 
   const template = useMemo(() => slotTemplate(firstType), [firstType])
 
@@ -225,6 +226,14 @@ export default function AdminPlantoesPage() {
       }
       const { data } = await api.post('/admin/recurring-shifts/preview', payload)
       setRecurringPreview(data)
+      const defaults = {}
+      ;(data.items || []).forEach((item) => {
+        defaults[item.batch_item_id] = {
+          decision: item.conflict_status || item.duplicate_status ? 'skip' : 'create',
+          notes: '',
+        }
+      })
+      setItemDecisions(defaults)
     } catch (e) {
       setError(e?.response?.data?.detail || 'Falha ao gerar preview da recorrência.')
     } finally {
@@ -245,6 +254,11 @@ export default function AdminPlantoesPage() {
         batch_id: recurringPreview.batch_id,
         include_conflicts: false,
         include_duplicates: false,
+        item_decisions: Object.entries(itemDecisions).map(([batchItemId, val]) => ({
+          batch_item_id: Number(batchItemId),
+          decision: val.decision,
+          notes: val.notes || null,
+        })),
       }
       const { data } = await api.post('/admin/recurring-shifts/confirm', payload)
       await loadData()
@@ -255,6 +269,21 @@ export default function AdminPlantoesPage() {
       setLoading(false)
     }
   }
+
+  const totals = useMemo(() => {
+    if (!recurringPreview?.items) return { create: 0, skip: 0, keep: 0, total: 0, normal: 0, conflict: 0, duplicate: 0 }
+    const t = { create: 0, skip: 0, keep: 0, total: recurringPreview.items.length, normal: 0, conflict: 0, duplicate: 0 }
+    recurringPreview.items.forEach((item) => {
+      if (!item.conflict_status && !item.duplicate_status) t.normal += 1
+      if (item.conflict_status) t.conflict += 1
+      if (item.duplicate_status) t.duplicate += 1
+      const d = itemDecisions[item.batch_item_id]?.decision
+      if (d === 'create') t.create += 1
+      if (d === 'skip') t.skip += 1
+      if (d === 'keep_existing') t.keep += 1
+    })
+    return t
+  }, [recurringPreview, itemDecisions])
 
   const countsByType = useMemo(() => {
     const map = { [SHIFT_TYPES.DAY]: 0, [SHIFT_TYPES.INTER]: 0, [SHIFT_TYPES.NIGHT]: 0, [SHIFT_TYPES.FULL]: 0 }
@@ -478,6 +507,9 @@ export default function AdminPlantoesPage() {
               Conflitos: {recurringPreview.total_conflicts} ·
               Duplicatas: {recurringPreview.total_duplicates}
             </p>
+            <p className="text-xs text-gray-600 mt-1">
+              Normais: {totals.normal} · Selecionados criar: {totals.create} · Selecionados pular: {totals.skip} · Manter existente: {totals.keep}
+            </p>
             {recurringPreview?.result ? (
               <p className="text-sm text-green-700 mt-1">
                 Criados: {recurringPreview.result.total_created} · Pulados: {recurringPreview.result.skipped}
@@ -491,6 +523,8 @@ export default function AdminPlantoesPage() {
                     <th className="px-2 py-1 text-left">Início</th>
                     <th className="px-2 py-1 text-left">Fim</th>
                     <th className="px-2 py-1 text-left">Status</th>
+                    <th className="px-2 py-1 text-left">Decisão</th>
+                    <th className="px-2 py-1 text-left">Nota</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -500,7 +534,26 @@ export default function AdminPlantoesPage() {
                       <td className="px-2 py-1">{new Date(item.start_datetime).toLocaleString('pt-BR')}</td>
                       <td className="px-2 py-1">{new Date(item.end_datetime).toLocaleString('pt-BR')}</td>
                       <td className="px-2 py-1">
-                        {item.duplicate_status ? 'Duplicata' : item.conflict_status ? 'Conflito' : 'OK'}
+                        {item.duplicate_status ? `Duplicata (${item.existing_shift_id || '-'})` : item.conflict_status ? `Conflito (${item.existing_shift_id || '-'})` : 'OK'}
+                      </td>
+                      <td className="px-2 py-1">
+                        <select
+                          value={itemDecisions[item.batch_item_id]?.decision || 'create'}
+                          onChange={(e) => setItemDecisions((prev) => ({ ...prev, [item.batch_item_id]: { ...(prev[item.batch_item_id] || {}), decision: e.target.value } }))}
+                          className="rounded border px-1 py-1"
+                        >
+                          <option value="create">Criar</option>
+                          <option value="skip">Pular</option>
+                          <option value="keep_existing">Manter existente</option>
+                        </select>
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          value={itemDecisions[item.batch_item_id]?.notes || ''}
+                          onChange={(e) => setItemDecisions((prev) => ({ ...prev, [item.batch_item_id]: { ...(prev[item.batch_item_id] || {}), notes: e.target.value } }))}
+                          className="rounded border px-1 py-1 w-40"
+                          placeholder="Nota da decisão"
+                        />
                       </td>
                     </tr>
                   ))}

@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from calendar import monthrange
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -163,6 +163,7 @@ def confirm_batch(
     created_by: int,
     include_conflicts: bool,
     include_duplicates: bool,
+    item_decisions: Optional[Dict[int, dict]] = None,
     batch_id: Optional[int] = None,
 ) -> tuple[RecurringShiftBatch, List[int], int, int, int]:
     if batch_id:
@@ -180,20 +181,50 @@ def confirm_batch(
     conflicts = 0
     duplicates = 0
 
+    decision_map = item_decisions or {}
+
     for item in items:
         if item.created_shift_id or item.decision_status == RecurringItemDecisionStatus.CREATED:
             skipped += 1
             continue
         if item.duplicate_status:
             duplicates += 1
+        if item.conflict_status:
+            conflicts += 1
+        explicit_decision = decision_map.get(item.id, {})
+        action = explicit_decision.get("decision")
+        notes = explicit_decision.get("notes")
+        if action:
+            item.decision_action = action
+            item.decision_notes = notes
+            item.decided_by = created_by
+            item.decided_at = datetime.utcnow()
+
+        if action == "overwrite":
+            # Não suportado com segurança na modelagem atual de recorrência.
+            raise ValueError("Decisão 'overwrite' ainda não suportada com segurança")
+        if action in {"skip", "keep_existing"}:
+            if item.duplicate_status:
+                item.decision_status = RecurringItemDecisionStatus.SKIPPED_DUPLICATE
+            elif item.conflict_status:
+                item.decision_status = RecurringItemDecisionStatus.SKIPPED_CONFLICT
+            else:
+                item.decision_status = RecurringItemDecisionStatus.SKIPPED_CONFLICT
+            skipped += 1
+            continue
+        if action == "create":
+            pass
+
+        if item.duplicate_status:
             if not include_duplicates:
                 item.decision_status = RecurringItemDecisionStatus.SKIPPED_DUPLICATE
+                item.decision_action = item.decision_action or "skip"
                 skipped += 1
                 continue
         if item.conflict_status:
-            conflicts += 1
             if not include_conflicts:
                 item.decision_status = RecurringItemDecisionStatus.SKIPPED_CONFLICT
+                item.decision_action = item.decision_action or "skip"
                 skipped += 1
                 continue
 
@@ -209,6 +240,9 @@ def confirm_batch(
         db.flush()
         item.created_shift_id = shift.id
         item.decision_status = RecurringItemDecisionStatus.CREATED
+        item.decision_action = item.decision_action or "create"
+        item.decided_by = item.decided_by or created_by
+        item.decided_at = item.decided_at or datetime.utcnow()
         created_ids.append(shift.id)
 
     batch.status = RecurringBatchStatus.CONFIRMED

@@ -151,8 +151,10 @@ class RecurringShiftPreviewRequest(BaseModel):
 
 
 class RecurringShiftPreviewItem(BaseModel):
+    batch_item_id: int
     target_date: date
     weekday: int
+    professional_id: int
     shift_label: str
     start_datetime: datetime
     end_datetime: datetime
@@ -161,6 +163,9 @@ class RecurringShiftPreviewItem(BaseModel):
     conflict_status: bool
     existing_shift_id: Optional[int] = None
     validation_messages: List[str] = Field(default_factory=list)
+    decision_action: Optional[str] = None
+    decision_notes: Optional[str] = None
+    created_shift_id: Optional[int] = None
 
 
 class RecurringShiftPreviewResponse(BaseModel):
@@ -179,6 +184,16 @@ class RecurringShiftConfirmRequest(RecurringShiftPreviewRequest):
     batch_id: Optional[int] = None
 
 
+class RecurringShiftItemDecision(BaseModel):
+    batch_item_id: int
+    decision: str = Field(pattern=r"^(create|skip|keep_existing|overwrite)$")
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class RecurringShiftConfirmRequestV2(RecurringShiftConfirmRequest):
+    item_decisions: List[RecurringShiftItemDecision] = Field(default_factory=list)
+
+
 class RecurringShiftBatchResult(BaseModel):
     batch_id: int
     total_generated: int
@@ -187,6 +202,25 @@ class RecurringShiftBatchResult(BaseModel):
     total_created: int
     skipped: int
     created_shift_ids: List[int]
+
+
+class RecurringShiftBatchDetailResponse(BaseModel):
+    batch_id: int
+    user_id: int
+    weekday: int
+    shift_label: str
+    start_time: str
+    end_time: str
+    start_date: date
+    end_date: date
+    months_ahead: int
+    notes: Optional[str] = None
+    status: str
+    created_by: int
+    created_at: datetime
+    confirmed_at: Optional[datetime] = None
+    summary: dict
+    items: List[RecurringShiftPreviewItem]
 
 class FinalScheduleRow(BaseModel):
     shift_id: int

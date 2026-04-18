@@ -10,8 +10,9 @@ from ..models import RecurringShiftBatch, RecurringShiftBatchItem, User
 from ..services.recurring_shift_service import RecurringInput, build_preview, confirm_batch
 from ..utils.dependencies import require_admin
 from .schemas import (
+    RecurringShiftBatchDetailResponse,
     RecurringShiftBatchResult,
-    RecurringShiftConfirmRequest,
+    RecurringShiftConfirmRequestV2,
     RecurringShiftPreviewItem,
     RecurringShiftPreviewRequest,
     RecurringShiftPreviewResponse,
@@ -20,7 +21,7 @@ from .schemas import (
 router = APIRouter(prefix="/admin/recurring-shifts", tags=["Admin Recurring Shifts"])
 
 
-def _to_preview_item(item: RecurringShiftBatchItem, weekday: int, shift_label: str) -> RecurringShiftPreviewItem:
+def _to_preview_item(item: RecurringShiftBatchItem, weekday: int, shift_label: str, professional_id: int) -> RecurringShiftPreviewItem:
     duration = round((item.end_datetime - item.start_datetime).total_seconds() / 3600, 2)
     messages = []
     if item.validation_messages:
@@ -29,8 +30,10 @@ def _to_preview_item(item: RecurringShiftBatchItem, weekday: int, shift_label: s
         except ValueError:
             messages = [item.validation_messages]
     return RecurringShiftPreviewItem(
+        batch_item_id=item.id,
         target_date=item.target_date,
         weekday=weekday,
+        professional_id=professional_id,
         shift_label=shift_label,
         start_datetime=item.start_datetime,
         end_datetime=item.end_datetime,
@@ -39,6 +42,9 @@ def _to_preview_item(item: RecurringShiftBatchItem, weekday: int, shift_label: s
         conflict_status=item.conflict_status,
         existing_shift_id=item.existing_shift_id,
         validation_messages=messages,
+        decision_action=item.decision_action,
+        decision_notes=item.decision_notes,
+        created_shift_id=item.created_shift_id,
     )
 
 
@@ -61,13 +67,13 @@ def preview_recurring_shifts(
         total_generated=len(items),
         total_conflicts=sum(1 for i in items if i.conflict_status),
         total_duplicates=sum(1 for i in items if i.duplicate_status),
-        items=[_to_preview_item(i, batch.weekday, batch.shift_label) for i in items],
+        items=[_to_preview_item(i, batch.weekday, batch.shift_label, batch.user_id) for i in items],
     )
 
 
 @router.post("/confirm", response_model=RecurringShiftBatchResult)
 def confirm_recurring_shifts(
-    body: RecurringShiftConfirmRequest,
+    body: RecurringShiftConfirmRequestV2,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
@@ -88,6 +94,7 @@ def confirm_recurring_shifts(
             created_by=current_user.id,
             include_conflicts=body.include_conflicts,
             include_duplicates=body.include_duplicates,
+            item_decisions={item.batch_item_id: item.model_dump() for item in body.item_decisions},
             batch_id=body.batch_id,
         )
     except ValueError as exc:
@@ -142,7 +149,7 @@ def list_recurring_batches(
     return results
 
 
-@router.get("/{batch_id}", response_model=RecurringShiftPreviewResponse)
+@router.get("/{batch_id}", response_model=RecurringShiftBatchDetailResponse)
 def get_recurring_batch(
     batch_id: int,
     db: Session = Depends(get_db),
@@ -152,12 +159,27 @@ def get_recurring_batch(
     if not batch:
         raise HTTPException(status_code=404, detail="Batch de recorrência não encontrado")
     items = db.query(RecurringShiftBatchItem).filter(RecurringShiftBatchItem.batch_id == batch_id).all()
-    return RecurringShiftPreviewResponse(
+    summary = {}
+    if batch.summary_json:
+        try:
+            summary = json.loads(batch.summary_json)
+        except ValueError:
+            summary = {}
+    return RecurringShiftBatchDetailResponse(
         batch_id=batch.id,
-        interval_start=batch.start_date,
-        interval_end=batch.end_date,
-        total_generated=len(items),
-        total_conflicts=sum(1 for i in items if i.conflict_status),
-        total_duplicates=sum(1 for i in items if i.duplicate_status),
-        items=[_to_preview_item(i, batch.weekday, batch.shift_label) for i in items],
+        user_id=batch.user_id,
+        weekday=batch.weekday,
+        shift_label=batch.shift_label,
+        start_time=batch.start_time,
+        end_time=batch.end_time,
+        start_date=batch.start_date,
+        end_date=batch.end_date,
+        months_ahead=batch.months_ahead,
+        notes=batch.notes,
+        status=batch.status.value if hasattr(batch.status, "value") else str(batch.status),
+        created_by=batch.created_by,
+        created_at=batch.created_at,
+        confirmed_at=batch.confirmed_at,
+        summary=summary,
+        items=[_to_preview_item(i, batch.weekday, batch.shift_label, batch.user_id) for i in items],
     )

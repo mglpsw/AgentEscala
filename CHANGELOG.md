@@ -8,6 +8,8 @@
 - validação de limite de horizonte futuro em até 6 meses na geração da recorrência semanal.
 - UI no painel Admin de Plantões para criar recorrência semanal, visualizar preview e confirmar lote.
 - testes backend cobrindo geração, limite de 6 meses, noturno cruzando dia, duplicata/conflito e regressão de compatibilidade com camada documental `/admin/imports`.
+- confirmação granular por item no batch de recorrência (`item_decisions` com `create|skip|keep_existing`), com auditoria de decisão por item.
+- endpoint de detalhe de batch de recorrência enriquecido com parâmetros do lote, resumo, itens, decisões e shifts criados.
 
 ## [1.6.0] - 2026-04-18
 
