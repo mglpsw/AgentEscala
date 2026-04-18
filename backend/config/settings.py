@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     CORS_ALLOW_ORIGINS: str = ""
     METRICS_ENABLED: bool = True
-    OCR_API_BASE_URL: str = "https://api.ks-sm.net:9443"
+    OCR_API_BASE_URL: str = "http://192.168.3.155:8010"
     OCR_API_TIMEOUT_SECONDS: float = 20.0
     OCR_API_ENABLED: bool = True
     OCR_API_VERIFY_SSL: bool = True

@@ -31,7 +31,7 @@ entrada (CSV/XLSX/PDF/Imagem)
 
 ### 3) Integração OCR externa (prioritária)
 
-- Base URL padrão: `https://api.ks-sm.net:9443`.
+- Base URL padrão: `http://192.168.3.155:8010`.
 - Configuração via env:
   - `OCR_API_BASE_URL`
   - `OCR_API_TIMEOUT_SECONDS`

@@ -255,3 +255,72 @@ class ExcelExporter:
         wb.save(output)
         output.seek(0)
         return output
+
+
+    @staticmethod
+    def export_monthly_consolidated(shifts: List[Shift]) -> BytesIO:
+        """Exporta escala mensal consolidada oficial de todos os profissionais."""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Consolidado Mensal"
+
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+
+        headers = [
+            "Data",
+            "Dia da semana",
+            "Turno",
+            "Profissional",
+            "Categoria profissional",
+            "Status",
+            "Local",
+        ]
+        widths = [14, 18, 32, 28, 24, 14, 24]
+        for index, width in enumerate(widths, 1):
+            ws.column_dimensions[chr(64 + index)].width = width
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+
+        weekdays_pt = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
+
+        ordered = sorted(shifts, key=lambda shift: shift.start_time)
+        for row_num, shift in enumerate(ordered, 2):
+            start = shift.start_time
+            end = shift.end_time
+            role_value = shift.agent.role.value if shift.agent and shift.agent.role else "-"
+            data = [
+                start.strftime("%Y-%m-%d"),
+                weekdays_pt[start.weekday()],
+                f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}",
+                shift.agent.name if shift.agent else (shift.legacy_agent_name or "N/D"),
+                role_value,
+                "confirmado",
+                shift.location or "",
+            ]
+            for col_num, value in enumerate(data, 1):
+                cell = ws.cell(row=row_num, column=col_num, value=value)
+                cell.alignment = Alignment(vertical="center")
+
+        meta_ws = wb.create_sheet("Metadados")
+        meta_ws['A1'] = "Data de exportação"
+        meta_ws['B1'] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        meta_ws['A2'] = "Total de linhas"
+        meta_ws['B2'] = len(shifts)
+        meta_ws['A3'] = "Fonte"
+        meta_ws['B3'] = "Plantões oficiais confirmados (tabela shifts)"
+
+        for row in range(1, 4):
+            meta_ws[f'A{row}'].font = Font(bold=True)
+        meta_ws.column_dimensions['A'].width = 22
+        meta_ws.column_dimensions['B'].width = 46
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output

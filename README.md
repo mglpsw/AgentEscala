@@ -44,7 +44,7 @@ Upload
 
 - **CSV/XLSX:** continuam suportados sem mudança de contrato.
 - **PDF/Imagem:** usam OCR.
-- **OCR externo prioritário:** `https://api.ks-sm.net:9443`.
+- **OCR externo prioritário:** `http://192.168.3.155:8010`.
 - **Fallback local preservado:** nunca depende exclusivamente da API externa.
 
 ## Stack tecnológica
@@ -60,7 +60,7 @@ Upload
 - `SECRET_KEY`
 - `CORS_ALLOW_ORIGINS`
 - `METRICS_ENABLED`
-- `OCR_API_BASE_URL` (default: `https://api.ks-sm.net:9443`)
+- `OCR_API_BASE_URL` (default: `http://192.168.3.155:8010`)
 - `OCR_API_TIMEOUT_SECONDS`
 - `OCR_API_ENABLED`
 - `OCR_API_VERIFY_SSL`

@@ -53,6 +53,22 @@ function MySchedulePage() {
     window.URL.revokeObjectURL(url)
   }
 
+
+  const handleExportMonthlyConsolidated = async () => {
+    const target = month || new Date().toISOString().slice(0, 7)
+    const [yearStr, monthStr] = target.split('-')
+    const response = await api.get('/shifts/export/monthly-consolidated', {
+      params: { year: Number(yearStr), month: Number(monthStr) },
+      responseType: 'blob',
+    })
+    const url = window.URL.createObjectURL(response.data)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `escala_consolidada_${target}.xlsx`
+    anchor.click()
+    window.URL.revokeObjectURL(url)
+  }
+
   const sorted = useMemo(
     () => [...shifts].sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()),
     [shifts],
@@ -90,6 +106,13 @@ function MySchedulePage() {
             className="rounded border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
           >
             Exportar minha escala
+          </button>
+          <button
+            type="button"
+            onClick={handleExportMonthlyConsolidated}
+            className="rounded border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+          >
+            Exportar consolidado mensal (todos)
           </button>
         </div>
       </section>
