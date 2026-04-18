@@ -85,11 +85,12 @@ async def calibration_preview(
         ) from exc
 
     candidates = OcrCalibrationService.parse_raw_text(result["raw_text"])
+    match_context = OcrCalibrationService.build_match_context(db)
     rows: list[OcrCalibrationRow] = []
     matched = ambiguous = unmatched = 0
 
     for item in candidates:
-        match = OcrCalibrationService.match_candidate(db, item)
+        match = OcrCalibrationService.match_candidate(db, item, context=match_context)
         status_value = match["status"]
         if status_value == "matched":
             matched += 1

@@ -39,6 +39,16 @@ class ParsedScheduleCandidate:
 
 class OcrCalibrationService:
     @staticmethod
+    def build_match_context(db: Session) -> dict:
+        active_users = db.query(User).filter(User.is_active == True).all()  # noqa: E712
+        profiles = db.query(MedicalProfile).all()
+        by_crm = {str(p.crm_numero).strip(): p for p in profiles if p.crm_numero}
+        return {
+            "active_users": active_users,
+            "profiles_by_crm": by_crm,
+        }
+
+    @staticmethod
     def _normalize_name(text: str) -> str:
         text = re.sub(r"\s+", " ", text).strip()
         return re.sub(r"\b(SEG|TER|QUA|QUI|SEX|SAB|SÁB|DOM)\b", "", text, flags=re.IGNORECASE).strip()
@@ -120,12 +130,19 @@ class OcrCalibrationService:
         return candidates
 
     @staticmethod
-    def match_candidate(db: Session, candidate: ParsedScheduleCandidate) -> dict:
+    def match_candidate(
+        db: Session,
+        candidate: ParsedScheduleCandidate,
+        context: Optional[dict] = None,
+    ) -> dict:
         name = (candidate.professional_name or "").strip()
         crm = (candidate.crm_number or "").strip()
+        resolved_context = context or OcrCalibrationService.build_match_context(db)
+        active_users: list[User] = resolved_context.get("active_users", [])
+        profiles_by_crm: dict[str, MedicalProfile] = resolved_context.get("profiles_by_crm", {})
 
         if crm:
-            profile = db.query(MedicalProfile).filter(MedicalProfile.crm_numero == crm).first()
+            profile = profiles_by_crm.get(crm)
             if profile:
                 return {
                     "status": "matched",
@@ -135,9 +152,8 @@ class OcrCalibrationService:
                 }
 
         if name:
-            users = db.query(User).filter(User.is_active == True).all()  # noqa: E712
             normalized = name.lower()
-            exact = [u for u in users if u.name.lower() == normalized]
+            exact = [u for u in active_users if u.name.lower() == normalized]
             if len(exact) == 1:
                 return {
                     "status": "matched",
@@ -146,7 +162,7 @@ class OcrCalibrationService:
                     "matched_name": exact[0].name,
                 }
 
-            partial = [u for u in users if normalized in u.name.lower() or u.name.lower() in normalized]
+            partial = [u for u in active_users if normalized in u.name.lower() or u.name.lower() in normalized]
             if len(partial) == 1:
                 return {
                     "status": "matched",

@@ -292,7 +292,7 @@ def _read_ocr_via_api(content: bytes, filename: str) -> Tuple[List[str], List[Di
             verify_ssl=settings.OCR_API_VERIFY_SSL,
         )
     except OcrAgentRouterError as exc:
-        record_ocr_api_failure(0)
+        record_ocr_api_failure(exc.latency_seconds)
         raise ValueError(str(exc)) from exc
 
     raw_text = result["raw_text"]

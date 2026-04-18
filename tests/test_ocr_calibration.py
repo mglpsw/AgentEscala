@@ -94,3 +94,40 @@ def test_admin_ocr_calibration_preview_emits_structured_logs(client, admin_heade
     messages = [record.getMessage() for record in caplog.records]
     assert any("ocr_calibration_preview_started" in msg for msg in messages)
     assert any("ocr_calibration_preview_completed" in msg for msg in messages)
+
+
+def test_admin_ocr_calibration_preview_builds_match_context_once(client, admin_headers, monkeypatch):
+    import backend.api.admin_ocr as admin_ocr_module
+
+    monkeypatch.setattr(settings_module.settings, "FEATURE_OCR_REMOTE_IMPORT", True)
+
+    def _fake_extract(**_kwargs):
+        return {
+            "raw_text": "01/04/2026 QUA 24 HORAS ALICE SILVA\n"
+                        "02/04/2026 QUI 12H DIA BOB SANTOS",
+            "source": "https://api.ks-sk.net:9443/ocr/extract",
+            "latency_seconds": 0.09,
+        }
+
+    call_counter = {"build": 0}
+
+    def _fake_build_context(_db):
+        call_counter["build"] += 1
+        return {"active_users": [], "profiles_by_crm": {}}
+
+    def _fake_match(_db, item, context=None):
+        assert context is not None
+        return {"status": "unmatched", "user_id": None, "match_reason": "no_match"}
+
+    monkeypatch.setattr(admin_ocr_module, "extract_text_via_agent_router", _fake_extract)
+    monkeypatch.setattr(admin_ocr_module.OcrCalibrationService, "build_match_context", _fake_build_context)
+    monkeypatch.setattr(admin_ocr_module.OcrCalibrationService, "match_candidate", _fake_match)
+
+    response = client.post(
+        "/admin/ocr/calibration/preview",
+        headers=admin_headers,
+        files={"file": ("escala.pdf", b"fake-pdf", "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    assert call_counter["build"] == 1

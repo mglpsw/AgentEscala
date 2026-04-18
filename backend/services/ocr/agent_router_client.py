@@ -14,6 +14,10 @@ import httpx
 class OcrAgentRouterError(ValueError):
     """Erro funcional do OCR remoto."""
 
+    def __init__(self, message: str, *, latency_seconds: float | None = None):
+        super().__init__(message)
+        self.latency_seconds = latency_seconds
+
 
 def _extract_text_from_payload(payload: Dict[str, Any]) -> str:
     if isinstance(payload.get("raw_text"), str):
@@ -54,9 +58,10 @@ def extract_text_via_agent_router(
     """
     normalized_base = (base_url or "").rstrip("/")
     if not normalized_base:
-        raise OcrAgentRouterError("OCR remoto indisponível: base URL não configurada.")
+        raise OcrAgentRouterError("OCR remoto indisponível: base URL não configurada.", latency_seconds=None)
 
     last_error: Optional[Exception] = None
+    total_started_at = perf_counter()
     for endpoint in endpoint_candidates:
         target_url = f"{normalized_base}{endpoint}"
         started_at = perf_counter()
@@ -71,7 +76,10 @@ def extract_text_via_agent_router(
             payload_dict = payload if isinstance(payload, dict) else {}
             raw_text = _extract_text_from_payload(payload_dict).strip()
             if not raw_text:
-                raise OcrAgentRouterError("OCR remoto retornou payload sem texto reconhecível.")
+                raise OcrAgentRouterError(
+                    "OCR remoto retornou payload sem texto reconhecível.",
+                    latency_seconds=perf_counter() - started_at,
+                )
 
             return {
                 "raw_text": raw_text,
@@ -81,4 +89,7 @@ def extract_text_via_agent_router(
         except Exception as exc:  # pragma: no cover - integração externa
             last_error = exc
 
-    raise OcrAgentRouterError(f"OCR remoto indisponível em {normalized_base}: {last_error}")
+    raise OcrAgentRouterError(
+        f"OCR remoto indisponível em {normalized_base}: {last_error}",
+        latency_seconds=perf_counter() - total_started_at,
+    )

@@ -1,5 +1,6 @@
 from backend.services import import_service
 from backend.services.import_service import _extract_text_from_ocr_payload, _parse_ocr_text_to_rows
+from backend.services.ocr.agent_router_client import OcrAgentRouterError
 
 
 def test_parse_ocr_text_to_rows_extracts_structured_fields():
@@ -138,3 +139,22 @@ def test_process_import_file_ocr_error_is_sanitized(monkeypatch):
             assert "pytesseract" not in message
     finally:
         db.close()
+
+
+def test_read_ocr_via_api_records_failure_with_measured_latency(monkeypatch):
+    captured = {"latency": None}
+
+    def _fake_extract(**_kwargs):
+        raise OcrAgentRouterError("falha remota", latency_seconds=1.37)
+
+    def _fake_record(latency):
+        captured["latency"] = latency
+
+    monkeypatch.setattr(import_service, "extract_text_via_agent_router", _fake_extract)
+    monkeypatch.setattr(import_service, "record_ocr_api_failure", _fake_record)
+
+    try:
+        import_service._read_ocr_via_api(b"fake", "escala.pdf")
+        assert False, "Era esperado ValueError para falha OCR"
+    except ValueError:
+        assert captured["latency"] == 1.37
