@@ -83,6 +83,14 @@ function build_error_message(error) {
   return 'Não foi possível carregar os dados do período exibido.'
 }
 
+function unwrapSettled(result, fallback) {
+  return result.status === 'fulfilled' ? result.value : fallback
+}
+
+function responseData(response, fallback = []) {
+  return Array.isArray(response?.data) ? response.data : fallback
+}
+
 function CalendarPage() {
   const { user, isAdmin } = useAuth()
   const [visibleRange, setVisibleRange] = useState(() => build_initial_range())
@@ -134,8 +142,9 @@ function CalendarPage() {
         endDate.setDate(endDate.getDate() - 1)
         const end = endDate.toISOString().slice(0, 10)
 
+        const shiftEndpoint = isAdmin ? '/shifts/' : '/me/shifts'
         const tasks = [
-          api.get('/me/shifts', { signal: controller.signal, params: { start_date: start, end_date: end } }),
+          api.get(shiftEndpoint, { signal: controller.signal, params: { start_date: start, end_date: end } }),
           listFutureShiftRequests({ start_date: start, end_date: end }),
           listShiftRequests(),
           api.get('/shifts/day-config', { signal: controller.signal, params: { start_date: start, end_date: end } }),
@@ -145,13 +154,16 @@ function CalendarPage() {
           tasks.push(api.get('/users/agents', { signal: controller.signal }))
         }
 
-        const [myShiftsResp, requestList, shiftRequestList, dayConfigResp, agentsResp] = await Promise.all(tasks)
+        const [myShiftsResp, requestList, shiftRequestList, dayConfigResp, agentsResp] = await Promise.allSettled(tasks)
         if (controller.signal.aborted) return
 
-        const shifts = Array.isArray(myShiftsResp.data) ? myShiftsResp.data : []
-        const preRequests = Array.isArray(requestList) ? requestList : []
-        const requestFlow = Array.isArray(shiftRequestList) ? shiftRequestList : []
-        const dayConfig = Array.isArray(dayConfigResp.data) ? dayConfigResp.data : []
+        const failures = [myShiftsResp, requestList, shiftRequestList, dayConfigResp, agentsResp]
+          .filter((result) => result && result.status === 'rejected')
+
+        const shifts = responseData(unwrapSettled(myShiftsResp, null))
+        const preRequests = Array.isArray(unwrapSettled(requestList, [])) ? unwrapSettled(requestList, []) : []
+        const requestFlow = Array.isArray(unwrapSettled(shiftRequestList, [])) ? unwrapSettled(shiftRequestList, []) : []
+        const dayConfig = responseData(unwrapSettled(dayConfigResp, null))
 
         const mappedMap = {}
         dayConfig.forEach((entry) => {
@@ -162,7 +174,7 @@ function CalendarPage() {
         setFutureRequests(preRequests)
         setShiftRequests(requestFlow)
         if (isAdmin) {
-          const agentList = Array.isArray(agentsResp?.data) ? agentsResp.data : []
+          const agentList = responseData(unwrapSettled(agentsResp, null))
           setAgents(agentList)
           if (agentList.length > 0 && !adminAddForm.agent_id) {
             setAdminAddForm((current) => ({ ...current, agent_id: String(agentList[0].id) }))
@@ -170,6 +182,9 @@ function CalendarPage() {
         }
 
         setEvents([...shifts.map((s) => map_shift_to_event(s, user.id)), ...preRequests.map(map_request_to_event)])
+        if (failures.length > 0) {
+          setError('Calendário carregado parcialmente. Algumas informações auxiliares não responderam.')
+        }
       } catch (requestErr) {
         if (controller.signal.aborted) return
         setEvents([])
@@ -251,9 +266,12 @@ function CalendarPage() {
 
       <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="p-4">
-          <div className="mb-3 flex flex-wrap items-center gap-4 text-xs text-gray-600">
-            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-600" /> Confirmado</span>
-            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" /> Pré-solicitação</span>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-600">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-600" /> Confirmado</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" /> Pré-solicitação</span>
+            </div>
+            {isLoading ? <span className="text-blue-700">Carregando calendário...</span> : null}
           </div>
           <div className="overflow-x-auto">
             <div className="min-w-[720px]">
@@ -270,7 +288,6 @@ function CalendarPage() {
                 datesSet={handleDatesSet}
                 events={events}
                 dateClick={(info) => openDayActions(info.dateStr)}
-                loading={isLoading}
               />
             </div>
           </div>
