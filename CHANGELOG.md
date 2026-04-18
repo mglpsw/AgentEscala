@@ -169,3 +169,10 @@
 
 ### Adicionado
 - base estável inicial com auth, plantões, trocas, importação CSV/XLSX e frontend React.
+
+## 2026-04-18 — OCR determinístico por dia + month view mobile
+
+- Pipeline OCR/documental v3 com detecção de layout local (`avive_tabular`, `pa24h_block`, `generic_table`), aliases, limpeza de ruído, score por thresholds e metadata de fallback LLM só para ambiguidades.
+- Preview OCR no frontend agrupada por dia com cards operacionais, edição inline mínima e painel-resumo lateral para conflitos, ambiguidades e sugestões de enriquecimento de CRM.
+- Calendário mensal otimizado para mobile com resumo compacto de até 4 plantonistas por célula e painel/modal de detalhes completos por dia.
+- Novos testes backend/frontend cobrindo layouts reais, divisão de múltiplos profissionais/CRM composto, limpeza de nomes, agrupamento por dia e renderização da month view.

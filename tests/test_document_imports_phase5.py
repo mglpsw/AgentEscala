@@ -150,3 +150,81 @@ def test_apply_to_staging_uses_inferred_times(client, admin_headers):
     staging_resp = client.post(f"/admin/imports/{import_id}/apply-to-staging", headers=admin_headers)
     assert staging_resp.status_code == 200
     assert staging_resp.json()["invalid_rows"] == 0
+
+
+def test_detects_avive_layout_ignores_initial_zeros_and_classifies_shift():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Cidade", "Estado", "Empresa", "Unidade", "Especialidade", "Profissional", "Data", "Dia", "H1", "H2", "H3", "H4"],
+                        "rows": [
+                            ["POA", "RS", "Avive", "PA", "Clinico", "Joel Dahne 51 99911-6562", "10/04/2026", "SEX", "00:00", "00:00", "10:00", "22:00"],
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+    doc = normalize_ocr_payload_document(db, payload, "avive.pdf")
+    row = doc["rows"][0]
+    assert row["source_layout_type"] == "avive_tabular"
+    assert row["start_time_raw"] == "10:00"
+    assert row["end_time_raw"] == "22:00"
+    assert row["shift_kind"] == "intermediate"
+    assert row["canonical_name"] == "Joel Soares Dahne"
+    db.close()
+
+
+def test_detects_pa24h_and_splits_multiple_professionals_and_crm():
+    db = SessionLocal()
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "PA 24H",
+                        "headers": ["DATA", "DIA", "PLANTÃO", "CRM", "NOME COMPLETO"],
+                        "rows": [["11/04/2026", "SAB", "12H NOITE", "55597 e 42143", "LETICIA E JEAN"]],
+                    }
+                ],
+            }
+        ]
+    }
+
+    doc = normalize_ocr_payload_document(db, payload, "pa24h.pdf")
+    assert len(doc["rows"]) == 2
+    assert all(row["source_layout_type"] == "pa24h_block" for row in doc["rows"])
+    assert all(row["multiple_professionals_detected"] for row in doc["rows"])
+    assert {row["crm_detected"] for row in doc["rows"]} == {"55597", "42143"}
+    assert len({row["day_group_id"] for row in doc["rows"]}) == 1
+    db.close()
+
+
+def test_name_cleaning_removes_faturamento_and_phone():
+    db = SessionLocal()
+    payload = {
+        "pages": [{"page_number": 1, "tables": [{"title": "ABRIL/2026", "headers": ["Profissional", "Data", "Entrada", "Saída"], "rows": [["Daniel Pires 51 99140-4656 Faturamento", "12/04/2026", "08:00", "20:00"]]}]}]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "noise.pdf")
+    row = doc["rows"][0]
+    assert row["professional_name_normalized"] == "Daniel Pires"
+    assert row["canonical_name"] == "Daniel Pires"
+    db.close()
+
+
+def test_grouped_day_validation_and_metadata_counts():
+    db = SessionLocal()
+    payload = {
+        "pages": [{"page_number": 1, "tables": [{"title": "ABRIL/2026", "headers": ["DATA", "DIA", "PLANTÃO", "CRM", "NOME COMPLETO"], "rows": [["14/04/2026", "TER", "12H DIA", "", "HELENE E ???"]]}]}]
+    }
+    doc = normalize_ocr_payload_document(db, payload, "grouped.pdf")
+    assert doc["metadata"]["layout_counts"]["pa24h_block"] >= 1
+    assert any("CRM ausente" in item for item in doc["rows"][0]["grouped_day_validation"])
+    db.close()
