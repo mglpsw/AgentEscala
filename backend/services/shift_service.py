@@ -7,6 +7,13 @@ from sqlalchemy import and_, or_
 from ..models import Shift, User
 from .schedule_validation_service import validate_shift
 
+PLANTAO_TYPE_RULES = {
+    "12H DIA": (8, 20),
+    "12H NOITE": (20, 8),
+    "10-22H": (10, 22),
+    "24 HORAS": (0, 0),
+}
+
 
 class ShiftService:
     """Serviço para gerenciar turnos"""
@@ -229,3 +236,61 @@ class ShiftService:
             "ambiguous_user_names": [name for (name,) in ambiguous_user_names],
             "note": "Fallback por nome é temporário (legacy_agent_name). Priorize user_id.",
         }
+
+    @staticmethod
+    def infer_plantao_type(shift: Shift) -> str | None:
+        start_hour = shift.start_time.hour
+        end_hour = shift.end_time.hour
+        duration_hours = int((shift.end_time - shift.start_time).total_seconds() // 3600)
+
+        if duration_hours >= 23:
+            return "24 HORAS"
+        if start_hour == 8 and end_hour == 20:
+            return "12H DIA"
+        if start_hour == 20 and end_hour in {7, 8}:
+            return "12H NOITE"
+        if start_hour == 10 and end_hour == 22:
+            return "10-22H"
+        title = (shift.title or "").upper().strip()
+        return title if title in PLANTAO_TYPE_RULES else None
+
+    @staticmethod
+    def get_daily_coverage_flags(
+        db: Session,
+        start_date: date,
+        end_date: date,
+    ) -> list[dict]:
+        query = ShiftService.get_filtered_shifts(db, start_date=start_date, end_date=end_date, skip=0, limit=5000)
+        grouped: dict[str, dict] = {}
+
+        cursor = start_date
+        while cursor <= end_date:
+            key = cursor.isoformat()
+            grouped[key] = {
+                "date": key,
+                "counts": {"12H DIA": 0, "10-22H": 0, "12H NOITE": 0},
+                "required": {"12H DIA": 2, "10-22H": 1, "12H NOITE": 1},
+            }
+            cursor += timedelta(days=1)
+
+        for shift in query:
+            day_key = shift.start_time.date().isoformat()
+            if day_key not in grouped:
+                continue
+            plantao_type = ShiftService.infer_plantao_type(shift)
+            if plantao_type in grouped[day_key]["counts"]:
+                grouped[day_key]["counts"][plantao_type] += 1
+
+        result: list[dict] = []
+        for item in grouped.values():
+            counts = item["counts"]
+            required = item["required"]
+            missing = {
+                key: max(required[key] - counts.get(key, 0), 0)
+                for key in required
+            }
+            item["complete"] = all(missing[key] == 0 for key in missing)
+            item["missing"] = missing
+            result.append(item)
+
+        return result

@@ -189,6 +189,27 @@ def test_import_endpoint_requires_admin(client, agent_headers):
     assert resp.status_code == 403
 
 
+def test_non_admin_forbidden_on_schedule_import_admin_routes(client, admin_headers, agent_headers):
+    """PASSO 1: todas as rotas administrativas de importação devem negar médico (403)."""
+    upload = _csv_upload(client, admin_headers, FIXTURES / "escala_exemplo.csv")
+    assert upload.status_code == 201, upload.text
+    import_id = upload.json()["import_id"]
+
+    calls = [
+        ("post", f"/schedule-imports/{import_id}/validate"),
+        ("get", "/schedule-imports/"),
+        ("get", f"/schedule-imports/{import_id}"),
+        ("get", f"/schedule-imports/{import_id}/summary"),
+        ("get", f"/schedule-imports/{import_id}/rows"),
+        ("post", f"/schedule-imports/{import_id}/confirm"),
+        ("get", f"/schedule-imports/{import_id}/report"),
+    ]
+
+    for method, path in calls:
+        resp = client.request(method, path, headers=agent_headers)
+        assert resp.status_code == 403, f"{method.upper()} {path} deveria retornar 403"
+
+
 def test_import_valid_csv(client, admin_headers):
     resp = _csv_upload(client, admin_headers, FIXTURES / "escala_exemplo.csv")
     assert resp.status_code == 201, resp.text

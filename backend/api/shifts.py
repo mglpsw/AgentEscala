@@ -277,6 +277,33 @@ def export_shifts_ics(
     return _build_shift_export_response(shifts, "ics", "full")
 
 
+@router.get("/coverage/flags")
+def get_coverage_flags(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Retorna flag diária de cobertura de plantão (completo/incompleto)."""
+    today = date.today()
+    default_start = today.replace(day=1)
+    if today.month == 12:
+        default_end = date(today.year + 1, 1, 1).fromordinal(date(today.year + 1, 1, 1).toordinal() - 1)
+    else:
+        default_end = date(today.year, today.month + 1, 1).fromordinal(
+            date(today.year, today.month + 1, 1).toordinal() - 1
+        )
+
+    parsed_start = _parse_export_date(start_date) if start_date else default_start
+    parsed_end = _parse_export_date(end_date) if end_date else default_end
+    if parsed_start > parsed_end:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Data inicial não pode ser maior que a data final."
+        )
+    return ShiftService.get_daily_coverage_flags(db, parsed_start, parsed_end)
+
+
 @router.get("/consistency-report")
 def get_shift_consistency_report(
     db: Session = Depends(get_db),

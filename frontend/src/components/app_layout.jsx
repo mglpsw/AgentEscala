@@ -11,6 +11,7 @@ const nav_links = [
   { to: '/swaps/pending', label: '⏳ Trocas Pendentes' },
   { to: '/import', label: '📥 Importar Escala' },
   { to: '/admin/users', label: '👥 Usuários' },
+  { to: '/admin/plantoes', label: '🧩 Plantões Admin' },
 ]
 
 // Layout principal com cabeçalho e navegação lateral
@@ -19,7 +20,7 @@ function AppLayout() {
   const { logout, user, isAdmin } = useAuth()
 
   const visibleLinks = nav_links.filter((link) => {
-    if ((link.to === '/swaps/pending' || link.to === '/import' || link.to === '/admin/users') && !isAdmin) {
+    if ((link.to === '/swaps/pending' || link.to === '/import' || link.to === '/admin/users' || link.to === '/admin/plantoes') && !isAdmin) {
       return false
     }
     return true
