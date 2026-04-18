@@ -283,6 +283,17 @@ def test_listar_shifts_por_agente(client, agent_headers, admin_headers):
     assert all(s["agent_id"] == alice_id for s in shifts)
 
 
+@pytest.mark.xfail(
+    reason="Hardening de autorização por ownership/admin ainda pendente no endpoint /shifts/agent/{id}.",
+    strict=False,
+)
+def test_agente_nao_pode_listar_turnos_de_outro_agente(client, agent_headers, admin_headers):
+    """Requisito de segurança (PASSO 1): médico só deve consultar os próprios turnos."""
+    bob_id = _user_id(client, admin_headers, "bob@agentescala.com")
+    resp = client.get(f"/shifts/agent/{bob_id}", headers=agent_headers)
+    assert resp.status_code == 403
+
+
 def test_final_schedule_retorna_campos_essenciais_para_frontend(client, agent_headers):
     """GET /shifts/final-schedule entrega a linha já pronta para a tabela final."""
     resp = client.get("/shifts/final-schedule", headers=agent_headers)

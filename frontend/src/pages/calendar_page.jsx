@@ -34,18 +34,25 @@ function shift_overlaps_range(shift, visible_range) {
   return shift_start < visible_range.end && shift_end > visible_range.start
 }
 
-function map_shift_to_event(shift, agent_name) {
+function map_shift_to_event(shift, current_user) {
+  const ownShift =
+    shift.agent_id === current_user?.id ||
+    shift.user_id === current_user?.id ||
+    shift.agent?.name === current_user?.name
   return {
     id: String(shift.id),
-    title: shift.title?.trim() || 'Turno',
+    title: `${shift.agent?.name || current_user?.name || 'Profissional'} · ${shift.title?.trim() || 'Turno'}`,
     start: shift.start_time,
     end: shift.end_time,
+    backgroundColor: ownShift ? '#2563eb' : '#6b7280',
+    borderColor: ownShift ? '#1d4ed8' : '#4b5563',
     extendedProps: {
       location: shift.location ?? '',
       description: shift.description ?? '',
       duration_hours: calculate_duration_hours(shift.start_time, shift.end_time),
       status: 'scheduled',
-      agent_name: agent_name ?? '',
+      agent_name: shift.agent?.name ?? current_user?.name ?? '',
+      own_shift: ownShift,
     },
   }
 }
@@ -84,6 +91,7 @@ function CalendarPage() {
   const [is_loading, set_is_loading] = useState(true)
   const [error, set_error] = useState('')
   const [reload_key, set_reload_key] = useState(0)
+  const [coverageFlags, setCoverageFlags] = useState([])
   const last_range_key = useRef('')
 
   const visible_range_key = useMemo(
@@ -121,9 +129,25 @@ function CalendarPage() {
       set_error('')
 
       try {
-        const { data } = await api.get(`/shifts/agent/${user.id}`, {
-          signal: controller.signal,
-        })
+        const start = visible_range.start.toISOString().slice(0, 10)
+        const endDate = new Date(visible_range.end)
+        endDate.setDate(endDate.getDate() - 1)
+        const end = endDate.toISOString().slice(0, 10)
+
+        const [shiftsResp, coverageResp] = await Promise.all([
+          api.get('/shifts', {
+            signal: controller.signal,
+            params: { limit: 2000 },
+          }),
+          api.get('/shifts/coverage/flags', {
+            signal: controller.signal,
+            params: { start_date: start, end_date: end },
+          }),
+        ])
+
+        const data = shiftsResp.data
+        const coverage = coverageResp.data
+        setCoverageFlags(Array.isArray(coverage) ? coverage : [])
 
         if (controller.signal.aborted) {
           return
@@ -131,7 +155,7 @@ function CalendarPage() {
 
         const next_events = data
           .filter((shift) => shift_overlaps_range(shift, visible_range))
-          .map((shift) => map_shift_to_event(shift, user.name))
+          .map((shift) => map_shift_to_event(shift, user))
 
         set_events(next_events)
       } catch (request_error) {
@@ -140,6 +164,7 @@ function CalendarPage() {
         }
 
         set_events([])
+        setCoverageFlags([])
         set_error(build_error_message(request_error))
       } finally {
         if (!controller.signal.aborted) {
@@ -154,6 +179,11 @@ function CalendarPage() {
   }, [reload_key, user?.id, user?.name, visible_range, visible_range_key])
 
   const has_no_shifts = !is_loading && !error && events.length === 0
+  const incompleteDays = new Set(
+    coverageFlags
+      .filter((item) => item.complete === false)
+      .map((item) => item.date),
+  )
 
   return (
     <div className="space-y-6">
@@ -231,6 +261,10 @@ function CalendarPage() {
                 events={events}
                 datesSet={handle_dates_set}
                 eventContent={render_event_content}
+                dayCellClassNames={(arg) => {
+                  const key = arg.date.toISOString().slice(0, 10)
+                  return incompleteDays.has(key) ? ['bg-red-100'] : []
+                }}
               />
             </div>
           </div>
