@@ -37,7 +37,9 @@ function AppLayout() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold tracking-wide">AgentEscala</h1>
-            <p className="text-sm text-blue-200">Gestão de escalas médicas · v1.5.0</p>
+            <p className="text-sm text-blue-200">
+              Gestão de escalas médicas · v{import.meta.env.VITE_APP_VERSION}
+            </p>
           </div>
           <div className="text-right">
             <div className="flex items-center gap-2 justify-end">

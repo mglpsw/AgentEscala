@@ -4,8 +4,8 @@ import App from '../src/app.jsx';
 
 
 describe('App', () => {
-  it('renderiza sem crashar', () => {
+  it('renderiza sem crashar', async () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: /agentescala/i })).toBeDefined();
+    expect(await screen.findByRole('heading', { name: /agentescala/i })).toBeDefined();
   });
 });

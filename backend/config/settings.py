@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # Aplicação
     APP_NAME: str = "AgentEscala"
-    APP_VERSION: str = "1.5.1"
+    APP_VERSION: str = "1.5.3"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
     CORS_ALLOW_ORIGINS: str = ""
