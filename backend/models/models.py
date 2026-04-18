@@ -53,6 +53,20 @@ class SwapStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
+class FutureShiftRequestStatus(str, enum.Enum):
+    """Status de solicitação prévia de plantão futuro"""
+    ACTIVE = "active"
+    CANCELLED = "cancelled"
+
+
+class ShiftRequestStatus(str, enum.Enum):
+    PENDING_TARGET = "pending_target"
+    PENDING_ADMIN = "pending_admin"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    CANCELLED = "cancelled"
+
+
 class User(Base):
     """Modelo de usuário que representa agentes e administradores"""
     __tablename__ = "users"
@@ -88,6 +102,22 @@ class User(Base):
         back_populates="user",
         uselist=False,
         cascade="all, delete-orphan"
+    )
+    future_shift_requests = relationship(
+        "FutureShiftRequest",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    shift_requests_created = relationship(
+        "ShiftRequest",
+        back_populates="requester",
+        foreign_keys="ShiftRequest.requester_id",
+        cascade="all, delete-orphan"
+    )
+    shift_requests_targeted = relationship(
+        "ShiftRequest",
+        back_populates="target_user",
+        foreign_keys="ShiftRequest.target_user_id"
     )
 
 
@@ -187,6 +217,48 @@ class SwapRequest(Base):
     target_agent = relationship("User", back_populates="swap_requests_received", foreign_keys=[target_agent_id])
     origin_shift = relationship("Shift", back_populates="swap_requests_origin", foreign_keys=[origin_shift_id])
     target_shift = relationship("Shift", back_populates="swap_requests_target", foreign_keys=[target_shift_id])
+    reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+
+class FutureShiftRequest(Base):
+    """Solicitações prévias de plantões futuros feitas pelo próprio usuário"""
+    __tablename__ = "future_shift_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    requested_date = Column(Date, nullable=False, index=True)
+    shift_period = Column(String(40), nullable=False)
+    notes = Column(String, nullable=True)
+    status = Column(SQLEnum(FutureShiftRequestStatus), default=FutureShiftRequestStatus.ACTIVE, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    user = relationship("User", back_populates="future_shift_requests")
+
+
+
+
+class ShiftRequest(Base):
+    """Solicitação de cessão/assunção de plantão sem troca obrigatória."""
+    __tablename__ = "shift_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    requester_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    target_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    target_shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=True, index=True)
+    requested_date = Column(Date, nullable=False, index=True)
+    shift_period = Column(String(40), nullable=False)
+    note = Column(String, nullable=True)
+    status = Column(SQLEnum(ShiftRequestStatus), default=ShiftRequestStatus.PENDING_TARGET, nullable=False)
+    target_response_note = Column(String, nullable=True)
+    admin_notes = Column(String, nullable=True)
+    reviewed_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    requester = relationship("User", back_populates="shift_requests_created", foreign_keys=[requester_id])
+    target_user = relationship("User", back_populates="shift_requests_targeted", foreign_keys=[target_user_id])
+    target_shift = relationship("Shift", foreign_keys=[target_shift_id])
     reviewer = relationship("User", foreign_keys=[reviewed_by])
 
 

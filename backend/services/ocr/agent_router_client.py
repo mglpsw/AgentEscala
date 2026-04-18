@@ -49,7 +49,12 @@ def extract_text_via_agent_router(
     base_url: str,
     timeout_seconds: float,
     verify_ssl: bool,
-    endpoint_candidates: tuple[str, ...] = ("/ocr/extract", "/api/ocr/extract", "/extract"),
+    endpoint_candidates: tuple[str, ...] = (
+        "/ocr/extract",
+        "/ocr/analyze",
+        "/api/ocr/extract",
+        "/extract",
+    ),
 ) -> Dict[str, Any]:
     """Extrai texto via API OCR remota.
 

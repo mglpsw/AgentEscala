@@ -84,9 +84,20 @@ class ShiftService:
         return db.query(Shift).filter(Shift.id == shift_id).first()
 
     @staticmethod
-    def get_shifts_by_agent(db: Session, agent_id: int) -> List[Shift]:
-        """Listar todos os turnos de um agente"""
-        return db.query(Shift).filter(Shift.agent_id == agent_id).all()
+    def get_shifts_by_agent(
+        db: Session,
+        agent_id: int,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> List[Shift]:
+        """Listar todos os turnos de um agente com filtro opcional por período."""
+        query = db.query(Shift).filter(Shift.agent_id == agent_id)
+        if start_date:
+            query = query.filter(Shift.start_time >= datetime.combine(start_date, time.min))
+        if end_date:
+            exclusive_end = datetime.combine(end_date + timedelta(days=1), time.min)
+            query = query.filter(Shift.start_time < exclusive_end)
+        return query.order_by(Shift.start_time.asc()).all()
 
     @staticmethod
     def get_shifts_for_user(
@@ -127,9 +138,21 @@ class ShiftService:
         return query.order_by(Shift.start_time.asc()).all()
 
     @staticmethod
-    def get_all_shifts(db: Session, skip: int = 0, limit: int = 100) -> List[Shift]:
-        """Listar todos os turnos com paginação"""
-        return db.query(Shift).offset(skip).limit(limit).all()
+    def get_all_shifts(
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> List[Shift]:
+        """Listar todos os turnos com paginação e filtro opcional por período."""
+        query = db.query(Shift)
+        if start_date:
+            query = query.filter(Shift.start_time >= datetime.combine(start_date, time.min))
+        if end_date:
+            exclusive_end = datetime.combine(end_date + timedelta(days=1), time.min)
+            query = query.filter(Shift.start_time < exclusive_end)
+        return query.order_by(Shift.start_time.asc()).offset(skip).limit(limit).all()
 
     @staticmethod
     def get_filtered_shifts(
@@ -294,3 +317,56 @@ class ShiftService:
             result.append(item)
 
         return result
+
+
+    @staticmethod
+    def get_dynamic_day_slots(
+        db: Session,
+        start_date: date,
+        end_date: date,
+    ) -> list[dict]:
+        """Configuração dinâmica de turnos por dia com limite de médicos por tipo de plantão."""
+        flags = ShiftService.get_daily_coverage_flags(db, start_date, end_date)
+        shifts = ShiftService.get_filtered_shifts(db, start_date=start_date, end_date=end_date, skip=0, limit=5000)
+
+        indexed: dict[str, dict[str, list[dict]]] = {}
+        for item in flags:
+            indexed[item["date"]] = {
+                "12H DIA": [],
+                "10-22H": [],
+                "12H NOITE": [],
+                "24 HORAS": [],
+            }
+
+        for shift in shifts:
+            day_key = shift.start_time.date().isoformat()
+            if day_key not in indexed:
+                continue
+            plantao_type = ShiftService.infer_plantao_type(shift) or "24 HORAS"
+            if plantao_type not in indexed[day_key]:
+                indexed[day_key][plantao_type] = []
+            indexed[day_key][plantao_type].append({
+                "shift_id": shift.id,
+                "agent_id": shift.agent_id,
+                "agent_name": shift.agent.name if shift.agent else shift.legacy_agent_name,
+                "start_time": shift.start_time.isoformat(),
+                "end_time": shift.end_time.isoformat(),
+            })
+
+        response: list[dict] = []
+        for item in flags:
+            date_key = item["date"]
+            required = item["required"]
+            slots = []
+            for period, required_count in required.items():
+                occupied = indexed[date_key].get(period, [])
+                slots.append({
+                    "period": period,
+                    "max_doctors": required_count,
+                    "occupied_count": len(occupied),
+                    "remaining": max(required_count - len(occupied), 0),
+                    "occupied_shifts": occupied,
+                })
+            response.append({"date": date_key, "slots": slots})
+
+        return response

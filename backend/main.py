@@ -13,7 +13,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from .config.database import init_db
 from .config.settings import settings
-from .api import users, shifts, swaps, auth, schedule_imports, medical_profiles, me, admin_schedule, admin_ocr
+from .api import users, shifts, swaps, auth, schedule_imports, medical_profiles, me, admin_schedule, admin_ocr, shift_requests
 from .api.schemas import HealthResponse
 from .models import User
 from .services.terminal_action_service import TerminalActionExecutor
@@ -103,6 +103,7 @@ def _include_api_routers(prefix: str = "") -> None:
     app.include_router(users.router, prefix=prefix)
     app.include_router(shifts.router, prefix=prefix)
     app.include_router(swaps.router, prefix=prefix)
+    app.include_router(shift_requests.router, prefix=prefix)
     app.include_router(schedule_imports.router, prefix=prefix)
     app.include_router(medical_profiles.router, prefix=prefix)
     app.include_router(me.router, prefix=prefix)
