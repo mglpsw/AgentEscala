@@ -1,0 +1,139 @@
+name: Agent Review (AIOps)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  # ── Review automático em todo PR ─────────────────────────────────────────
+  pr-review:
+    name: Code Review via Agent-Router
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get diff
+        id: diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD --stat | head -30)
+          DIFF_FULL=$(git diff origin/${{ github.base_ref }}...HEAD | head -300)
+          echo "stat<<EOF" >> $GITHUB_OUTPUT
+          echo "$DIFF" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "full<<EOF" >> $GITHUB_OUTPUT
+          echo "$DIFF_FULL" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Call agent-router
+        id: review
+        env:
+          AGENT_URL: ${{ secrets.AGENT_ROUTER_URL || 'https://api.ks-sm.net:9443' }}
+        run: |
+          PROMPT="Você é um revisor de código especializado no projeto AgentEscala (FastAPI + React + PostgreSQL).
+
+          PR: ${{ github.event.pull_request.title }}
+          Branch: ${{ github.head_ref }} → ${{ github.base_ref }}
+
+          Arquivos alterados:
+          ${{ steps.diff.outputs.stat }}
+
+          Diff:
+          ${{ steps.diff.outputs.full }}
+
+          Faça uma revisão de código concisa em português do Brasil.
+          Foque em: bugs, segurança, performance, convenções do projeto.
+          Formato: use markdown com seções curtas. Máximo 400 palavras."
+
+          RESPONSE=$(curl -sf --max-time 60 \
+            "${AGENT_URL}/v1/chat/completions" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg model "agent-router:aiops" \
+              --arg prompt "$PROMPT" \
+              '{model: $model, messages: [{role: "user", content: $prompt}], max_tokens: 800}'
+            )" | jq -r '.choices[0].message.content // "Revisão indisponível."')
+
+          echo "response<<EOF" >> $GITHUB_OUTPUT
+          echo "$RESPONSE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post review comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const review = `## 🤖 Agent Review (AIOps)\n\n${{ steps.review.outputs.response }}\n\n---\n_Revisão automática via agent-router local. Não usa créditos GitHub._`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: review
+            });
+
+  # ── Comando via comentário: /agent <prompt> ───────────────────────────────
+  on-demand:
+    name: Agent on Demand
+    if: |
+      github.event_name == 'issue_comment' &&
+      startsWith(github.event.comment.body, '/agent')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract prompt
+        id: prompt
+        run: |
+          COMMENT="${{ github.event.comment.body }}"
+          PROMPT="${COMMENT#/agent }"
+          echo "prompt=$PROMPT" >> $GITHUB_OUTPUT
+
+      - name: Call agent-router
+        id: agent
+        env:
+          AGENT_URL: ${{ secrets.AGENT_ROUTER_URL || 'https://api.ks-sm.net:9443' }}
+        run: |
+          CONTEXT="Projeto AgentEscala (FastAPI + React + PostgreSQL, homelab CT102).
+          Repositório: ${{ github.repository }}. Branch padrão: main."
+
+          RESPONSE=$(curl -sf --max-time 60 \
+            "${AGENT_URL}/v1/chat/completions" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg model "agent-router:aiops" \
+              --arg ctx "$CONTEXT" \
+              --arg prompt "${{ steps.prompt.outputs.prompt }}" \
+              '{model: $model, messages: [
+                {role: "system", content: $ctx},
+                {role: "user", content: $prompt}
+              ], max_tokens: 800}'
+            )" | jq -r '.choices[0].message.content // "Agente indisponível."')
+
+          echo "response<<EOF" >> $GITHUB_OUTPUT
+          echo "$RESPONSE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post response
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `## 🤖 Agent Response\n\n**Prompt:** \`${{ steps.prompt.outputs.prompt }}\`\n\n${{ steps.agent.outputs.response }}\n\n---\n_via agent-router local (AIOps)_`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
