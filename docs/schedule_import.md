@@ -137,6 +137,21 @@ O sistema tenta resolver o nome do profissional do arquivo para um `User` ativo 
 - **Sem limpeza automática de staging**: `ScheduleImportRow` e `ScheduleImport` ficam no banco indefinidamente (nenhuma purge automática nesta fase)
 - **Sem dry-run de sobreposição com DB**: a verificação de sobreposição com turnos existentes só ocorre na confirmação, não no upload
 
+## Camada documental (Fase 5: XLSX/PDF/OCR normalizado)
+
+Além do fluxo legado (`/schedule-imports`), o sistema agora suporta uma camada
+documental admin-only em `/admin/imports`:
+
+1. `POST /admin/imports/parse-document` (XLSX multiaba ou OCR JSON)
+2. `POST /admin/imports/parse-ocr-payload` (debug com payload estruturado)
+3. `GET /admin/imports/{id}/normalized-preview`
+4. `POST /admin/imports/{id}/apply-to-staging`
+5. `POST /admin/imports/{id}/create-missing-users`
+6. `POST /admin/imports/{id}/confirm`
+
+O pipeline documental **não cria turnos direto**; ele sempre converte para o
+staging já existente (`schedule_imports`) e exige confirmação explícita.
+
 ## Rollback
 
 Para reverter a importação de uma determinada escala **antes** da confirmação:

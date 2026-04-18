@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.6.1] - 2026-04-18
+
+### Adicionado
+- Fase 1: recorrência semanal admin para plantões com preview obrigatório e confirmação em lote via `/admin/recurring-shifts`.
+- suporte backend para batch/auditoria de recorrência (`recurring_shift_batches` e `recurring_shift_batch_items`) com rastreio de conflitos, duplicatas, itens criados e itens pulados.
+- validação de limite de horizonte futuro em até 6 meses na geração da recorrência semanal.
+- UI no painel Admin de Plantões para criar recorrência semanal, visualizar preview e confirmar lote.
+- testes backend cobrindo geração, limite de 6 meses, noturno cruzando dia, duplicata/conflito e regressão de compatibilidade com camada documental `/admin/imports`.
+- confirmação granular por item no batch de recorrência (`item_decisions` com `create|skip|keep_existing`), com auditoria de decisão por item.
+- endpoint de detalhe de batch de recorrência enriquecido com parâmetros do lote, resumo, itens, decisões e shifts criados.
+
+## [1.6.0] - 2026-04-18
+
+### Adicionado
+- nova camada documental admin-only em `/admin/imports` com parsing incremental para XLSX multiaba e payload OCR estruturado, sem bypass de staging/revisão.
+- formato canônico interno normalizado em serviço dedicado para consolidação de cabeçalhos variantes, detecção de mês/ano, normalização de nomes com ruído e interpretação de turno noturno.
+- fluxo adicional parse → normalized-preview → apply-to-staging → confirm, reaproveitando o pipeline legado `/schedule-imports`.
+- endpoint assistido para criação de usuários candidatos (`POST /admin/imports/{id}/create-missing-users`) com trilha de ação no documento.
+- UI mínima de debug OCR na página de importação para colar payload JSON e enviar ao staging de forma conservadora.
+- testes de fase 5 para normalização semântica e fluxo dos novos endpoints.
+
+### Compatibilidade
+- contratos existentes da importação CSV/XLSX não foram removidos nem alterados; a nova camada estende o comportamento já validado.
+
 ## [1.5.5] - 2026-04-17
 
 ### Alterado

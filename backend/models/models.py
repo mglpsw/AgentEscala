@@ -298,6 +298,19 @@ class RowStatus(str, enum.Enum):
     INVALID = "invalid"    # erro fatal – não pode ser importado
 
 
+class RecurringBatchStatus(str, enum.Enum):
+    PREVIEW = "preview"
+    CONFIRMED = "confirmed"
+    FAILED = "failed"
+
+
+class RecurringItemDecisionStatus(str, enum.Enum):
+    PENDING = "pending"
+    SKIPPED_CONFLICT = "skipped_conflict"
+    SKIPPED_DUPLICATE = "skipped_duplicate"
+    CREATED = "created"
+
+
 class ScheduleImport(Base):
     """Lote de importação de escala anterior"""
     __tablename__ = "schedule_imports"
@@ -369,3 +382,52 @@ class ScheduleImportRow(Base):
     schedule_import = relationship("ScheduleImport", back_populates="rows")
     agent = relationship("User", foreign_keys=[agent_id])
     created_shift = relationship("Shift", foreign_keys=[created_shift_id])
+
+
+class RecurringShiftBatch(Base):
+    __tablename__ = "recurring_shift_batches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    weekday = Column(Integer, nullable=False)  # 0=segunda ... 6=domingo (python weekday)
+    shift_label = Column(String(80), nullable=False)
+    start_time = Column(String(5), nullable=False)  # HH:MM
+    end_time = Column(String(5), nullable=False)    # HH:MM
+    start_date = Column(Date, nullable=False, index=True)
+    end_date = Column(Date, nullable=False, index=True)
+    months_ahead = Column(Integer, nullable=False, default=1)
+    notes = Column(Text, nullable=True)
+    status = Column(SQLEnum(RecurringBatchStatus), nullable=False, default=RecurringBatchStatus.PREVIEW)
+
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    confirmed_at = Column(DateTime, nullable=True)
+
+    summary_json = Column(Text, nullable=True, default="{}")
+
+    user = relationship("User", foreign_keys=[user_id])
+    creator = relationship("User", foreign_keys=[created_by])
+    items = relationship("RecurringShiftBatchItem", back_populates="batch", cascade="all, delete-orphan")
+
+
+class RecurringShiftBatchItem(Base):
+    __tablename__ = "recurring_shift_batch_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    batch_id = Column(Integer, ForeignKey("recurring_shift_batches.id", ondelete="CASCADE"), nullable=False, index=True)
+    target_date = Column(Date, nullable=False, index=True)
+    start_datetime = Column(DateTime, nullable=False)
+    end_datetime = Column(DateTime, nullable=False)
+    existing_shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=True)
+    conflict_status = Column(Boolean, nullable=False, default=False)
+    duplicate_status = Column(Boolean, nullable=False, default=False)
+    decision_status = Column(SQLEnum(RecurringItemDecisionStatus), nullable=False, default=RecurringItemDecisionStatus.PENDING)
+    decision_action = Column(String(32), nullable=True)
+    decision_notes = Column(Text, nullable=True)
+    decided_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    decided_at = Column(DateTime, nullable=True)
+    validation_messages = Column(Text, nullable=True)
+    created_shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    batch = relationship("RecurringShiftBatch", back_populates="items")

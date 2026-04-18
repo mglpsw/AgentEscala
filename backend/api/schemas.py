@@ -138,6 +138,90 @@ class ScheduleValidationResponse(BaseModel):
     errors: List[dict]
     total_shifts: int
 
+
+class RecurringShiftPreviewRequest(BaseModel):
+    user_id: int
+    weekday: int = Field(ge=0, le=6)
+    shift_label: str = Field(min_length=2, max_length=80)
+    start_time: str = Field(pattern=r"^\d{2}:\d{2}$")
+    end_time: str = Field(pattern=r"^\d{2}:\d{2}$")
+    start_date: date
+    months_ahead: int = Field(default=1, ge=1, le=6)
+    notes: Optional[str] = Field(default=None, max_length=1000)
+
+
+class RecurringShiftPreviewItem(BaseModel):
+    batch_item_id: int
+    target_date: date
+    weekday: int
+    professional_id: int
+    shift_label: str
+    start_datetime: datetime
+    end_datetime: datetime
+    duration_hours: float
+    duplicate_status: bool
+    conflict_status: bool
+    existing_shift_id: Optional[int] = None
+    validation_messages: List[str] = Field(default_factory=list)
+    decision_action: Optional[str] = None
+    decision_notes: Optional[str] = None
+    created_shift_id: Optional[int] = None
+
+
+class RecurringShiftPreviewResponse(BaseModel):
+    batch_id: int
+    interval_start: date
+    interval_end: date
+    total_generated: int
+    total_conflicts: int
+    total_duplicates: int
+    items: List[RecurringShiftPreviewItem]
+
+
+class RecurringShiftConfirmRequest(RecurringShiftPreviewRequest):
+    include_conflicts: bool = False
+    include_duplicates: bool = False
+    batch_id: Optional[int] = None
+
+
+class RecurringShiftItemDecision(BaseModel):
+    batch_item_id: int
+    decision: str = Field(pattern=r"^(create|skip|keep_existing|overwrite)$")
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class RecurringShiftConfirmRequestV2(RecurringShiftConfirmRequest):
+    item_decisions: List[RecurringShiftItemDecision] = Field(default_factory=list)
+
+
+class RecurringShiftBatchResult(BaseModel):
+    batch_id: int
+    total_generated: int
+    total_conflicts: int
+    total_duplicates: int
+    total_created: int
+    skipped: int
+    created_shift_ids: List[int]
+
+
+class RecurringShiftBatchDetailResponse(BaseModel):
+    batch_id: int
+    user_id: int
+    weekday: int
+    shift_label: str
+    start_time: str
+    end_time: str
+    start_date: date
+    end_date: date
+    months_ahead: int
+    notes: Optional[str] = None
+    status: str
+    created_by: int
+    created_at: datetime
+    confirmed_at: Optional[datetime] = None
+    summary: dict
+    items: List[RecurringShiftPreviewItem]
+
 class FinalScheduleRow(BaseModel):
     shift_id: int
     agent_id: int

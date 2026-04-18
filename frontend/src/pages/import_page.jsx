@@ -337,6 +337,8 @@ function ImportPage() {
   const [importDetail,     setImportDetail]     = useState(null)   // ScheduleImportDetailResponse
   const [confirmResult,    setConfirmResult]    = useState(null)   // ScheduleImportSummary pós-confirm
   const [error,            setError]            = useState('')
+  const [ocrPayloadText,   setOcrPayloadText]   = useState('')
+  const [docImportId,      setDocImportId]      = useState(null)
 
   const handleFileChange = (e) => setSelectedFile(e.target.files[0] ?? null)
 
@@ -421,7 +423,33 @@ function ImportPage() {
     setSummary(null)
     setImportDetail(null)
     setConfirmResult(null)
+    setDocImportId(null)
+    setOcrPayloadText('')
     setError('')
+  }
+
+  const handleParseOcrPayload = async () => {
+    setError('')
+    setPageState(STATE.UPLOADING)
+    try {
+      const payload = JSON.parse(ocrPayloadText || '{}')
+      const { data: parsed } = await api.post('/admin/imports/parse-ocr-payload', {
+        source_filename: 'debug_ocr_payload.json',
+        payload,
+      })
+      setDocImportId(parsed.document_import_id)
+      const { data: applyResult } = await api.post(`/admin/imports/${parsed.document_import_id}/apply-to-staging`)
+      const { data: summaryData } = await api.get(`/schedule-imports/${applyResult.schedule_import_id}/summary`)
+      const { data: detailData } = await api.get(`/schedule-imports/${applyResult.schedule_import_id}`)
+      setSummary(summaryData)
+      setImportDetail(detailData)
+      setPageState(STATE.REVIEWING)
+    } catch (err) {
+      const detail = err?.response?.data?.detail
+      const msg = typeof detail === 'string' ? detail : 'Falha ao processar payload OCR.'
+      setError(msg)
+      setPageState(STATE.IDLE)
+    }
   }
 
   // Tela de sucesso após confirmação bem-sucedida
@@ -452,17 +480,40 @@ function ImportPage() {
 
   // Formulário de upload (estado inicial)
   return (
-    <UploadForm
-      selectedFile={selectedFile}
-      referencePeriod={referencePeriod}
-      sourceDescription={sourceDesc}
-      isUploading={pageState === STATE.UPLOADING}
-      error={error}
-      onFileChange={handleFileChange}
-      onReferencePeriodChange={(e) => setReferencePeriod(e.target.value)}
-      onSourceDescriptionChange={(e) => setSourceDesc(e.target.value)}
-      onSubmit={handleUpload}
-    />
+    <div className="space-y-6">
+      <UploadForm
+        selectedFile={selectedFile}
+        referencePeriod={referencePeriod}
+        sourceDescription={sourceDesc}
+        isUploading={pageState === STATE.UPLOADING}
+        error={error}
+        onFileChange={handleFileChange}
+        onReferencePeriodChange={(e) => setReferencePeriod(e.target.value)}
+        onSourceDescriptionChange={(e) => setSourceDesc(e.target.value)}
+        onSubmit={handleUpload}
+      />
+      <div className="bg-white border border-gray-200 rounded-xl p-4 max-w-3xl">
+        <h3 className="text-sm font-semibold text-gray-700 mb-2">Debug OCR (payload JSON)</h3>
+        <p className="text-xs text-gray-500 mb-2">
+          Fluxo conservador: parse-documento normalizado → apply-to-staging → revisão humana.
+          {docImportId ? ` Último document_import_id: ${docImportId}` : ''}
+        </p>
+        <textarea
+          value={ocrPayloadText}
+          onChange={(e) => setOcrPayloadText(e.target.value)}
+          placeholder='{"pages":[{"page_number":1,"tables":[{"title":"MARÇO/2026","headers":["Profissional","Data","Entrada","Saída"],"rows":[["Maria","01/03/2026","08:00","20:00"]]}]}]}'
+          className="w-full min-h-40 border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono"
+        />
+        <button
+          type="button"
+          onClick={handleParseOcrPayload}
+          disabled={pageState === STATE.UPLOADING || !ocrPayloadText.trim()}
+          className="mt-3 bg-slate-700 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+        >
+          Processar payload OCR e enviar ao staging
+        </button>
+      </div>
+    </div>
   )
 }
 
