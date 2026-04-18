@@ -1,259 +1,251 @@
-# AgentEscala v2.0 — Fase 1 (Passo 1: endurecimento de acesso e RBAC)
+# AgentEscala v2.0 — Fase 1 (PASSO 1 + endurecimento do importador admin)
 
-> Documento atualizado para substituir o plano genérico anterior por um plano **baseado no código real do repositório**. O foco aqui é preparar a base com segurança e controle de acesso antes de evoluir regras de negócio (ex.: preferências de plantão).
+Documento de planejamento conservador e incremental, baseado no código atual do repositório, com prioridade em segurança, RBAC, proteção de rotas e validação de upload.
 
 ## Diagnóstico atual
 
-### 1) Modelagem de usuários, autenticação e permissões
-- Usuários estão em `backend/models/models.py` com `role` (`admin`, `medico`, `financeiro`, `agent` legado), flag `is_admin` e `is_active`.
-- A autenticação JWT está em `backend/api/auth.py` com login/refresh/logout e retorno de `user_role` no login.
-- A autorização de admin depende de `require_admin` em `backend/utils/dependencies.py`, que aceita admin por `role == ADMIN` **ou** `is_admin == true`.
-- Existe dualidade de fonte de verdade de privilégio (`role` e `is_admin`), o que aumenta risco de inconsistência.
+### Usuários, autenticação e permissões
+- Modelo de usuário em `backend/models/models.py`:
+  - `role` enum (`admin`, `medico`, `financeiro`, `agent` legado)
+  - `is_admin` (flag booleana adicional)
+  - `is_active`
+- Autenticação JWT em `backend/api/auth.py`:
+  - `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me`
+  - login aplica `rate_limit_login` (`backend/utils/rate_limiter.py`)
+- Autorização administrativa central em `backend/utils/dependencies.py`:
+  - `require_admin` aceita admin por `role == ADMIN` **ou** `is_admin == true`
+  - há dualidade de fonte de verdade de privilégio (`role` x `is_admin`)
 
-### 2) Endpoints já admin-only (backend)
-**Imports (todos admin-only):** `backend/api/schedule_imports.py`
-- `POST /schedule-imports/`
-- `POST /schedule-imports/{import_id}/validate`
-- `GET /schedule-imports/`
-- `GET /schedule-imports/{import_id}`
-- `GET /schedule-imports/{import_id}/summary`
-- `GET /schedule-imports/{import_id}/rows`
-- `POST /schedule-imports/{import_id}/confirm`
-- `GET /schedule-imports/{import_id}/report`
+### Endpoints já admin-only (estado atual)
+- Importação de escala (todos admin-only) — `backend/api/schedule_imports.py`:
+  - `POST /schedule-imports/`
+  - `POST /schedule-imports/{id}/validate`
+  - `GET /schedule-imports/`
+  - `GET /schedule-imports/{id}`
+  - `GET /schedule-imports/{id}/summary`
+  - `GET /schedule-imports/{id}/rows`
+  - `POST /schedule-imports/{id}/confirm`
+  - `GET /schedule-imports/{id}/report`
+- Turnos admin-only (parcial) — `backend/api/shifts.py`:
+  - `POST /shifts/`, `PATCH /shifts/{id}`, `DELETE /shifts/{id}`, `GET /shifts/consistency-report`
+- Trocas admin-only (parcial) — `backend/api/swaps.py`:
+  - `GET /swaps/pending`, `GET /swaps/export/excel`, `POST /swaps/{id}/approve`, `POST /swaps/{id}/reject`
+- Gestão administrativa de usuários — `backend/api/users.py` (`/admin/users*`, `/admin/audit/users`)
 
-**Turnos admin-only (parciais):** `backend/api/shifts.py`
-- `POST /shifts/`
-- `PATCH /shifts/{shift_id}`
-- `DELETE /shifts/{shift_id}`
-- `GET /shifts/consistency-report`
+### Como a importação está protegida hoje
+- Backend: rotas de import usam `Depends(require_admin)` (proteção correta no servidor).
+- Frontend: rota `/import` exige `ProtectedRoute requiredRole="admin"` (`frontend/src/router/app_router.jsx`) e o menu oculta link de import para não-admin (`frontend/src/components/app_layout.jsx`).
 
-**Trocas admin-only (parciais):** `backend/api/swaps.py`
-- `GET /swaps/pending`
-- `GET /swaps/export/excel`
-- `POST /swaps/{swap_id}/approve`
-- `POST /swaps/{swap_id}/reject`
+### Onde o importador aceita/tenta processar imagem/PDF hoje
+- Backend (`backend/api/schedule_imports.py`) aceita content-type e extensões de:
+  - CSV/XLSX **e também** PDF/imagens (`.pdf`, `.png`, `.jpg`, `.jpeg`, `.webp`, `.tiff`).
+- Frontend (`frontend/src/pages/import_page.jsx`) também anuncia e aceita seleção desses formatos em `accept` e textos da UI.
+- Serviço (`backend/services/import_service.py`) ativa OCR para PDF/imagem:
+  - tenta API OCR (`_read_ocr_via_api`)
+  - fallback local para PDF (`_read_pdf_ocr` com `pypdf`)
+  - fallback local para imagem (`_read_image_ocr` com `Pillow/pytesseract`)
 
-**Admin de usuários/auditoria:** `backend/api/users.py`
-- `GET/POST/PUT/DELETE/PATCH /admin/users...`
-- `GET /admin/audit/users`
-- além dos endpoints legados admin-only em `/users` (create/list/admins/deactivate)
+### Onde nasce o erro técnico de OCR/Pillow/pytesseract
+- Em `backend/services/import_service.py`, `_read_image_ocr()` lança:
+  - `ValueError("OCR de imagem indisponível neste ambiente (dependências Pillow/pytesseract ausentes).")`
+- Esse erro é reempacotado por `process_import_file()` em:
+  - `ValueError("Não foi possível ler o arquivo '<nome>': <erro técnico>")`
+- Em `backend/api/schedule_imports.py`, o `except ValueError` retorna HTTP 422 com `detail=str(exc)`.
+- Resultado: o detalhe técnico interno vaza para o usuário final (falha de UX/escopo nesta fase).
 
-**Outros admin-only:**
-- `POST /api/v1/terminal/action` em `backend/main.py`
-- `POST /admin/schedule/validate` em `backend/api/admin_schedule.py`
+### Como o frontend decide o que mostrar por usuário
+- `AuthProvider` calcula `isAdmin` com `role === 'admin' || is_admin === true` (`frontend/src/contexts/auth_context.jsx`).
+- Rotas admin (`/import`, `/swaps/pending`, `/admin/users`) ficam em guard específico (`frontend/src/router/app_router.jsx`).
+- Menu lateral oculta itens admin para não-admin (`frontend/src/components/app_layout.jsx`).
 
-### 3) Como a importação de escala está protegida hoje
-- Proteção está correta no backend: todos os endpoints de import usam `Depends(require_admin)` em `backend/api/schedule_imports.py`.
-- A rota de UI `/import` é protegida no frontend por `ProtectedRoute requiredRole="admin"` em `frontend/src/router/app_router.jsx`.
-- O menu também oculta “Importar Escala” para não-admin em `frontend/src/components/app_layout.jsx`.
+### Inconsistências backend x frontend de permissões
+- Frontend usa fluxo de “escopo próprio” para turnos do médico (via `user.id`), mas backend ainda permite endpoints amplos para autenticados em `shifts`.
+- Conclusão: backend precisa reforçar escopo/autorização como fonte de verdade (não confiar só na ocultação de UI).
 
-### 4) Como o frontend decide o que mostrar por usuário
-- `AuthProvider` define `isAdmin` por `user.role === 'admin' || user.is_admin === true` em `frontend/src/contexts/auth_context.jsx`.
-- Rotas admin ficam em bloco dedicado no router (`/import`, `/swaps/pending`, `/admin/users`).
-- O menu lateral filtra links admin via `isAdmin`.
-- Páginas de calendário/turnos do médico usam `user.id` do contexto para chamar `/shifts/agent/{user.id}`.
+---
 
-### 5) Gaps de segurança e controle de acesso identificados
-1. **IDOR em turnos**: backend permite qualquer usuário autenticado consultar turnos de qualquer agente em `GET /shifts/agent/{agent_id}` e também listar todos os turnos em `GET /shifts`.
-2. **Exposição ampla de escala**: endpoints de export/lista de `shifts` estão abertos para qualquer autenticado, não apenas admin.
-3. **RBAC híbrido e ambíguo**: coexistência de `role` + `is_admin` como decisão efetiva de permissão.
-4. **Rate limit de login em memória local** (`backend/utils/rate_limiter.py`): não considera `X-Forwarded-For`, não é distribuído entre réplicas.
-5. **Logout/blacklist de refresh em memória** (`backend/utils/token_store.py`): revogação não é persistente entre reinícios.
-6. **Cobertura de testes de autorização ainda parcial**: há bons testes para import/admin, mas falta bloqueio explícito para médico consultar `/shifts/agent/{outro_id}`.
+## Bug atual do importador
 
-### Inconsistências backend x frontend (permissões)
-- **Frontend assume isolamento por usuário** (sempre chama `/shifts/agent/{user.id}`), mas **backend não reforça essa restrição**.
-- Resultado: um cliente malicioso pode chamar API direta e acessar dados além da UI.
-- Conclusão: backend deve ser fonte de verdade e não depender de ocultação de botões/rotas.
+### Sintoma
+Ao enviar `.jpeg` (ou outros arquivos de imagem/PDF sem dependências OCR locais disponíveis), o sistema retorna erro técnico citando indisponibilidade de OCR e dependências (`Pillow/pytesseract`).
+
+### Causa técnica
+1. Upload aceita imagem/PDF no endpoint admin de import.
+2. Pipeline tenta OCR (API externa e fallback local).
+3. Fallback local de imagem depende de libs não garantidas no ambiente.
+4. Mensagem técnica da exceção é propagada para a resposta HTTP.
+
+### Requisito para esta fase
+- Escopo oficial do importador: **somente CSV e XLSX**.
+- Rejeitar PDF/imagem com mensagem funcional e controlada (sem expor dependências internas).
 
 ---
 
 ## Riscos atuais
 
-1. Vazamento de escala entre médicos (confidencialidade de dados operacionais).
-2. Escalonamento indevido por inconsistência entre `role` e `is_admin`.
-3. Contorno de bloqueios de UI via chamadas HTTP diretas.
-4. Mitigação de brute-force limitada em cenários com proxy/replicação.
-5. Perda de trilha de segurança de sessão após restart (revogação volátil).
+1. Ambiguidade de privilégio (`role` vs `is_admin`) gerando decisões inconsistentes de autorização.
+2. Dependência de ocultação de UI sem endurecimento equivalente no backend em alguns fluxos.
+3. Vazamento de detalhes internos de infraestrutura OCR no erro de upload.
+4. Rate limit de login em memória local (não distribuído por réplica/proxy por padrão).
+5. Revogação de refresh token em memória (`token_store`) volátil em restart.
 
 ---
 
-## Plano por etapas (PASSO 1 conservador)
+## Plano por etapas (conservador e incremental)
 
-### Etapa A — Consolidar RBAC sem quebrar contratos
-- Manter compatibilidade com `UserRole` atual, mas definir regra operacional única:
-  - **admin efetivo** = `role == admin` (fonte primária)
-  - `is_admin` mantido como campo legado/espelho temporário.
-- Centralizar helper em `dependencies.py`:
+### Etapa 1 — Consolidar RBAC sem quebrar compatibilidade
+- Padronizar helper de decisão admin em `backend/utils/dependencies.py`:
   - `is_effective_admin(user)`
-  - `require_admin` passa a usar helper central.
-- Não remover papéis existentes neste passo; apenas clarificar e padronizar verificação.
+  - `require_admin` usa helper único
+- Manter campos atuais (`role`, `is_admin`) na Fase 1, sem migração ampla de banco.
 
-### Etapa B — Backend como fonte de verdade para escopo de dados
-- Endurecer `GET /shifts/agent/{agent_id}`:
-  - admin acessa qualquer `agent_id`
-  - médico só acessa o próprio `current_user.id`
-  - senão, `403`.
-- Revisar `GET /shifts` e exports (`/shifts/export*`, `/shifts/final-schedule`) com política explícita:
-  - opção conservadora recomendada: admin-only para visão global;
-  - médicos usam `/me/shifts` como rota oficial de visão própria.
-- Preservar resposta/shape quando permitido, evitando quebra de frontend.
+### Etapa 2 — Importação estritamente admin + validação estrita de arquivo
+- Backend `schedule_imports`:
+  - aceitar oficialmente apenas CSV/XLSX
+  - remover aceitação de PDF/imagem no endpoint desta fase
+  - retornar 415/422 com mensagem funcional: ex.
+    - “Formato não suportado nesta fase. Envie CSV ou XLSX.”
+- Serviço `import_service`:
+  - não acionar OCR para uploads de import padrão nesta fase
+  - evitar encadear mensagens técnicas de dependências para resposta do usuário
+- Frontend `import_page`:
+  - `accept` apenas `.csv,.xlsx,.xls`
+  - atualizar textos de ajuda para remover referência a PDF/imagens
 
-### Etapa C — Importação/revisão/confirmação estritamente admin-only (hardening)
-- Manter proteção atual dos endpoints (já correta).
-- Adicionar testes de regressão para garantir que nenhum endpoint de import perca `require_admin`.
-- Documentar no backend README e docs operacionais que import é ação exclusiva de admin.
+### Etapa 3 — Backend como fonte de verdade para autorização
+- Revisar rotas de `shifts` com escopo por papel:
+  - admin com visão ampla
+  - médico limitado ao próprio escopo
+- Evitar depender de guardas apenas no frontend.
 
-### Etapa D — Frontend por papel (ocultação + alinhamento)
-- Continuar ocultação de rotas/menu admin.
-- Ajustar telas de médico para usar apenas `/me/shifts` onde fizer sentido (reduz dependência de endpoint amplo).
-- Exibir estado de acesso negado amigável quando API retornar 403.
+### Etapa 4 — Hardening de autenticação e auditoria mínima
+- Login rate-limit: manter solução atual (conservadora), com melhorias incrementais em telemetria e identificação de origem quando houver proxy confiável.
+- Auditoria mínima:
+  - manter `AdminUserAuditLog` para ações administrativas
+  - adicionar logs estruturados de autenticação (sucesso, falha, bloqueio 429)
 
-### Etapa E — Login hardening e auditoria mínima
-- Rate limit:
-  - manter implementação atual no passo 1 (baixo risco),
-  - incluir leitura opcional de IP real via proxy confiável (configurável),
-  - adicionar métricas/contadores de bloqueio 429.
-- Auditoria:
-  - manter `AdminUserAuditLog` para ações de usuários,
-  - adicionar logs mínimos de autenticação (sucesso/falha/login bloqueado por rate-limit).
-  - não criar grandes mudanças de banco agora; priorizar logs estruturados.
-
-### Etapa F — Testes automatizados de autorização e regressão
-- Novos testes de autorização para `shifts` (IDOR).
-- Reforço de testes para import admin-only e rotas admin do frontend.
-- Rodar regressão de login JWT, import CSV/XLSX, OCR e swaps.
+### Etapa 5 — Regressão orientada por testes
+- Garantir não quebra de:
+  - login JWT
+  - swaps
+  - calendário/minha escala
+  - import CSV/XLSX com staging/confirm
 
 ---
 
 ## Arquivos que precisarão ser alterados
 
-### Backend (prioridade alta)
+### Backend
 1. `backend/utils/dependencies.py`
-   - padronizar helper de admin efetivo.
-2. `backend/api/shifts.py`
-   - reforçar autorização por recurso (`/agent/{id}`, listas/export).
-3. `backend/services/shift_service.py`
-   - opcional: adicionar métodos com escopo por usuário/admin para reduzir lógica no router.
-4. `backend/api/auth.py`
-   - logs mínimos de autenticação e resposta consistente de papel.
-5. `backend/utils/rate_limiter.py`
-   - melhoria conservadora de identificação de IP sob proxy confiável.
+   - helper único de admin efetivo.
+2. `backend/api/schedule_imports.py`
+   - validação de content-type/extensão restrita a CSV/XLSX e mensagem amigável para formatos não suportados.
+3. `backend/services/import_service.py`
+   - não propagar erro técnico de OCR ao usuário no fluxo de import padrão desta fase.
+4. `backend/api/shifts.py`
+   - reforço de autorização por escopo (admin vs médico).
+5. `backend/api/auth.py` e/ou camada de observabilidade
+   - logs mínimos de autenticação.
 
-### Frontend (prioridade média)
-6. `frontend/src/pages/calendar_page.jsx`
-7. `frontend/src/pages/shifts_page.jsx`
-   - migrar consumo para rotas de “meu escopo” quando aplicável.
+### Frontend
+6. `frontend/src/pages/import_page.jsx`
+   - restringir `accept` e textos da UI para CSV/XLSX.
+7. `frontend/src/router/app_router.jsx` e `frontend/src/components/app_layout.jsx`
+   - manter/validar guardas admin de import.
 8. `frontend/src/contexts/auth_context.jsx`
-   - manter cálculo de admin alinhado com backend (sem ampliar privilégios).
-9. `frontend/src/router/app_router.jsx` e `frontend/src/components/app_layout.jsx`
-   - manter/ajustar guardas e ocultação de UI por papel (sem alterar UX principal).
+   - manter alinhamento de papel admin com backend.
 
 ### Testes
-10. `tests/test_routers.py`
-11. `tests/test_api.py`
-12. `tests/test_import.py`
-13. `tests/test_rate_limit.py`
-   - ampliar casos de autorização e não-regressão.
+9. `tests/test_import.py`
+   - validar rejeição amigável de PDF/JPG/JPEG/PNG para importador.
+10. `tests/test_routers.py` / `tests/test_api.py`
+   - autorização por escopo em rotas de turnos e import.
+11. `tests/test_rate_limit.py`
+   - garantir regressão zero no bloqueio de login (429).
 
 ---
 
 ## Impacto esperado
 
 ### Ganhos
-- Redução de risco de acesso indevido (IDOR).
-- RBAC mais previsível e auditável.
-- Garantia formal de import admin-only no backend (fonte de verdade).
-- Base segura para, depois, incluir aba de preferências sem confundir permissões.
+- Segurança e previsibilidade maiores no controle de acesso.
+- Importador com escopo claro (CSV/XLSX), UX mais limpa e sem vazamento técnico.
+- Base preparada para futura aba de preferências, mantendo decisão final com admin.
 
-### Custo/impacto operacional
-- Mudanças pequenas e localizadas em autorização.
-- Sem necessidade de migração de banco ampla neste passo.
-- Possível ajuste fino de frontend para endpoints de escopo próprio.
+### Impacto operacional
+- Mudanças localizadas em validação e autorização.
+- Sem reescrita arquitetural e sem migração ampla de banco na Fase 1.
 
 ---
 
-## Testes necessários (obrigatórios)
+## Testes necessários
 
-### Autorização backend
-1. Médico não pode acessar `/shifts/agent/{outro_id}` → `403`.
-2. Médico não pode usar endpoints globais definidos como admin-only (`/shifts` e exports, se endurecidos) → `403`.
-3. Admin continua acessando tudo normalmente → `200`.
+### Autorização
+1. Não-admin recebe `403` em todas as rotas administrativas de import.
+2. Não-admin não acessa escopo de outro usuário em rotas de turnos após hardening.
+3. Admin mantém acesso normal aos fluxos de gestão.
 
-### Import admin-only
-4. Médico em qualquer rota `/schedule-imports/*` → `403`.
-5. Admin upload/validate/confirm/report permanece funcional.
+### Upload/validação de formato
+4. Upload CSV válido continua funcionando.
+5. Upload XLSX válido continua funcionando.
+6. Upload PDF retorna erro funcional controlado (sem stack/detail técnico interno).
+7. Upload JPG/JPEG/PNG retorna erro funcional controlado (sem menção a Pillow/pytesseract).
 
-### Auth/rate-limit
-6. `/auth/login` mantém `429` após limite.
-7. Login válido continua emitindo access+refresh sem regressão.
-
-### Frontend/regressão
-8. Rotas `/import`, `/swaps/pending`, `/admin/users` continuam inacessíveis para não-admin.
-9. Calendário e Minha Escala de médico continuam funcionais após endurecimento.
-10. Fluxo de swaps e OCR/import staging não quebra.
+### Regressão
+8. Login + refresh + logout sem regressão.
+9. Calendário e “Minha Escala” continuam operando.
+10. Swaps continuam operando.
+11. Rate-limit de login mantém comportamento 429.
 
 ---
 
 ## Riscos de regressão
 
-1. Frontend atual usa `/shifts/agent/{user.id}`; se política mudar abruptamente sem fallback, pode haver erro de carregamento.
-2. Endpoints de export usados por usuários não-admin podem deixar de funcionar caso virem admin-only sem ajuste de UX.
-3. Ajustes no helper de admin podem impactar usuários legados com `is_admin=true` e `role` divergente.
+1. Frontend de import ainda aceitar formato antigo se não for alinhado com backend.
+2. Endpoints de import podem quebrar clientes antigos que tentavam PDF/imagem.
+3. Endurecimento de autorização em `shifts` pode impactar telas que dependam de visão ampla sem perfil admin.
 
 ### Mitigação
-- Implementar validações com feature flag leve (se necessário) para rollout gradual.
-- Atualizar testes antes de endurecer regra.
-- Fazer deploy em CT 102 com smoke test controlado.
+- Implementação em commits pequenos com testes por etapa.
+- Mensagens de erro estáveis e funcionais.
+- Deploy gradual com smoke tests no CT 102.
 
 ---
 
 ## Ordem recomendada de implementação
 
-1. **Testes primeiro (red/green de segurança)**
-   - criar testes que capturem IDOR e regras admin-only esperadas.
-2. **Padronização RBAC em `dependencies.py`**
-   - helper único de decisão admin.
-3. **Hardening de `backend/api/shifts.py`**
-   - bloquear acesso cruzado por `agent_id`.
-4. **Ajuste mínimo frontend (se necessário)**
-   - usar endpoints no escopo próprio (`/me/shifts`) para médico.
-5. **Logs mínimos de autenticação + ajuste rate-limit conservador**
-6. **Rodada completa de regressão (auth/import/OCR/swaps/admin UI)**
-7. **Deploy incremental no CT 102 + monitoramento CT 200**
+1. Testes de upload/autorizações (incluindo rejeição de PDF/imagem) — primeiro.
+2. Restrição de upload no backend (`schedule_imports`) para CSV/XLSX.
+3. Ajuste de mensagens funcionais e sanitização de erro no `import_service`.
+4. Ajuste de UI do importador (accept + textos).
+5. Hardening de autorização por escopo em `shifts`.
+6. Ajustes finos de logs de autenticação e auditoria mínima.
+7. Regressão completa e validação de deploy.
 
 ---
 
 ## Plano de Execução da Fase 1 (commits pequenos e seguros)
 
-### Commit 1 — testes de autorização de escopo
-- adicionar testes para bloquear `/shifts/agent/{outro_id}` para médico.
-- reforçar testes de import admin-only (todas as rotas críticas).
+### Commit 1 — testes de base de segurança (já iniciado)
+- Cobertura de admin-only em import e cenário de escopo de turnos (teste alvo de hardening).
 
-### Commit 2 — helper de RBAC central
-- introduzir `is_effective_admin` em `dependencies.py`.
-- ajustar `require_admin` para usar helper.
+### Commit 2 — importador admin estrito em CSV/XLSX
+- Backend rejeita PDF/imagem com mensagem funcional controlada.
+- Sem OCR no fluxo padrão desta fase.
 
-### Commit 3 — hardening do router de shifts
-- aplicar checagem de ownership/admin em `/shifts/agent/{id}`.
-- decidir e aplicar política explícita para `/shifts` e exports globais.
+### Commit 3 — frontend alinhado ao escopo oficial de upload
+- `accept` e textos da página de import atualizados para CSV/XLSX.
 
-### Commit 4 — alinhamento frontend mínimo
-- garantir que páginas de médico consumam rotas de escopo próprio.
-- manter ocultação de UI por papel já existente.
+### Commit 4 — hardening de autorização por escopo em turnos
+- backend reforça ownership/admin no acesso por agente.
 
-### Commit 5 — observabilidade de auth/rate-limit
-- logs estruturados para login sucesso/falha/429.
-- melhoria conservadora da origem de IP sob proxy confiável.
-
-### Commit 6 — regressão e documentação operacional
-- atualizar docs (`docs/operations.md`/README backend) com matriz de permissões.
-- executar suíte alvo de regressão e registrar evidências.
+### Commit 5 — logs mínimos de autenticação + regressão
+- observabilidade mínima de login e ações admin críticas.
+- rodada de testes de regressão.
 
 ---
 
-## Fora de escopo deste PASSO 1
-- Implementação da aba de preferências de plantão.
-- Mudanças amplas de schema de banco para novas features de negócio.
-- Reescrita arquitetural de autenticação/autorização.
-
+## Fora de escopo nesta fase
+- Implementar a aba de preferências de plantão.
+- Reativar OCR no importador padrão.
+- Migrações amplas de banco sem necessidade de segurança imediata.
