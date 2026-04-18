@@ -93,10 +93,16 @@ function CalendarPage() {
   const [reload_key, set_reload_key] = useState(0)
   const [coverageFlags, setCoverageFlags] = useState([])
   const last_range_key = useRef('')
+  const user_id = user?.id
+  const user_name = user?.name
 
   const visible_range_key = useMemo(
     () => `${visible_range.start.toISOString()}::${visible_range.end.toISOString()}`,
     [visible_range],
+  )
+  const current_user = useMemo(
+    () => (user_id ? { id: user_id, name: user_name } : null),
+    [user_id, user_name],
   )
 
   const handle_dates_set = useCallback((date_info) => {
@@ -117,7 +123,7 @@ function CalendarPage() {
   }, [])
 
   useEffect(() => {
-    if (!user?.id) {
+    if (!current_user?.id) {
       set_is_loading(false)
       return undefined
     }
@@ -155,7 +161,7 @@ function CalendarPage() {
 
         const next_events = data
           .filter((shift) => shift_overlaps_range(shift, visible_range))
-          .map((shift) => map_shift_to_event(shift, user))
+          .map((shift) => map_shift_to_event(shift, current_user))
 
         set_events(next_events)
       } catch (request_error) {
@@ -176,7 +182,7 @@ function CalendarPage() {
     load_shifts()
 
     return () => controller.abort()
-  }, [reload_key, user?.id, user?.name, visible_range, visible_range_key])
+  }, [current_user, reload_key, visible_range, visible_range_key])
 
   const has_no_shifts = !is_loading && !error && events.length === 0
   const incompleteDays = new Set(
