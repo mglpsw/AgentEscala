@@ -49,14 +49,17 @@ function map_shift_to_event(shift, currentUserId) {
 function compactName(name) {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean)
   if (parts.length <= 1) return parts[0] || '—'
-  return `${parts[0]} ${parts[1][0]}.`
+  const first = parts[0]
+  const second = parts.length > 2 ? parts[parts.length - 1] : parts[1]
+  return `${first} ${second[0]}.`
 }
 
-function compactShiftLabel(shift) {
+function compactShiftTime(shift) {
   const start = new Date(shift.start_time)
   const end = new Date(shift.end_time)
-  const s = `${String(start.getHours()).padStart(2, '0')}-${String(end.getHours()).padStart(2, '0')}`
-  return `${compactName(shift.agent?.name)} ${s}`
+  const s = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`
+  const e = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`
+  return `${s}-${e}`
 }
 
 function escapeHtml(value) {
@@ -79,6 +82,16 @@ function inferPeriodFromShift(shift) {
   if (s === 20 && (e === 7 || e === 8)) return '12H NOITE'
   if (s === 10 && e === 22) return '10-22H'
   return '12H DIA'
+}
+
+function periodVisual(period) {
+  const map = {
+    '12H DIA': { bg: '#dcfce7', text: '#166534', border: '#86efac' },
+    '10-22H': { bg: '#fef3c7', text: '#92400e', border: '#fcd34d' },
+    '12H NOITE': { bg: '#dbeafe', text: '#1e3a8a', border: '#93c5fd' },
+    '24 HORAS': { bg: '#ede9fe', text: '#5b21b6', border: '#c4b5fd' },
+  }
+  return map[period] || { bg: '#f3f4f6', text: '#374151', border: '#d1d5db' }
 }
 
 function map_request_to_event(request) {
@@ -325,9 +338,29 @@ function CalendarPage() {
                   const items = daySummaryMap[dateKey] || []
                   const safeDayNumber = escapeHtml(arg.dayNumberText)
                   if (items.length === 0) return { html: `<div class="fc-daygrid-day-number">${safeDayNumber}</div>` }
-                  const lines = items.slice(0, 4).map((shift) => `<div class="text-[10px] leading-3 truncate">${escapeHtml(compactShiftLabel(shift))}</div>`).join('')
-                  const more = items.length > 4 ? `<div class="text-[10px] text-gray-500">+${items.length - 4}</div>` : ''
-                  return { html: `<div class="fc-daygrid-day-number">${safeDayNumber}</div><div>${lines}${more}</div>` }
+                  const lines = items.slice(0, 4).map((shift) => {
+                    const period = inferPeriodFromShift(shift)
+                    const visual = periodVisual(period)
+                    return [
+                      '<div style="display:flex;align-items:center;gap:4px;padding:1px 4px;border-radius:6px;border:1px solid;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:18px;',
+                      `background:${visual.bg};color:${visual.text};border-color:${visual.border};font-size:10px;line-height:12px;">`,
+                      `<span style="font-weight:600;">${escapeHtml(compactName(shift.agent?.name || ''))}</span>`,
+                      `<span style="opacity:.9;">${escapeHtml(compactShiftTime(shift))}</span>`,
+                      '</div>',
+                    ].join('')
+                  }).join('')
+                  const more = items.length > 4
+                    ? `<div style="font-size:10px;line-height:12px;color:#4b5563;font-weight:600;padding-left:2px;">+${items.length - 4}</div>`
+                    : ''
+                  return {
+                    html: [
+                      `<div class="fc-daygrid-day-number">${safeDayNumber}</div>`,
+                      '<div style="display:flex;flex-direction:column;gap:2px;padding-top:2px;">',
+                      lines,
+                      more,
+                      '</div>',
+                    ].join(''),
+                  }
                 }}
                 datesSet={handleDatesSet}
                 events={events}
@@ -339,10 +372,17 @@ function CalendarPage() {
       </section>
 
       {menuOpen ? (
-        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-4 fixed inset-x-2 bottom-2 top-20 overflow-y-auto z-20 md:static md:inset-auto">
+        <>
+          <button
+            type="button"
+            aria-label="Fechar painel"
+            className="fixed inset-0 z-10 bg-black/35 md:hidden"
+            onClick={() => setMenuOpen(false)}
+          />
+          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-4 fixed inset-x-2 bottom-2 top-20 overflow-y-auto z-20 md:static md:inset-auto md:z-auto" role="dialog" aria-modal="true">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-800">Ações do dia {selectedDate}</h3>
-            <button type="button" className="rounded border px-2 py-1 text-sm" onClick={() => setMenuOpen(false)}>⋯</button>
+            <button type="button" className="rounded border px-3 py-1.5 text-sm font-medium" onClick={() => setMenuOpen(false)}>Fechar</button>
           </div>
 
           {requestError ? <p className="text-sm text-red-600">{requestError}</p> : null}
@@ -362,14 +402,17 @@ function CalendarPage() {
 
           <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
             <p className="text-xs font-semibold text-gray-700 mb-2">Escala completa do dia ({selectedDayItems.length})</p>
-            <div className="space-y-1">
-              {selectedDayItems.slice(0, 20).map((item) => (
-                <div key={item.id} className="rounded border border-gray-200 bg-white p-2 text-xs">
-                  <div className="font-medium text-gray-800">{item.agent?.name || 'Profissional'}</div>
-                  <div className="text-gray-600">{new Date(item.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - {new Date(item.end_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · {inferPeriodFromShift(item)}</div>
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+              {selectedDayItems.map((item) => (
+                <div key={item.id} className="rounded border border-gray-200 bg-white p-2.5 text-xs">
+                  <div className="font-medium text-gray-800 break-words">{item.agent?.name || 'Profissional'}</div>
+                  <div className="text-gray-600 mt-0.5">{compactShiftTime(item)}</div>
+                  <div className="mt-1">
+                    <span className="inline-flex rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700">{inferPeriodFromShift(item)}</span>
+                  </div>
                 </div>
               ))}
-              {selectedDayItems.length === 0 ? <p className="text-xs text-gray-500">Sem plantonistas no dia.</p> : null}
+              {selectedDayItems.length === 0 ? <p className="rounded border border-dashed border-gray-300 bg-white p-3 text-xs text-gray-500">Sem plantonistas no dia selecionado.</p> : null}
             </div>
           </div>
 
@@ -406,7 +449,8 @@ function CalendarPage() {
               </form>
             ) : null}
           </div>
-        </section>
+          </section>
+        </>
       ) : null}
 
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
