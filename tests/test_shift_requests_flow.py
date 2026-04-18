@@ -51,10 +51,6 @@ def test_shift_request_flow_target_user_then_admin(client, admin_headers):
         target_shift_id = bob_shift.id
     finally:
         db.close()
-    shifts = client.get('/shifts', headers=alice_headers).json()
-    bob_shift = next(item for item in shifts if item['agent']['email'] == 'bob@agentescala.com')
-    requested_date = bob_shift['start_time'][:10]
-
     create = client.post(
         '/shift-requests/',
         headers=alice_headers,
@@ -63,7 +59,6 @@ def test_shift_request_flow_target_user_then_admin(client, admin_headers):
             'shift_period': '12H NOITE',
             'note': 'Quero cobrir este turno',
             'target_shift_id': target_shift_id,
-            'target_shift_id': bob_shift['id'],
         },
     )
     assert create.status_code == 201

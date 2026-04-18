@@ -26,7 +26,7 @@ function SwapForm({ onCreated }) {
 
   // Carrega turnos de outros agentes
   useEffect(() => {
-    api.get('/shifts')
+    api.get('/shifts/')
       .then(res => {
         // Filtra apenas turnos de outros agentes
         setOtherShifts(res.data.filter(s => s.agent_id !== user?.id))
@@ -47,7 +47,7 @@ function SwapForm({ onCreated }) {
     setError('')
     setSuccess('')
     try {
-      await api.post('/swaps', {
+      await api.post('/swaps/', {
         target_agent_id: Number(targetAgentId),
         origin_shift_id: Number(originShiftId),
         target_shift_id: Number(targetShiftId),

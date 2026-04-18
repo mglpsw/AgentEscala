@@ -222,8 +222,8 @@ if _FRONTEND_DIST.is_dir():
     # Qualquer outro caminho não-encontrado é tratado como rota SPA → index.html.
     _API_PATH_PREFIXES = (
         "/auth", "/users", "/shifts", "/swaps", "/schedule-imports",
-        "/health", "/metrics", "/docs", "/redoc", "/openapi", "/api",
-        "/assets",
+        "/me", "/shift-requests", "/admin", "/health", "/metrics",
+        "/docs", "/redoc", "/openapi", "/api", "/media", "/assets",
     )
 
     @app.exception_handler(404)

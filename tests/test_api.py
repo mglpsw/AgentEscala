@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from backend.config.database import SessionLocal
+from backend.config.settings import settings
 from backend.models import Shift, User, UserRole
 from backend.utils.auth import get_password_hash
 
@@ -10,7 +11,7 @@ def test_healthcheck_is_public(client):
 
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"
-    assert response.json()["version"] == "1.5.1"
+    assert response.json()["version"] == settings.APP_VERSION
     assert response.json()["database"] in {"up", "down"}
     assert response.json()["ocr"] in {"enabled", "disabled"}
 
