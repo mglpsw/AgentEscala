@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.6.1] - 2026-04-18
+
+### Adicionado
+- Fase 1: recorrência semanal admin para plantões com preview obrigatório e confirmação em lote via `/admin/recurring-shifts`.
+- suporte backend para batch/auditoria de recorrência (`recurring_shift_batches` e `recurring_shift_batch_items`) com rastreio de conflitos, duplicatas, itens criados e itens pulados.
+- validação de limite de horizonte futuro em até 6 meses na geração da recorrência semanal.
+- UI no painel Admin de Plantões para criar recorrência semanal, visualizar preview e confirmar lote.
+- testes backend cobrindo geração, limite de 6 meses, noturno cruzando dia, duplicata/conflito e regressão de compatibilidade com camada documental `/admin/imports`.
+
 ## [1.6.0] - 2026-04-18
 
 ### Adicionado

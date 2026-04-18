@@ -21,6 +21,15 @@ const EXTRA_OPTIONS = [
   { key: SHIFT_TYPES.NIGHT, label: '12H NOITE (20-08)', start: '20:00', end: '08:00' },
   { key: SHIFT_TYPES.FULL, label: '24 HORAS', start: '00:00', end: '00:00' },
 ]
+const WEEKDAY_OPTIONS = [
+  { value: 0, label: 'Segunda-feira' },
+  { value: 1, label: 'Terça-feira' },
+  { value: 2, label: 'Quarta-feira' },
+  { value: 3, label: 'Quinta-feira' },
+  { value: 4, label: 'Sexta-feira' },
+  { value: 5, label: 'Sábado' },
+  { value: 6, label: 'Domingo' },
+]
 
 function nextDay(dateStr) {
   const d = new Date(`${dateStr}T00:00:00`)
@@ -78,6 +87,17 @@ export default function AdminPlantoesPage() {
 
   const [firstType, setFirstType] = useState(SHIFT_TYPES.DAY)
   const [slotAssignments, setSlotAssignments] = useState({})
+  const [recurringForm, setRecurringForm] = useState({
+    user_id: '',
+    weekday: 0,
+    shift_label: SHIFT_TYPES.DAY,
+    start_time: '08:00',
+    end_time: '20:00',
+    start_date: new Date().toISOString().slice(0, 10),
+    months_ahead: 1,
+    notes: '',
+  })
+  const [recurringPreview, setRecurringPreview] = useState(null)
 
   const template = useMemo(() => slotTemplate(firstType), [firstType])
 
@@ -97,6 +117,9 @@ export default function AdminPlantoesPage() {
         setSelectedUserId(String(usersResp.data[0].id))
       }
       if (!extraUserId && usersResp.data.length > 0) setExtraUserId(String(usersResp.data[0].id))
+      if (!recurringForm.user_id && usersResp.data.length > 0) {
+        setRecurringForm((prev) => ({ ...prev, user_id: String(usersResp.data[0].id) }))
+      }
       setShifts(shiftsResp.data.filter((s) => s.start_time?.slice(0, 10) === date))
       setCoverage(coverageResp.data?.[0] ?? null)
     } catch {
@@ -185,6 +208,49 @@ export default function AdminPlantoesPage() {
       await loadData()
     } catch {
       setError('Falha ao remover plantão.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRecurringPreview = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const payload = {
+        ...recurringForm,
+        user_id: Number(recurringForm.user_id),
+        weekday: Number(recurringForm.weekday),
+        months_ahead: Number(recurringForm.months_ahead),
+      }
+      const { data } = await api.post('/admin/recurring-shifts/preview', payload)
+      setRecurringPreview(data)
+    } catch (e) {
+      setError(e?.response?.data?.detail || 'Falha ao gerar preview da recorrência.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRecurringConfirm = async () => {
+    if (!recurringPreview) return
+    setLoading(true)
+    setError('')
+    try {
+      const payload = {
+        ...recurringForm,
+        user_id: Number(recurringForm.user_id),
+        weekday: Number(recurringForm.weekday),
+        months_ahead: Number(recurringForm.months_ahead),
+        batch_id: recurringPreview.batch_id,
+        include_conflicts: false,
+        include_duplicates: false,
+      }
+      const { data } = await api.post('/admin/recurring-shifts/confirm', payload)
+      await loadData()
+      setRecurringPreview((prev) => ({ ...prev, result: data }))
+    } catch (e) {
+      setError(e?.response?.data?.detail || 'Falha ao confirmar recorrência semanal.')
     } finally {
       setLoading(false)
     }
@@ -338,6 +404,111 @@ export default function AdminPlantoesPage() {
             ))}
           </tbody>
         </table>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+        <h3 className="text-lg font-semibold text-gray-800">Criar recorrência semanal</h3>
+        <p className="text-xs text-gray-500">Preview obrigatório. Limite máximo de 6 meses.</p>
+        <div className="grid gap-3 md:grid-cols-4">
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Profissional</label>
+            <select
+              value={recurringForm.user_id}
+              onChange={(e) => setRecurringForm((p) => ({ ...p, user_id: e.target.value }))}
+              className="rounded border px-3 py-2 text-sm w-full"
+            >
+              {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Dia da semana</label>
+            <select
+              value={recurringForm.weekday}
+              onChange={(e) => setRecurringForm((p) => ({ ...p, weekday: Number(e.target.value) }))}
+              className="rounded border px-3 py-2 text-sm w-full"
+            >
+              {WEEKDAY_OPTIONS.map((w) => <option key={w.value} value={w.value}>{w.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Turno</label>
+            <select
+              value={recurringForm.shift_label}
+              onChange={(e) => {
+                const selected = EXTRA_OPTIONS.find((item) => item.key === e.target.value)
+                setRecurringForm((p) => ({ ...p, shift_label: e.target.value, start_time: selected?.start || p.start_time, end_time: selected?.end || p.end_time }))
+              }}
+              className="rounded border px-3 py-2 text-sm w-full"
+            >
+              {EXTRA_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Data inicial</label>
+            <input type="date" value={recurringForm.start_date} onChange={(e) => setRecurringForm((p) => ({ ...p, start_date: e.target.value }))} className="rounded border px-3 py-2 text-sm w-full" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Hora início</label>
+            <input type="time" value={recurringForm.start_time} onChange={(e) => setRecurringForm((p) => ({ ...p, start_time: e.target.value }))} className="rounded border px-3 py-2 text-sm w-full" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Hora fim</label>
+            <input type="time" value={recurringForm.end_time} onChange={(e) => setRecurringForm((p) => ({ ...p, end_time: e.target.value }))} className="rounded border px-3 py-2 text-sm w-full" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Meses</label>
+            <input type="number" min="1" max="6" value={recurringForm.months_ahead} onChange={(e) => setRecurringForm((p) => ({ ...p, months_ahead: Math.max(1, Math.min(6, Number(e.target.value) || 1)) }))} className="rounded border px-3 py-2 text-sm w-full" />
+          </div>
+          <div className="md:col-span-4">
+            <label className="block text-xs text-gray-600 mb-1">Notas</label>
+            <input type="text" value={recurringForm.notes} onChange={(e) => setRecurringForm((p) => ({ ...p, notes: e.target.value }))} className="rounded border px-3 py-2 text-sm w-full" />
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={handleRecurringPreview} disabled={loading || !recurringForm.user_id} className="rounded bg-slate-700 px-4 py-2 text-sm text-white disabled:opacity-50">Gerar preview</button>
+          <button onClick={handleRecurringConfirm} disabled={loading || !recurringPreview} className="rounded bg-green-600 px-4 py-2 text-sm text-white disabled:opacity-50">Confirmar criação em lote</button>
+        </div>
+
+        {recurringPreview ? (
+          <div className="rounded border border-gray-200 p-3">
+            <p className="text-sm text-gray-700">
+              Intervalo: {recurringPreview.interval_start} até {recurringPreview.interval_end} ·
+              Total: {recurringPreview.total_generated} ·
+              Conflitos: {recurringPreview.total_conflicts} ·
+              Duplicatas: {recurringPreview.total_duplicates}
+            </p>
+            {recurringPreview?.result ? (
+              <p className="text-sm text-green-700 mt-1">
+                Criados: {recurringPreview.result.total_created} · Pulados: {recurringPreview.result.skipped}
+              </p>
+            ) : null}
+            <div className="max-h-56 overflow-auto mt-2 border rounded">
+              <table className="min-w-full text-xs">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-2 py-1 text-left">Data</th>
+                    <th className="px-2 py-1 text-left">Início</th>
+                    <th className="px-2 py-1 text-left">Fim</th>
+                    <th className="px-2 py-1 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recurringPreview.items.map((item) => (
+                    <tr key={`${item.target_date}-${item.start_datetime}`} className="border-t">
+                      <td className="px-2 py-1">{item.target_date}</td>
+                      <td className="px-2 py-1">{new Date(item.start_datetime).toLocaleString('pt-BR')}</td>
+                      <td className="px-2 py-1">{new Date(item.end_datetime).toLocaleString('pt-BR')}</td>
+                      <td className="px-2 py-1">
+                        {item.duplicate_status ? 'Duplicata' : item.conflict_status ? 'Conflito' : 'OK'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   )
