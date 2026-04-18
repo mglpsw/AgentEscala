@@ -28,8 +28,8 @@ function build_initial_range() {
   }
 }
 
-function map_shift_to_event(shift, current_user) {
-  const ownShift = shift.agent_id === current_user?.id
+function map_shift_to_event(shift, currentUserId) {
+  const ownShift = shift.agent_id === currentUserId
   return {
     id: `shift-${shift.id}`,
     title: `${shift.agent?.name || 'Profissional'} · ${shift.title?.trim() || 'Turno'}`,
@@ -128,8 +128,9 @@ function CalendarPage() {
       setIsLoading(true)
       setError('')
       try {
-        const start = visibleRange.start.toISOString().slice(0, 10)
-        const endDate = new Date(visibleRange.end)
+        const [rangeStartIso, rangeEndIso] = visibleRangeKey.split('::')
+        const start = rangeStartIso.slice(0, 10)
+        const endDate = new Date(rangeEndIso)
         endDate.setDate(endDate.getDate() - 1)
         const end = endDate.toISOString().slice(0, 10)
 
@@ -168,7 +169,7 @@ function CalendarPage() {
           }
         }
 
-        setEvents([...shifts.map((s) => map_shift_to_event(s, user)), ...preRequests.map(map_request_to_event)])
+        setEvents([...shifts.map((s) => map_shift_to_event(s, user.id)), ...preRequests.map(map_request_to_event)])
       } catch (requestErr) {
         if (controller.signal.aborted) return
         setEvents([])

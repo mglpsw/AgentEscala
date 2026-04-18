@@ -15,7 +15,7 @@ function SwapsPage() {
   const fetchSwaps = useCallback(() => {
     setLoading(true)
     setError('')
-    api.get('/swaps')
+    api.get('/swaps/')
       .then(res => setSwaps(res.data))
       .catch(() => setError('Erro ao carregar trocas'))
       .finally(() => setLoading(false))

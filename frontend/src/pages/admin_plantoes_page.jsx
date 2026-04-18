@@ -86,7 +86,7 @@ export default function AdminPlantoesPage() {
     try {
       const [usersResp, shiftsResp, coverageResp] = await Promise.all([
         api.get('/users/agents'),
-        api.get('/shifts', { params: { limit: 500 } }),
+        api.get('/shifts/', { params: { limit: 500 } }),
         api.get('/shifts/coverage/flags', { params: { start_date: date, end_date: date } }),
       ])
       setUsers(usersResp.data)
