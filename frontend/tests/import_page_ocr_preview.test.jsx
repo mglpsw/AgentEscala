@@ -165,4 +165,56 @@ describe('ImportPage OCR preview agrupada por dia', () => {
     expect(screen.getByDisplayValue('DUPLICADO P1')).toBeInTheDocument()
     expect(screen.getByDisplayValue('DUPLICADO P2 EDITADO')).toBeInTheDocument()
   })
+
+  it('mantém baseline correto do diff quando há source_row_index repetido em tabelas diferentes', async () => {
+    api.post.mockResolvedValueOnce({ data: { document_import_id: 'abc-4' } })
+    api.get.mockResolvedValueOnce({
+      data: {
+        rows: [
+          {
+            source_page: 1,
+            source_table_index: 1,
+            source_row_index: 1,
+            day_group_id: '2026-04-13',
+            date_iso: '2026-04-13',
+            source_layout_type: 'generic_table',
+            professional_name_raw: 'BASE T1',
+            start_time_raw: '08:00',
+            end_time_raw: '20:00',
+            shift_kind: 'day',
+            confidence: 0.9,
+            match_status: 'matched',
+          },
+          {
+            source_page: 1,
+            source_table_index: 2,
+            source_row_index: 1,
+            day_group_id: '2026-04-13',
+            date_iso: '2026-04-13',
+            source_layout_type: 'generic_table',
+            professional_name_raw: 'BASE T2',
+            start_time_raw: '08:00',
+            end_time_raw: '20:00',
+            shift_kind: 'day',
+            confidence: 0.9,
+            match_status: 'matched',
+          },
+        ],
+      },
+    })
+
+    render(<ImportPage />)
+    fireEvent.change(screen.getByPlaceholderText(/{"pages":/i), {
+      target: { value: JSON.stringify({ pages: [{ page_number: 1, tables: [] }] }) },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /parse \+ preview ocr/i }))
+    await waitFor(() => expect(screen.getByDisplayValue('BASE T1')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByDisplayValue('BASE T2'), { target: { value: 'BASE T2 EDITADO' } })
+
+    expect(screen.getAllByText(/corrigido manualmente/i)).toHaveLength(1)
+    expect(screen.getAllByText(/diff ocr → edição/i)).toHaveLength(1)
+    expect(screen.getByDisplayValue('BASE T1')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('BASE T2 EDITADO')).toBeInTheDocument()
+  })
 })
