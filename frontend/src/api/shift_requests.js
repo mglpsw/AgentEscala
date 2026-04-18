@@ -1,7 +1,7 @@
 import api from './client.js'
 
 export function listShiftRequests() {
-  return api.get('/shift-requests').then((response) => response.data)
+  return api.get('/shift-requests/').then((response) => response.data)
 }
 
 export function createShiftRequest(payload) {
