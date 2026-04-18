@@ -16,6 +16,13 @@ def test_healthcheck_is_public(client):
     assert response.json()["ocr"] in {"enabled", "disabled"}
 
 
+def test_admin_spa_route_keeps_frontend_fallback(client):
+    response = client.get("/admin/plantoes")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+
+
 def test_login_and_protected_route_require_auth(client, admin_headers):
     unauthorized = client.get("/users")
     assert unauthorized.status_code == 401
