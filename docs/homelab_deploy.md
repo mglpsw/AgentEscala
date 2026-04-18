@@ -46,6 +46,7 @@ porque `9443` é externo ao CT.
 - `infra/docker-compose.homelab.yml`: stack do backend + banco com rede e volume dedicados.
 - `infra/.env.homelab.example`: template das variáveis do CT 102.
 - `infra/scripts/couple_to_homelab.sh`: validação e primeira subida com dry-run.
+- `infra/scripts/rebuild_official_homelab.sh`: rebuild canônico da stack oficial já ativa.
 - `infra/scripts/backup_postgres.sh`: backup manual do banco do AgentEscala.
 - `infra/scripts/restore_postgres.sh`: restore destrutivo com confirmação explícita.
 - `infra/scripts/plan_npm_publish.sh`: resumo seguro da configuração NPM esperada.
@@ -88,21 +89,48 @@ O script valida variáveis, porta, compose e build. Se o `up` falhar, o rollback
 ## Atualização De Stack Já Ativo
 
 Quando o stack já está rodando, a porta `18000` estará ocupada pelo próprio
-backend oficial. Nesse cenário, use o fluxo abaixo:
+backend oficial. Nesse cenário, o caminho canônico é o script abaixo:
 
 ```bash
 cd /opt/repos/AgentEscala
 git fetch origin main
 git merge --ff-only FETCH_HEAD
 
-DEBUG=false docker-compose -p agentescala_official \
-  -f infra/docker-compose.homelab.yml \
-  --env-file infra/.env.homelab \
-  up -d --build --force-recreate backend
+./infra/scripts/rebuild_official_homelab.sh
 ```
 
-O prefixo `DEBUG=false` evita que um `DEBUG=release` exportado no shell do CT
-seja injetado no container. O backend espera booleano.
+O script valida que está usando apenas a topologia oficial do CT 102:
+
+```text
+COMPOSE_PROJECT_NAME=agentescala_official
+AGENTESCALA_IMAGE=agentescala:homelab
+BACKEND_BIND_ADDRESS=192.168.3.155
+BACKEND_HOST_PORT=18000
+POSTGRES_VOLUME_NAME=agentescala_postgres_data_official18000
+INTERNAL_NETWORK_NAME=agentescala_official_internal
+VITE_API_BASE_URL=https://escala.ks-sm.net:9443
+```
+
+Ele também roda `npm run lint`, `npm run test`, executa o build Docker com
+`--force-recreate backend`, valida `/health` no backend direto e confirma que o
+bundle publicado contém `https://escala.ks-sm.net:9443`.
+
+Se houver uma alteração local ainda não commitada que precisa ser testada antes
+do merge, use conscientemente:
+
+```bash
+./infra/scripts/rebuild_official_homelab.sh --allow-dirty
+```
+
+O prefixo `DEBUG=false` já é aplicado pelo script para evitar que um
+`DEBUG=release` exportado no shell do CT seja injetado no container. O backend
+espera booleano.
+
+Não use `docker-compose up -d --build` na raiz do repositório para atualizar o
+CT 102. Esse comando usa `docker-compose.yml`, cria a stack local `agentescala`
+e pode publicar portas/volumes não canônicos. A stack oficial sempre deve ser
+atualizada com `infra/docker-compose.homelab.yml` e projeto
+`agentescala_official`.
 
 ## Nginx Proxy Manager
 

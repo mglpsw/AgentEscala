@@ -6,6 +6,7 @@ Create Date: 2026-04-18 13:15:00
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -15,8 +16,21 @@ branch_labels = None
 depends_on = None
 
 
-recurring_batch_status = sa.Enum('PREVIEW', 'CONFIRMED', 'FAILED', name='recurringbatchstatus')
-recurring_item_decision_status = sa.Enum('PENDING', 'SKIPPED_CONFLICT', 'SKIPPED_DUPLICATE', 'CREATED', name='recurringitemdecisionstatus')
+recurring_batch_status = postgresql.ENUM(
+    'PREVIEW',
+    'CONFIRMED',
+    'FAILED',
+    name='recurringbatchstatus',
+    create_type=False,
+)
+recurring_item_decision_status = postgresql.ENUM(
+    'PENDING',
+    'SKIPPED_CONFLICT',
+    'SKIPPED_DUPLICATE',
+    'CREATED',
+    name='recurringitemdecisionstatus',
+    create_type=False,
+)
 
 
 def upgrade() -> None:
