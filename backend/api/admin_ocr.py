@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -12,6 +14,7 @@ from ..services.ocr.calibration_service import OcrCalibrationService
 from ..utils.dependencies import require_admin
 
 router = APIRouter(prefix="/admin/ocr", tags=["Admin OCR"])
+logger = logging.getLogger("agentescala.admin_ocr")
 
 
 class OcrCalibrationRow(BaseModel):
@@ -45,14 +48,17 @@ async def calibration_preview(
     _: User = Depends(require_admin),
 ):
     filename = file.filename or "upload"
+    logger.info("ocr_calibration_preview_started filename=%s", filename)
     allowed_ext = (".pdf", ".png", ".jpg", ".jpeg", ".webp", ".tiff")
     if not filename.lower().endswith(allowed_ext):
+        logger.warning("ocr_calibration_preview_rejected_invalid_format filename=%s", filename)
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Formato não suportado para calibração OCR. Use PDF ou imagem.",
         )
 
     if not settings.FEATURE_OCR_REMOTE_IMPORT:
+        logger.warning("ocr_calibration_preview_blocked_feature_disabled filename=%s", filename)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Feature OCR remoto desativada. Ative FEATURE_OCR_REMOTE_IMPORT para usar a calibração.",
@@ -60,6 +66,7 @@ async def calibration_preview(
 
     content = await file.read()
     if not content:
+        logger.warning("ocr_calibration_preview_empty_file filename=%s", filename)
         raise HTTPException(status_code=400, detail="Arquivo vazio")
 
     try:
@@ -71,6 +78,7 @@ async def calibration_preview(
             verify_ssl=settings.OCR_API_VERIFY_SSL,
         )
     except OcrAgentRouterError as exc:
+        logger.warning("ocr_calibration_preview_remote_error filename=%s reason=%s", filename, exc)
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Não foi possível extrair texto do arquivo no OCR remoto. Tente novamente.",
@@ -107,6 +115,14 @@ async def calibration_preview(
             )
         )
 
+    logger.info(
+        "ocr_calibration_preview_completed filename=%s total=%s matched=%s ambiguous=%s unmatched=%s",
+        filename,
+        len(rows),
+        matched,
+        ambiguous,
+        unmatched,
+    )
     return OcrCalibrationResponse(
         filename=filename,
         total_rows=len(rows),
