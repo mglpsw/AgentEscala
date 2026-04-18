@@ -12,6 +12,10 @@ from .shift_service import PLANTAO_TYPE_RULES
 
 class ShiftRequestService:
     @staticmethod
+    def _is_admin(user: Optional[User]) -> bool:
+        return bool(user and (user.role == UserRole.ADMIN or user.is_admin))
+
+    @staticmethod
     def _period_to_datetimes(requested_date: date, shift_period: str) -> tuple[datetime, datetime]:
         period = shift_period.strip().upper()
         start_hour, end_hour = PLANTAO_TYPE_RULES.get(period, (None, None))
@@ -54,6 +58,12 @@ class ShiftRequestService:
             target_shift = db.query(Shift).filter(Shift.id == target_shift_id).first()
             if not target_shift:
                 raise ValueError("Plantão alvo não encontrado.")
+
+            expected_start, expected_end = ShiftRequestService._period_to_datetimes(requested_date, period)
+            if target_shift.start_time != expected_start or target_shift.end_time != expected_end:
+                raise ValueError("Plantão alvo não corresponde à data/período solicitados.")
+            if target_shift.start_time.date() < date.today():
+                raise ValueError("Não é permitido solicitar transferência de plantão passado.")
         else:
             target_shift = ShiftRequestService._find_shift_by_period(db, requested_date, period)
 
@@ -80,6 +90,7 @@ class ShiftRequestService:
     @staticmethod
     def list_for_user(db: Session, user: User) -> list[ShiftRequest]:
         query = db.query(ShiftRequest)
+        if ShiftRequestService._is_admin(user):
         if user.role == UserRole.ADMIN:
             return query.order_by(ShiftRequest.created_at.desc()).all()
 
@@ -127,6 +138,7 @@ class ShiftRequestService:
             raise ValueError("Solicitação não encontrada.")
 
         admin = db.query(User).filter(User.id == admin_id).first()
+        if not ShiftRequestService._is_admin(admin):
         if not admin or admin.role != UserRole.ADMIN:
             raise ValueError("Somente administradores podem revisar solicitações.")
 
