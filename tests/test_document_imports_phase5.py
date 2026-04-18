@@ -1,0 +1,71 @@
+from backend.services.document_normalization_service import normalize_ocr_payload_document
+from backend.config.database import SessionLocal
+
+
+def _sample_payload():
+    return {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "MARÇO/2026",
+                        "headers": ["Profissional", "Data", "Entrada", "Saída", "Total de Horas"],
+                        "rows": [
+                            ["Mariana Koppe Pereira 11999998888", "01/03/2026", "08:00", "20:00", "12"],
+                            ["Carlos Silva Faturamento", "01/03/2026", "20:00", "08:00", "12"],
+                        ],
+                        "confidence": 0.93,
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def test_normalize_ocr_payload_handles_noise_and_overnight():
+    db = SessionLocal()
+    doc = normalize_ocr_payload_document(db, _sample_payload(), "escala.pdf")
+
+    assert doc["source_type"] == "pdf"
+    assert doc["detected_months"][0]["month"] == 3
+    assert len(doc["rows"]) == 2
+
+    first = doc["rows"][0]
+    assert first["professional_name_normalized"] == "Mariana Koppe Pereira"
+    assert first["match_status"] in {"new_user_candidate", "matched", "ambiguous"}
+
+    second = doc["rows"][1]
+    assert second["professional_name_normalized"] == "Carlos Silva"
+    assert second["end_datetime"] > second["start_datetime"]
+    assert second["duration_hours"] == 12.0
+    db.close()
+
+
+def test_admin_document_import_endpoints_flow(client, admin_headers):
+    parse_resp = client.post(
+        "/admin/imports/parse-ocr-payload",
+        headers=admin_headers,
+        json={"source_filename": "escala_marco.json", "payload": _sample_payload()},
+    )
+    assert parse_resp.status_code == 201
+    parsed = parse_resp.json()
+    assert parsed["total_rows"] == 2
+    assert parsed["document_import_id"]
+
+    import_id = parsed["document_import_id"]
+    preview_resp = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers)
+    assert preview_resp.status_code == 200
+    preview = preview_resp.json()
+    assert preview["source_filename"] == "escala_marco.json"
+    assert len(preview["rows"]) == 2
+
+    staging_resp = client.post(f"/admin/imports/{import_id}/apply-to-staging", headers=admin_headers)
+    assert staging_resp.status_code == 200
+    staging = staging_resp.json()
+    assert staging["schedule_import_id"] > 0
+
+    confirm_resp = client.post(f"/admin/imports/{import_id}/confirm", headers=admin_headers)
+    assert confirm_resp.status_code == 200
+    confirmed = confirm_resp.json()
+    assert confirmed["created_shifts"] >= 0

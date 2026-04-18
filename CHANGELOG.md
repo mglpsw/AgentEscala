@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.0] - 2026-04-18
+
+### Adicionado
+- nova camada documental admin-only em `/admin/imports` com parsing incremental para XLSX multiaba e payload OCR estruturado, sem bypass de staging/revisão.
+- formato canônico interno normalizado em serviço dedicado para consolidação de cabeçalhos variantes, detecção de mês/ano, normalização de nomes com ruído e interpretação de turno noturno.
+- fluxo adicional parse → normalized-preview → apply-to-staging → confirm, reaproveitando o pipeline legado `/schedule-imports`.
+- endpoint assistido para criação de usuários candidatos (`POST /admin/imports/{id}/create-missing-users`) com trilha de ação no documento.
+- UI mínima de debug OCR na página de importação para colar payload JSON e enviar ao staging de forma conservadora.
+- testes de fase 5 para normalização semântica e fluxo dos novos endpoints.
+
+### Compatibilidade
+- contratos existentes da importação CSV/XLSX não foram removidos nem alterados; a nova camada estende o comportamento já validado.
+
 ## [1.5.5] - 2026-04-17
 
 ### Alterado
