@@ -327,3 +327,69 @@ def test_apply_to_staging_respects_preview_edits(client, admin_headers):
     assert imported_row["raw_professional"] == "Alice Silva Corrigida"
     assert imported_row["raw_start_time"] == "10:00"
     assert imported_row["raw_end_time"] == "22:00"
+
+
+def test_apply_to_staging_uses_source_row_key_to_avoid_cross_page_collisions(client, admin_headers):
+    payload = {
+        "pages": [
+            {
+                "page_number": 1,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Entrada", "Saída"],
+                        "rows": [["Alice P1", "19/04/2026", "08:00", "20:00"]],
+                    }
+                ],
+            },
+            {
+                "page_number": 2,
+                "tables": [
+                    {
+                        "title": "ABRIL/2026",
+                        "headers": ["Profissional", "Data", "Entrada", "Saída"],
+                        "rows": [["Alice P2", "19/04/2026", "08:00", "20:00"]],
+                    }
+                ],
+            },
+        ]
+    }
+    parse_resp = client.post(
+        "/admin/imports/parse-ocr-payload",
+        headers=admin_headers,
+        json={"source_filename": "multi_page_same_index.json", "payload": payload},
+    )
+    assert parse_resp.status_code == 201
+    import_id = parse_resp.json()["document_import_id"]
+
+    preview_resp = client.get(f"/admin/imports/{import_id}/normalized-preview", headers=admin_headers)
+    rows = preview_resp.json()["rows"]
+    assert len(rows) == 2
+    assert rows[0]["source_row_index"] == rows[1]["source_row_index"]
+    assert rows[0]["source_page"] != rows[1]["source_page"]
+
+    target_row = next((row for row in rows if row["source_page"] == 2), rows[1])
+    source_sheet = target_row.get("source_sheet") or "no-sheet"
+    source_page = target_row.get("source_page") or "no-page"
+    source_row_key = f"{source_sheet}::{source_page}::{target_row['source_row_index']}"
+
+    staging_resp = client.post(
+        f"/admin/imports/{import_id}/apply-to-staging",
+        headers=admin_headers,
+        json={
+            "edited_rows": [
+                {
+                    "source_row_index": target_row["source_row_index"],
+                    "source_row_key": source_row_key,
+                    "professional_name_raw": "Alice P2 Corrigida",
+                }
+            ]
+        },
+    )
+    assert staging_resp.status_code == 200
+    schedule_import_id = staging_resp.json()["schedule_import_id"]
+    rows_resp = client.get(f"/schedule-imports/{schedule_import_id}/rows", headers=admin_headers)
+    assert rows_resp.status_code == 200
+    imported_names = {row["raw_professional"] for row in rows_resp.json()}
+    assert "Alice P2 Corrigida" in imported_names
+    assert "Alice P1" in imported_names

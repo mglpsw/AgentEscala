@@ -14,6 +14,13 @@ const SHIFT_KIND_STYLES = {
 
 const EDITABLE_OCR_FIELDS = ['professional_name_raw', 'start_time_raw', 'end_time_raw', 'shift_kind']
 
+function buildOcrRowKey(row) {
+  const sheet = (row?.source_sheet || '').trim() || 'no-sheet'
+  const page = row?.source_page ?? 'no-page'
+  const index = row?.source_row_index ?? 'no-row'
+  return `${sheet}::${page}::${index}`
+}
+
 function extractShiftsCreated(summary) {
   const match = summary?.source_description?.match(/Turnos criados nesta confirmação:\s*(\d+)/)
   return match ? parseInt(match[1], 10) : null
@@ -124,13 +131,13 @@ function OcrDayCards({ groupedDays, onInlineEdit }) {
             </div>
 
             <div className="space-y-2">
-              {day.rows.map((row, idx) => (
-                <div key={`${key}-${idx}`} className={`rounded border p-3 text-xs ${row._ui_isAnomalous ? 'border-rose-200 bg-rose-50/30' : 'border-gray-100'}`}>
+              {day.rows.map((row) => (
+                <div key={row._ui_row_key || `${key}-${row.source_row_index}`} className={`rounded border p-3 text-xs ${row._ui_isAnomalous ? 'border-rose-200 bg-rose-50/30' : 'border-gray-100'}`}>
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
-                    <label className="space-y-1"><span className="text-gray-500">Nome bruto</span><input value={row.professional_name_raw || ''} onChange={(e) => onInlineEdit(row.source_row_index, 'professional_name_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
-                    <label className="space-y-1"><span className="text-gray-500">Horário início</span><input value={row.start_time_raw || ''} onChange={(e) => onInlineEdit(row.source_row_index, 'start_time_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
-                    <label className="space-y-1"><span className="text-gray-500">Horário fim</span><input value={row.end_time_raw || ''} onChange={(e) => onInlineEdit(row.source_row_index, 'end_time_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
-                    <label className="space-y-1"><span className="text-gray-500">Turno</span><select value={row.shift_kind || 'custom'} onChange={(e) => onInlineEdit(row.source_row_index, 'shift_kind', e.target.value)} className="w-full rounded border px-2 py-1"><option value="day">day</option><option value="intermediate">intermediate</option><option value="night">night</option><option value="twenty_four">twenty_four</option><option value="custom">custom</option></select></label>
+                    <label className="space-y-1"><span className="text-gray-500">Nome bruto</span><input value={row.professional_name_raw || ''} onChange={(e) => onInlineEdit(row._ui_row_key, 'professional_name_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
+                    <label className="space-y-1"><span className="text-gray-500">Horário início</span><input value={row.start_time_raw || ''} onChange={(e) => onInlineEdit(row._ui_row_key, 'start_time_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
+                    <label className="space-y-1"><span className="text-gray-500">Horário fim</span><input value={row.end_time_raw || ''} onChange={(e) => onInlineEdit(row._ui_row_key, 'end_time_raw', e.target.value)} className="w-full rounded border px-2 py-1" /></label>
+                    <label className="space-y-1"><span className="text-gray-500">Turno</span><select value={row.shift_kind || 'custom'} onChange={(e) => onInlineEdit(row._ui_row_key, 'shift_kind', e.target.value)} className="w-full rounded border px-2 py-1"><option value="day">day</option><option value="intermediate">intermediate</option><option value="night">night</option><option value="twenty_four">twenty_four</option><option value="custom">custom</option></select></label>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <span className={`px-2 py-1 rounded-full border ${SHIFT_KIND_STYLES[row.shift_kind] || SHIFT_KIND_STYLES.custom}`}>{row.shift_kind || 'custom'}</span>
@@ -221,7 +228,8 @@ function ImportPage() {
   const enhancedOcrPreviewRows = useMemo(() => {
     const anomalyRegex = /conflito|ambígu|crm|duplicado|falt|erro|inconsist/i
     return ocrPreviewRows.map((row) => {
-      const original = ocrOriginalRowsByIndex[row.source_row_index] || {}
+      const rowKey = buildOcrRowKey(row)
+      const original = ocrOriginalRowsByIndex[rowKey] || {}
       const diffItems = EDITABLE_OCR_FIELDS
         .filter((field) => (original[field] || '') !== (row[field] || ''))
         .map((field) => ({
@@ -234,6 +242,7 @@ function ImportPage() {
       const isAnomalous = [...(row.grouped_day_validation || []), ...(row.validation_messages || [])].some((msg) => anomalyRegex.test(msg || ''))
       return {
         ...row,
+        _ui_row_key: rowKey,
         _ui_diffItems: diffItems,
         _ui_flags: {
           auto: diffItems.length === 0,
@@ -327,7 +336,7 @@ function ImportPage() {
       setDocImportId(parsed.document_import_id)
       const { data: preview } = await api.get(`/admin/imports/${parsed.document_import_id}/normalized-preview`)
       const rows = preview.rows || []
-      setOcrOriginalRowsByIndex(Object.fromEntries(rows.map((row) => [row.source_row_index, { ...row }])))
+      setOcrOriginalRowsByIndex(Object.fromEntries(rows.map((row) => [buildOcrRowKey(row), { ...row }])))
       setOcrPreviewRows(rows)
       setPageState(STATE.IDLE)
     } catch (err) {
@@ -342,6 +351,7 @@ function ImportPage() {
     try {
       const editedRows = ocrPreviewRows.map((row) => ({
         source_row_index: row.source_row_index,
+        source_row_key: buildOcrRowKey(row),
         professional_name_raw: row.professional_name_raw,
         professional_name_normalized: row.professional_name_normalized,
         canonical_name: row.canonical_name,
@@ -364,8 +374,8 @@ function ImportPage() {
     }
   }
 
-  const onInlineEdit = (rowIndex, field, value) => {
-    setOcrPreviewRows((current) => current.map((row) => (row.source_row_index === rowIndex ? { ...row, [field]: value } : row)))
+  const onInlineEdit = (rowKey, field, value) => {
+    setOcrPreviewRows((current) => current.map((row) => (buildOcrRowKey(row) === rowKey ? { ...row, [field]: value } : row)))
   }
 
   if (pageState === STATE.CONFIRMED) return <ConfirmedView summary={confirmResult} shiftsCreated={extractShiftsCreated(confirmResult)} onReset={handleReset} />

@@ -109,11 +109,60 @@ describe('ImportPage OCR preview agrupada por dia', () => {
           edited_rows: expect.arrayContaining([
             expect.objectContaining({
               source_row_index: 22,
+              source_row_key: expect.any(String),
               professional_name_raw: 'NOME EDITADO',
             }),
           ]),
         }),
       )
     })
+  })
+
+  it('edita apenas a linha alvo quando source_row_index se repete entre páginas', async () => {
+    api.post.mockResolvedValueOnce({ data: { document_import_id: 'abc-3' } })
+    api.get.mockResolvedValueOnce({
+      data: {
+        rows: [
+          {
+            source_page: 1,
+            source_row_index: 1,
+            day_group_id: '2026-04-12',
+            date_iso: '2026-04-12',
+            source_layout_type: 'generic_table',
+            professional_name_raw: 'DUPLICADO P1',
+            start_time_raw: '08:00',
+            end_time_raw: '20:00',
+            shift_kind: 'day',
+            confidence: 0.9,
+            match_status: 'matched',
+          },
+          {
+            source_page: 2,
+            source_row_index: 1,
+            day_group_id: '2026-04-12',
+            date_iso: '2026-04-12',
+            source_layout_type: 'generic_table',
+            professional_name_raw: 'DUPLICADO P2',
+            start_time_raw: '08:00',
+            end_time_raw: '20:00',
+            shift_kind: 'day',
+            confidence: 0.9,
+            match_status: 'matched',
+          },
+        ],
+      },
+    })
+
+    render(<ImportPage />)
+    fireEvent.change(screen.getByPlaceholderText(/{"pages":/i), {
+      target: { value: JSON.stringify({ pages: [{ page_number: 1, tables: [] }] }) },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /parse \+ preview ocr/i }))
+    await waitFor(() => expect(screen.getByDisplayValue('DUPLICADO P1')).toBeInTheDocument())
+
+    fireEvent.change(screen.getByDisplayValue('DUPLICADO P2'), { target: { value: 'DUPLICADO P2 EDITADO' } })
+
+    expect(screen.getByDisplayValue('DUPLICADO P1')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('DUPLICADO P2 EDITADO')).toBeInTheDocument()
   })
 })

@@ -101,6 +101,7 @@ class ApplyToStagingResponse(BaseModel):
 
 class ApplyToStagingRowEdit(BaseModel):
     source_row_index: int
+    source_row_key: Optional[str] = None
     professional_name_raw: Optional[str] = None
     professional_name_normalized: Optional[str] = None
     canonical_name: Optional[str] = None

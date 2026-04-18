@@ -9,12 +9,16 @@ import { listFutureShiftRequests } from '../src/api/future_shift_requests.js'
 import { listShiftRequests } from '../src/api/shift_requests.js'
 
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ events, dayCellContent }) => (
-    <div data-testid="calendar">
-      Calendário renderizado · {events.length} evento(s)
-      <span data-testid="day-cell-handler">{typeof dayCellContent}</span>
-    </div>
-  ),
+  default: ({ events, dayCellContent }) => {
+    const result = dayCellContent?.({ date: new Date('2026-04-18T00:00:00'), dayNumberText: '18' })
+    return (
+      <div data-testid="calendar">
+        Calendário renderizado · {events.length} evento(s)
+        <span data-testid="day-cell-handler">{typeof dayCellContent}</span>
+        <pre data-testid="day-cell-html">{result?.html || ''}</pre>
+      </div>
+    )
+  },
 }))
 
 vi.mock('@fullcalendar/daygrid', () => ({ default: {} }))
@@ -116,5 +120,35 @@ describe('CalendarPage', () => {
       expect(screen.getByTestId('calendar')).toBeInTheDocument()
     })
     expect(screen.getByText(/carregado parcialmente/i)).toBeInTheDocument()
+  })
+
+  it('escapa conteúdo de nomes ao gerar html compacto do dia', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/shifts/') {
+        return Promise.resolve({
+          data: [
+            {
+              id: 30,
+              agent_id: 2,
+              agent: { name: '<img src=x onerror=alert(1)>' },
+              title: 'Plantão',
+              start_time: '2026-04-18T08:00:00',
+              end_time: '2026-04-18T20:00:00',
+              location: 'CT',
+            },
+          ],
+        })
+      }
+      if (url === '/shifts/day-config') return Promise.resolve({ data: [{ date: '2026-04-18', slots: [] }] })
+      if (url === '/users/agents') return Promise.resolve({ data: [{ id: 2, name: 'Alice' }] })
+      return Promise.resolve({ data: [] })
+    })
+
+    render(<CalendarPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('day-cell-html').textContent).toContain('&lt;img')
+    })
+    expect(screen.getByTestId('day-cell-html').textContent).not.toContain('<img')
   })
 })
