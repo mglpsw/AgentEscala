@@ -1,18 +1,20 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import AppLayout from '../components/app_layout.jsx'
 import ProtectedRoute from '../components/protected_route.jsx'
-import LoginPage from '../pages/login_page.jsx'
-import CalendarPage from '../pages/calendar_page.jsx'
-import ShiftsPage from '../pages/shifts_page.jsx'
-import MySchedulePage from '../pages/my_schedule_page.jsx'
-import SwapsPage from '../pages/swaps_page.jsx'
-import PendingSwapsPage from '../pages/pending_swaps_page.jsx'
-import ImportPage from '../pages/import_page.jsx'
-import UsersAdminPage from '../pages/users_admin_page.jsx'
-import AdminPlantoesPage from '../pages/admin_plantoes_page.jsx'
-import ProfilePage from '../pages/profile_page.jsx'
-import NotFoundPage from '../pages/not_found_page.jsx'
 import useAuth from '../hooks/use_auth.js'
+
+const AppLayout = lazy(() => import('../components/app_layout.jsx'))
+const LoginPage = lazy(() => import('../pages/login_page.jsx'))
+const CalendarPage = lazy(() => import('../pages/calendar_page.jsx'))
+const ShiftsPage = lazy(() => import('../pages/shifts_page.jsx'))
+const MySchedulePage = lazy(() => import('../pages/my_schedule_page.jsx'))
+const SwapsPage = lazy(() => import('../pages/swaps_page.jsx'))
+const PendingSwapsPage = lazy(() => import('../pages/pending_swaps_page.jsx'))
+const ImportPage = lazy(() => import('../pages/import_page.jsx'))
+const UsersAdminPage = lazy(() => import('../pages/users_admin_page.jsx'))
+const AdminPlantoesPage = lazy(() => import('../pages/admin_plantoes_page.jsx'))
+const ProfilePage = lazy(() => import('../pages/profile_page.jsx'))
+const NotFoundPage = lazy(() => import('../pages/not_found_page.jsx'))
 
 // Redireciona a raiz conforme estado de autenticação
 function RootRedirect() {
@@ -21,40 +23,50 @@ function RootRedirect() {
   return <Navigate to={isAuthenticated ? '/calendar' : '/login'} replace />
 }
 
+function RouteFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-6 text-sm text-gray-600">
+      Carregando...
+    </div>
+  )
+}
+
 // Roteamento principal — rotas protegidas agrupadas por nível de acesso
 function AppRouter() {
   return (
     <BrowserRouter>
-      <Routes>
-        {/* Rota pública */}
-        <Route path="/login" element={<LoginPage />} />
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          {/* Rota pública */}
+          <Route path="/login" element={<LoginPage />} />
 
-        {/* Rotas protegidas — qualquer usuário autenticado */}
-        <Route element={<ProtectedRoute />}>
-          <Route element={<AppLayout />}>
-            <Route path="/calendar" element={<CalendarPage />} />
-            <Route path="/shifts" element={<ShiftsPage />} />
-            <Route path="/my-schedule" element={<MySchedulePage />} />
-            <Route path="/swaps" element={<SwapsPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
+          {/* Rotas protegidas — qualquer usuário autenticado */}
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
+              <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/shifts" element={<ShiftsPage />} />
+              <Route path="/my-schedule" element={<MySchedulePage />} />
+              <Route path="/swaps" element={<SwapsPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+            </Route>
           </Route>
-        </Route>
 
-        {/* Rotas protegidas — somente admin */}
-        <Route element={<ProtectedRoute requiredRole="admin" />}>
-          <Route element={<AppLayout />}>
-            <Route path="/swaps/pending" element={<PendingSwapsPage />} />
-            <Route path="/import" element={<ImportPage />} />
-            <Route path="/admin/users" element={<UsersAdminPage />} />
-            <Route path="/admin/plantoes" element={<AdminPlantoesPage />} />
+          {/* Rotas protegidas — somente admin */}
+          <Route element={<ProtectedRoute requiredRole="admin" />}>
+            <Route element={<AppLayout />}>
+              <Route path="/swaps/pending" element={<PendingSwapsPage />} />
+              <Route path="/import" element={<ImportPage />} />
+              <Route path="/admin/users" element={<UsersAdminPage />} />
+              <Route path="/admin/plantoes" element={<AdminPlantoesPage />} />
+            </Route>
           </Route>
-        </Route>
 
-        {/* Raiz: redireciona conforme autenticação */}
-        <Route path="/" element={<RootRedirect />} />
+          {/* Raiz: redireciona conforme autenticação */}
+          <Route path="/" element={<RootRedirect />} />
 
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

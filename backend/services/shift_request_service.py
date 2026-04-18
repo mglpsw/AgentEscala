@@ -91,6 +91,7 @@ class ShiftRequestService:
     def list_for_user(db: Session, user: User) -> list[ShiftRequest]:
         query = db.query(ShiftRequest)
         if ShiftRequestService._is_admin(user):
+        if user.role == UserRole.ADMIN:
             return query.order_by(ShiftRequest.created_at.desc()).all()
 
         return (
@@ -138,6 +139,7 @@ class ShiftRequestService:
 
         admin = db.query(User).filter(User.id == admin_id).first()
         if not ShiftRequestService._is_admin(admin):
+        if not admin or admin.role != UserRole.ADMIN:
             raise ValueError("Somente administradores podem revisar solicitações.")
 
         if request.status != ShiftRequestStatus.PENDING_ADMIN:
