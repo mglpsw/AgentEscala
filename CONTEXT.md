@@ -37,7 +37,7 @@ AgentEscala está estável em operação com:
 
 ## OCR em produção (como funciona hoje)
 
-- Prioriza a API externa `https://api.ks-sm.net:9443`.
+- Prioriza a API externa `http://192.168.3.155:8010`.
 - Aceita payloads OCR em formatos diversos (`raw_text`, `text`, `content`, `lines`, `data`, `result`).
 - Mantém fallback local calibrado para continuidade operacional.
 - Registra estratégia `ks-sm-api-ocr` quando o OCR externo é aplicado.

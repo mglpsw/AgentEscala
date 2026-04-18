@@ -3,7 +3,7 @@ import re
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from typing import List, Optional
 from datetime import date, datetime
-from ..models import UFEnum, UserRole, SwapStatus
+from ..models import UFEnum, UserRole, SwapStatus, FutureShiftRequestStatus, ShiftRequestStatus
 
 
 CPF_PATTERN = re.compile(r"^\d{11}$")
@@ -152,6 +152,25 @@ class FinalScheduleRow(BaseModel):
     shift_period: str
 
 
+class FutureShiftRequestCreate(BaseModel):
+    requested_date: date
+    shift_period: str = Field(min_length=3, max_length=40)
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class FutureShiftRequestResponse(BaseModel):
+    id: int
+    user_id: int
+    requested_date: date
+    shift_period: str
+    notes: Optional[str] = None
+    status: FutureShiftRequestStatus
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # Esquemas de perfil médico
 class MedicalProfileBase(BaseModel):
     nome_completo: str = Field(min_length=2)
@@ -230,6 +249,41 @@ class FinalScheduleMetadata(BaseModel):
 class FinalScheduleExportResponse(BaseModel):
     shifts: List[FinalScheduleRow]
     metadata: FinalScheduleMetadata
+
+
+class ShiftRequestCreate(BaseModel):
+    requested_date: date
+    shift_period: str = Field(min_length=3, max_length=40)
+    note: Optional[str] = Field(default=None, max_length=500)
+    target_shift_id: Optional[int] = None
+
+
+class ShiftRequestResponse(BaseModel):
+    id: int
+    requester_id: int
+    target_user_id: Optional[int] = None
+    target_shift_id: Optional[int] = None
+    requested_date: date
+    shift_period: str
+    note: Optional[str] = None
+    target_response_note: Optional[str] = None
+    admin_notes: Optional[str] = None
+    status: ShiftRequestStatus
+    reviewed_by: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ShiftRequestTargetResponsePayload(BaseModel):
+    accept: bool
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+class ShiftRequestAdminReviewPayload(BaseModel):
+    approve: bool
+    admin_notes: Optional[str] = Field(default=None, max_length=500)
 
 
 # Esquemas de SwapRequest

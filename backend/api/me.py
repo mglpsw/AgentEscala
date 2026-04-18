@@ -13,8 +13,8 @@ from sqlalchemy.orm import Session
 from ..config.database import get_db
 from ..config.settings import settings
 from ..models import User
-from .schemas import MeUpdatePayload
-from ..services import ShiftService
+from .schemas import MeUpdatePayload, FutureShiftRequestCreate, FutureShiftRequestResponse
+from ..services import ShiftService, FutureShiftRequestService
 from ..utils.dependencies import get_current_user
 from ..utils.ics_exporter import ICSExporter
 
@@ -168,3 +168,53 @@ def export_my_shifts_ics(
         media_type="text/calendar",
         headers={"Content-Disposition": "attachment; filename=minha_escala.ics"},
     )
+
+
+@router.get("/future-shift-requests", response_model=list[FutureShiftRequestResponse])
+def list_my_future_shift_requests(
+    start_date: Optional[date] = Query(default=None),
+    end_date: Optional[date] = Query(default=None),
+    include_cancelled: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(status_code=400, detail="Data inicial não pode ser maior que data final.")
+
+    return FutureShiftRequestService.list_requests(
+        db=db,
+        user_id=current_user.id,
+        start_date=start_date,
+        end_date=end_date,
+        include_cancelled=include_cancelled,
+    )
+
+
+@router.post("/future-shift-requests", response_model=FutureShiftRequestResponse, status_code=status.HTTP_201_CREATED)
+def create_my_future_shift_request(
+    payload: FutureShiftRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return FutureShiftRequestService.create_request(
+            db=db,
+            user_id=current_user.id,
+            requested_date=payload.requested_date,
+            shift_period=payload.shift_period,
+            notes=payload.notes,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/future-shift-requests/{request_id}", response_model=FutureShiftRequestResponse)
+def cancel_my_future_shift_request(
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    cancelled = FutureShiftRequestService.cancel_request(db=db, request_id=request_id, user_id=current_user.id)
+    if not cancelled:
+        raise HTTPException(status_code=404, detail="Solicitação futura não encontrada.")
+    return cancelled

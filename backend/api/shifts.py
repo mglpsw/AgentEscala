@@ -1,5 +1,6 @@
 import re
 from datetime import date, datetime
+import calendar
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,7 +9,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from ..config.database import get_db
-from ..models import User
+from ..models import User, UserRole
 from ..services import SchedulePresentationService, ShiftService
 from ..utils import ExcelExporter, ICSExporter
 from ..utils.dependencies import get_current_user, require_admin
@@ -145,21 +146,40 @@ def create_shift(
 def list_shifts(
     skip: int = 0,
     limit: int = 100,
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user)
 ):
-    """Listar todos os turnos"""
-    return ShiftService.get_all_shifts(db, skip, limit)
+    """Listar todos os turnos (passado/presente/futuro) com filtro opcional por período."""
+    parsed_start_date, parsed_end_date = _parse_export_period(start_date, end_date)
+    return ShiftService.get_all_shifts(
+        db,
+        skip,
+        limit,
+        parsed_start_date,
+        parsed_end_date,
+    )
 
 
 @router.get("/agent/{agent_id}", response_model=List[ShiftResponse])
 def list_agent_shifts(
     agent_id: int,
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
     db: Session = Depends(get_db),
-    _: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
-    """Listar todos os turnos de um agente específico"""
-    return ShiftService.get_shifts_by_agent(db, agent_id)
+    """Listar turnos de um agente específico com suporte a histórico e meses futuros."""
+    is_admin = current_user.role == UserRole.ADMIN or current_user.is_admin
+    if not is_admin and current_user.id != agent_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para consultar turnos de outro usuário.",
+        )
+
+    parsed_start_date, parsed_end_date = _parse_export_period(start_date, end_date)
+    return ShiftService.get_shifts_by_agent(db, agent_id, parsed_start_date, parsed_end_date)
 
 
 @router.get("/export")
@@ -275,6 +295,46 @@ def export_shifts_ics(
         limit,
     )
     return _build_shift_export_response(shifts, "ics", "full")
+
+
+@router.get("/export/monthly-consolidated", response_class=StreamingResponse)
+def export_monthly_consolidated_xlsx(
+    year: int = Query(..., ge=2000, le=2100),
+    month: int = Query(..., ge=1, le=12),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Exportar planilha mensal consolidada com todos os plantões oficiais confirmados."""
+    month_start = date(year, month, 1)
+    month_end = date(year, month, calendar.monthrange(year, month)[1])
+    shifts = ShiftService.get_filtered_shifts(
+        db,
+        start_date=month_start,
+        end_date=month_end,
+        skip=0,
+        limit=10000,
+    )
+    export_file = ExcelExporter.export_monthly_consolidated(shifts)
+    filename = f"escala_consolidada_{year:04d}-{month:02d}.xlsx"
+    return StreamingResponse(
+        export_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/day-config")
+def get_day_dynamic_config(
+    start_date: str = Query(...),
+    end_date: str = Query(...),
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+):
+    """Retorna configuração dinâmica de slots por dia com limite de médicos por período."""
+    parsed_start, parsed_end = _parse_export_period(start_date, end_date)
+    if parsed_start is None or parsed_end is None:
+        raise HTTPException(status_code=400, detail="start_date e end_date são obrigatórios.")
+    return ShiftService.get_dynamic_day_slots(db, parsed_start, parsed_end)
 
 
 @router.get("/coverage/flags")
