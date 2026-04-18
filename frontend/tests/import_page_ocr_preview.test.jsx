@@ -80,6 +80,8 @@ describe('ImportPage OCR preview agrupada por dia', () => {
               shift_kind: 'day',
               confidence: 0.9,
               match_status: 'matched',
+              alias_applied: true,
+              validation_messages: ['Possível conflito de CRM'],
             },
           ],
         },
@@ -95,6 +97,9 @@ describe('ImportPage OCR preview agrupada por dia', () => {
     await waitFor(() => expect(screen.getByDisplayValue('NOME ORIGINAL')).toBeInTheDocument())
 
     fireEvent.change(screen.getByDisplayValue('NOME ORIGINAL'), { target: { value: 'NOME EDITADO' } })
+    expect(screen.getByText(/sugerido por alias\/crm/i)).toBeInTheDocument()
+    expect(screen.getByText(/anomalia detectada/i)).toBeInTheDocument()
+    expect(screen.getByText(/diff ocr → edição/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /apply to staging/i }))
 
     await waitFor(() => {
