@@ -7,6 +7,7 @@ Create Date: 2026-04-18
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision = 'd7c1f4ea9a20'
@@ -15,13 +16,14 @@ branch_labels = None
 depends_on = None
 
 
-shift_request_status = sa.Enum(
+shift_request_status = postgresql.ENUM(
     'PENDING_TARGET',
     'PENDING_ADMIN',
     'APPROVED',
     'REJECTED',
     'CANCELLED',
     name='shiftrequeststatus',
+    create_type=False,
 )
 
 

@@ -25,20 +25,16 @@ const EXTRA_OPTIONS = [
 function nextDay(dateStr) {
   const d = new Date(`${dateStr}T00:00:00`)
   d.setDate(d.getDate() + 1)
-  return d.toISOString().slice(0, 10)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function buildDateTime(date, hhmm) {
   return `${date}T${hhmm}:00`
 }
 
-function nextDay(dateStr) {
-  const d = new Date(`${dateStr}T00:00:00`)
-  d.setDate(d.getDate() + 1)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
 function slotTemplate(firstType) {
   if (firstType === SHIFT_TYPES.FULL) {
     return [
@@ -75,8 +71,6 @@ export default function AdminPlantoesPage() {
   const [coverage, setCoverage] = useState(null)
   const [selectedUserId, setSelectedUserId] = useState('')
   const [selectedPlantao, setSelectedPlantao] = useState(PLANTAO_OPTIONS[0].key)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [extraUserId, setExtraUserId] = useState('')
@@ -143,6 +137,11 @@ export default function AdminPlantoesPage() {
       await loadData()
     } catch (e) {
       setError(e?.response?.data?.detail || 'Falha ao adicionar plantão.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleSlotChange = (slotId, userId) => {
     setSlotAssignments((prev) => ({ ...prev, [slotId]: userId }))
   }
@@ -205,15 +204,11 @@ export default function AdminPlantoesPage() {
       <header>
         <h2 className="text-2xl font-bold text-gray-800">Painel Admin de Plantões</h2>
         <p className="text-sm text-gray-600">Adicionar/remover médicos por classe de plantão e validar cobertura diária.</p>
-      </header>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
-        <div className="flex flex-wrap gap-4 items-end">
         <p className="text-sm text-gray-600">Padrão diário com 4 campos (ou 2 campos 24h) + opção de turno extra individual.</p>
       </header>
 
       <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
-        <div className="flex gap-4 items-end flex-wrap">
+        <div className="flex flex-wrap gap-4 items-end">
           <div>
             <label className="block text-xs text-gray-600 mb-1">Data</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="rounded border px-3 py-2 text-sm" />
@@ -248,6 +243,11 @@ export default function AdminPlantoesPage() {
         ) : null}
 
         <div className="text-xs text-gray-600">Contagem atual: 12H DIA={byType['12H DIA']} · 10-22H={byType['10-22H']} · 12H NOITE={byType['12H NOITE']}</div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div>
             <label className="block text-xs text-gray-600 mb-1">1º campo (selecionável)</label>
             <select value={firstType} onChange={(e) => setFirstType(e.target.value)} className="rounded border px-3 py-2 text-sm">
               <option value={SHIFT_TYPES.DAY}>12H DIA</option>
@@ -333,7 +333,6 @@ export default function AdminPlantoesPage() {
                   <button onClick={() => handleRemove(shift.id)} className="text-red-600 hover:text-red-700" disabled={loading}>
                     remover
                   </button>
-                  <button onClick={() => handleRemove(shift.id)} className="text-red-600 hover:text-red-700" disabled={loading}>remover</button>
                 </td>
               </tr>
             ))}
