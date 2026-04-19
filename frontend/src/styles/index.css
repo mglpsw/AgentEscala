@@ -1,3 +1,17 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .agentescala-day-cell {
+    @apply cursor-pointer transition-colors;
+  }
+
+  .agentescala-day-cell:hover {
+    @apply bg-gray-50;
+  }
+
+  .agentescala-day-cell:focus-visible {
+    @apply outline-none ring-2 ring-blue-300;
+  }
+}

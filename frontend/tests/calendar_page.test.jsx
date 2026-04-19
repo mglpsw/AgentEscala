@@ -9,14 +9,18 @@ import { listFutureShiftRequests } from '../src/api/future_shift_requests.js'
 import { listShiftRequests } from '../src/api/shift_requests.js'
 
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ events, dayCellContent, dateClick }) => {
-    const result = dayCellContent?.({ date: new Date('2026-04-18T00:00:00'), dayNumberText: '18' })
+  default: ({ events, dayCellContent, dayCellDidMount, dateClick }) => {
+    const date = new Date('2026-04-18T00:00:00')
+    const result = dayCellContent?.({ date, dayNumberText: '18' })
+    const cellRef = { classList: { add: vi.fn() }, setAttribute: vi.fn() }
+    dayCellDidMount?.({ date, el: cellRef })
     return (
       <div data-testid="calendar">
         Calendário renderizado · {events.length} evento(s)
         <button type="button" data-testid="date-click" onClick={() => dateClick?.({ dateStr: '2026-04-18' })}>abrir dia</button>
+        <button type="button" data-testid="cell-click" onClick={() => cellRef.onclick?.()}>abrir célula</button>
         <span data-testid="day-cell-handler">{typeof dayCellContent}</span>
-        <pre data-testid="day-cell-html">{result?.html || ''}</pre>
+        <div data-testid="day-cell-node">{result}</div>
       </div>
     )
   },
@@ -148,9 +152,9 @@ describe('CalendarPage', () => {
     render(<CalendarPage />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('day-cell-html').textContent).toContain('&lt;img')
+      expect(screen.getByTestId('day-shift-badge-30')).toBeInTheDocument()
     })
-    expect(screen.getByTestId('day-cell-html').textContent).not.toContain('<img')
+    expect(screen.getByTestId('day-cell-node').textContent).toContain('<img o.')
   })
 
   it('mantém até 4 plantonistas na célula e agrega excedente com +N', async () => {
@@ -174,8 +178,9 @@ describe('CalendarPage', () => {
     render(<CalendarPage />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('day-cell-html').textContent).toContain('+1')
+      expect(screen.getByText('+1')).toBeInTheDocument()
     })
+    expect(screen.getAllByTestId(/day-shift-badge-/)).toHaveLength(4)
   })
 
   it('abre detalhe do dia com toque e mostra nome completo, horário e turno', async () => {
@@ -192,5 +197,61 @@ describe('CalendarPage', () => {
     expect(screen.getAllByText('Alice').length).toBeGreaterThan(0)
     expect(screen.getByText('08:00-20:00')).toBeInTheDocument()
     expect(screen.getAllByText('12H DIA').length).toBeGreaterThan(0)
+  })
+
+  it('aplica limite mobile com 2 itens visíveis e mantém +N', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/shifts/') {
+        return Promise.resolve({
+          data: [
+            { id: 11, agent_id: 2, agent: { name: 'Aline Longo Nome Exemplo' }, title: 'Plantão', start_time: '2026-04-18T08:00:00', end_time: '2026-04-18T20:00:00' },
+            { id: 12, agent_id: 3, agent: { name: 'Bruno Lima' }, title: 'Plantão', start_time: '2026-04-18T10:00:00', end_time: '2026-04-18T22:00:00' },
+            { id: 13, agent_id: 4, agent: { name: 'Carla Dias' }, title: 'Plantão', start_time: '2026-04-18T20:00:00', end_time: '2026-04-19T08:00:00' },
+          ],
+        })
+      }
+      if (url === '/shifts/day-config') return Promise.resolve({ data: [{ date: '2026-04-18', slots: [] }] })
+      if (url === '/users/agents') return Promise.resolve({ data: [{ id: 2, name: 'Alice' }] })
+      return Promise.resolve({ data: [] })
+    })
+    window.innerWidth = 375
+    window.dispatchEvent(new Event('resize'))
+
+    render(<CalendarPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('+1')).toBeInTheDocument()
+    })
+    expect(screen.getAllByTestId(/day-shift-badge-/)).toHaveLength(2)
+    expect(screen.queryByText(/08–20/)).not.toBeInTheDocument()
+  })
+
+  it('destaca plantões do usuário logado no badge e no detalhe do dia', async () => {
+    api.get.mockImplementation((url) => {
+      if (url === '/shifts/') {
+        return Promise.resolve({
+          data: [
+            { id: 21, agent_id: 1, agent: { name: 'Admin User' }, title: 'Plantão', start_time: '2026-04-18T08:00:00', end_time: '2026-04-18T20:00:00' },
+            { id: 22, agent_id: 2, agent: { name: 'Outro User' }, title: 'Plantão', start_time: '2026-04-18T10:00:00', end_time: '2026-04-18T22:00:00' },
+          ],
+        })
+      }
+      if (url === '/shifts/day-config') return Promise.resolve({ data: [{ date: '2026-04-18', slots: [] }] })
+      if (url === '/users/agents') return Promise.resolve({ data: [{ id: 2, name: 'Alice' }] })
+      return Promise.resolve({ data: [] })
+    })
+
+    render(<CalendarPage />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('day-shift-badge-21')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('day-shift-badge-21').className).toContain('ring-blue-400/70')
+
+    fireEvent.click(screen.getByTestId('cell-click'))
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+    expect(screen.getByText('Admin User').closest('.rounded')?.className).toContain('border-blue-300')
   })
 })

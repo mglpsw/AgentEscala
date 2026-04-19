@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -48,10 +48,11 @@ function map_shift_to_event(shift, currentUserId) {
 
 function compactName(name) {
   const parts = (name || '').trim().split(/\s+/).filter(Boolean)
-  if (parts.length <= 1) return parts[0] || '—'
+  if (parts.length <= 1) return (parts[0] || '—').slice(0, 14)
   const first = parts[0]
   const second = parts.length > 2 ? parts[parts.length - 1] : parts[1]
-  return `${first} ${second[0]}.`
+  const compact = `${first} ${second[0]}.`
+  return compact.length > 14 ? `${compact.slice(0, 13)}…` : compact
 }
 
 function compactShiftTime(shift) {
@@ -62,13 +63,9 @@ function compactShiftTime(shift) {
   return `${s}-${e}`
 }
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
+function getVisibleShifts(shifts, limit) {
+  if (!Array.isArray(shifts) || limit <= 0) return []
+  return shifts.slice(0, limit)
 }
 
 function inferPeriodFromShift(shift) {
@@ -86,13 +83,37 @@ function inferPeriodFromShift(shift) {
 
 function periodVisual(period) {
   const map = {
-    '12H DIA': { bg: '#dcfce7', text: '#166534', border: '#86efac' },
-    '10-22H': { bg: '#fef3c7', text: '#92400e', border: '#fcd34d' },
-    '12H NOITE': { bg: '#dbeafe', text: '#1e3a8a', border: '#93c5fd' },
-    '24 HORAS': { bg: '#ede9fe', text: '#5b21b6', border: '#c4b5fd' },
+    '12H DIA': 'border-emerald-200 bg-emerald-100 text-emerald-800',
+    '10-22H': 'border-blue-200 bg-blue-100 text-blue-800',
+    '12H NOITE': 'border-violet-200 bg-violet-100 text-violet-800',
+    '24 HORAS': 'border-gray-200 bg-gray-100 text-gray-700',
   }
-  return map[period] || { bg: '#f3f4f6', text: '#374151', border: '#d1d5db' }
+  return map[period] || 'border-gray-200 bg-gray-100 text-gray-700'
 }
+
+const ShiftBadge = memo(function ShiftBadge({ shift, showTime, isOwn }) {
+  const period = inferPeriodFromShift(shift)
+  const periodClassName = periodVisual(period)
+  const [start, end] = compactShiftTime(shift).split('-')
+  const compactStart = start?.endsWith(':00') ? start.slice(0, 2) : start
+  const compactEnd = end?.endsWith(':00') ? end.slice(0, 2) : end
+  const time = `${compactStart}–${compactEnd}`
+  return (
+    <div
+      data-testid={`day-shift-badge-${shift.id}`}
+      className={`inline-flex min-h-6 w-full items-center gap-1 overflow-hidden rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-[11px] ${periodClassName} ${isOwn ? 'ring-1 ring-blue-400/70' : ''}`}
+      title={`${shift.agent?.name || 'Profissional'} · ${compactShiftTime(shift)} · ${period}`}
+    >
+      <span className="truncate">{compactName(shift.agent?.name || '')}</span>
+      {showTime ? <span className="shrink-0 opacity-80">{time}</span> : null}
+    </div>
+  )
+})
+
+const MoreIndicator = memo(function MoreIndicator({ count }) {
+  if (!count || count <= 0) return null
+  return <div className="px-0.5 text-[10px] font-semibold leading-none text-gray-600 sm:text-[11px]">+{count}</div>
+})
 
 function map_request_to_event(request) {
   const start = `${request.requested_date}T08:00:00`
@@ -141,6 +162,10 @@ function CalendarPage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [agents, setAgents] = useState([])
   const [dayDetails, setDayDetails] = useState([])
+  const [isCompactCalendar, setIsCompactCalendar] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth < 640
+  })
 
   const [futureRequestForm, setFutureRequestForm] = useState({ requested_date: '', shift_period: SHIFT_PERIOD_OPTIONS[0], notes: '' })
   const [shiftRequestForm, setShiftRequestForm] = useState({ requested_date: '', shift_period: SHIFT_PERIOD_OPTIONS[0], note: '' })
@@ -159,6 +184,12 @@ function CalendarPage() {
   }, [])
 
   const reloadData = useCallback(() => setReloadKey((k) => k + 1), [])
+
+  useEffect(() => {
+    const onResize = () => setIsCompactCalendar(window.innerWidth < 640)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     if (!user?.id) {
@@ -302,6 +333,47 @@ function CalendarPage() {
     return grouped
   }, [dayDetails])
   const selectedDayItems = selectedDate ? daySummaryMap[selectedDate] || [] : []
+  const maxVisiblePerDay = isCompactCalendar ? 2 : 4
+  const selectedDayItemsByPeriod = useMemo(() => {
+    return selectedDayItems.reduce((acc, item) => {
+      const period = inferPeriodFromShift(item)
+      acc[period] = acc[period] || []
+      acc[period].push(item)
+      return acc
+    }, {})
+  }, [selectedDayItems])
+
+  const handleDayCellMount = useCallback((arg) => {
+    arg.el.classList.add('agentescala-day-cell')
+    arg.el.setAttribute('role', 'button')
+    arg.el.setAttribute('tabIndex', '0')
+    arg.el.onclick = () => openDayActions(arg.date.toISOString().slice(0, 10))
+    arg.el.onkeydown = (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        openDayActions(arg.date.toISOString().slice(0, 10))
+      }
+    }
+  }, [])
+
+  const renderDayCellContent = useCallback((arg) => {
+    const dateKey = arg.date.toISOString().slice(0, 10)
+    const items = daySummaryMap[dateKey] || []
+    const visibleShifts = getVisibleShifts(items, maxVisiblePerDay)
+    const overflowCount = Math.max(items.length - visibleShifts.length, 0)
+
+    return (
+      <div className="flex h-full flex-col overflow-hidden">
+        <div className="fc-daygrid-day-number mb-1 text-[11px] font-semibold text-gray-600">{arg.dayNumberText}</div>
+        <div className="flex min-h-[84px] flex-col gap-1 overflow-hidden">
+          {visibleShifts.map((shift) => (
+            <ShiftBadge key={shift.id} shift={shift} showTime={!isCompactCalendar} isOwn={shift.agent_id === user?.id} />
+          ))}
+          <MoreIndicator count={overflowCount} />
+        </div>
+      </div>
+    )
+  }, [daySummaryMap, isCompactCalendar, maxVisiblePerDay, user?.id])
 
   return (
     <div className="space-y-6">
@@ -333,35 +405,8 @@ function CalendarPage() {
                 firstDay={1}
                 height="auto"
                 dayMaxEvents={3}
-                dayCellContent={(arg) => {
-                  const dateKey = arg.date.toISOString().slice(0, 10)
-                  const items = daySummaryMap[dateKey] || []
-                  const safeDayNumber = escapeHtml(arg.dayNumberText)
-                  if (items.length === 0) return { html: `<div class="fc-daygrid-day-number">${safeDayNumber}</div>` }
-                  const lines = items.slice(0, 4).map((shift) => {
-                    const period = inferPeriodFromShift(shift)
-                    const visual = periodVisual(period)
-                    return [
-                      '<div style="display:flex;align-items:center;gap:4px;padding:1px 4px;border-radius:6px;border:1px solid;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:18px;',
-                      `background:${visual.bg};color:${visual.text};border-color:${visual.border};font-size:10px;line-height:12px;">`,
-                      `<span style="font-weight:600;">${escapeHtml(compactName(shift.agent?.name || ''))}</span>`,
-                      `<span style="opacity:.9;">${escapeHtml(compactShiftTime(shift))}</span>`,
-                      '</div>',
-                    ].join('')
-                  }).join('')
-                  const more = items.length > 4
-                    ? `<div style="font-size:10px;line-height:12px;color:#4b5563;font-weight:600;padding-left:2px;">+${items.length - 4}</div>`
-                    : ''
-                  return {
-                    html: [
-                      `<div class="fc-daygrid-day-number">${safeDayNumber}</div>`,
-                      '<div style="display:flex;flex-direction:column;gap:2px;padding-top:2px;">',
-                      lines,
-                      more,
-                      '</div>',
-                    ].join(''),
-                  }
-                }}
+                dayCellContent={renderDayCellContent}
+                dayCellDidMount={handleDayCellMount}
                 datesSet={handleDatesSet}
                 events={events}
                 dateClick={(info) => openDayActions(info.dateStr)}
@@ -403,19 +448,20 @@ function CalendarPage() {
           <div className="rounded-lg border border-gray-100 bg-gray-50 p-3">
             <p className="text-xs font-semibold text-gray-700 mb-2">Escala completa do dia ({selectedDayItems.length})</p>
             <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-              {selectedDayItems.map((item) => (
-                <div key={item.id} className="rounded border border-gray-200 bg-white p-2.5 text-xs">
-                  <div className="font-medium text-gray-800 break-words">{item.agent?.name || 'Profissional'}</div>
-                  <div className="text-gray-600 mt-0.5">{compactShiftTime(item)}</div>
-                  <div className="mt-1">
-                    <span className="inline-flex rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700">{inferPeriodFromShift(item)}</span>
-                  </div>
+              {Object.entries(selectedDayItemsByPeriod).map(([period, items]) => (
+                <div key={period} className="space-y-1.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{period}</p>
+                  {items.map((item) => (
+                    <div key={item.id} className={`rounded border bg-white p-2.5 text-xs ${item.agent_id === user?.id ? 'border-blue-300 ring-1 ring-blue-100' : 'border-gray-200'}`}>
+                      <div className="font-medium text-gray-800 break-words">{item.agent?.name || 'Profissional'}</div>
+                      <div className="text-gray-600 mt-0.5">{compactShiftTime(item)}</div>
+                    </div>
+                  ))}
                 </div>
               ))}
               {selectedDayItems.length === 0 ? <p className="rounded border border-dashed border-gray-300 bg-white p-3 text-xs text-gray-500">Sem plantonistas no dia selecionado.</p> : null}
             </div>
           </div>
-
           <div className="grid gap-4 lg:grid-cols-2">
             <form onSubmit={handleCreateFutureRequest} className="rounded border border-amber-200 bg-amber-50 p-3 space-y-2">
               <p className="text-sm font-semibold text-amber-800">Solicitação prévia futura</p>
