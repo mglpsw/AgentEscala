@@ -224,7 +224,7 @@ run_interactive() {
     --auto-commits
     --read CLAUDE.md
     --read AGENTS.md
-    --show-model-warnings=false
+    --no-show-model-warnings
   )
 
   if [[ -n "$PROMPT" ]]; then
