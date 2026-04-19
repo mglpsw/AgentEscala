@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
@@ -62,13 +62,9 @@ function compactShiftTime(shift) {
   return `${s}-${e}`
 }
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
+function getVisibleShifts(shifts, limit) {
+  if (!Array.isArray(shifts) || limit <= 0) return []
+  return shifts.slice(0, limit)
 }
 
 function inferPeriodFromShift(shift) {
@@ -86,13 +82,36 @@ function inferPeriodFromShift(shift) {
 
 function periodVisual(period) {
   const map = {
-    '12H DIA': { bg: '#dcfce7', text: '#166534', border: '#86efac' },
-    '10-22H': { bg: '#fef3c7', text: '#92400e', border: '#fcd34d' },
-    '12H NOITE': { bg: '#dbeafe', text: '#1e3a8a', border: '#93c5fd' },
-    '24 HORAS': { bg: '#ede9fe', text: '#5b21b6', border: '#c4b5fd' },
+    '12H DIA': 'border-emerald-200 bg-emerald-100 text-emerald-800',
+    '10-22H': 'border-blue-200 bg-blue-100 text-blue-800',
+    '12H NOITE': 'border-violet-200 bg-violet-100 text-violet-800',
+    '24 HORAS': 'border-gray-200 bg-gray-100 text-gray-700',
   }
-  return map[period] || { bg: '#f3f4f6', text: '#374151', border: '#d1d5db' }
+  return map[period] || 'border-gray-200 bg-gray-100 text-gray-700'
 }
+
+const ShiftBadge = memo(function ShiftBadge({ shift, showTime }) {
+  const period = inferPeriodFromShift(shift)
+  const periodClassName = periodVisual(period)
+  const [start, end] = compactShiftTime(shift).split('-')
+  const compactStart = start?.endsWith(':00') ? start.slice(0, 2) : start
+  const compactEnd = end?.endsWith(':00') ? end.slice(0, 2) : end
+  const time = `${compactStart}–${compactEnd}`
+  return (
+    <div
+      className={`inline-flex min-h-6 w-full items-center gap-1 overflow-hidden rounded-md border px-1.5 py-0.5 text-[10px] font-medium leading-tight sm:text-[11px] ${periodClassName}`}
+      title={`${shift.agent?.name || 'Profissional'} · ${compactShiftTime(shift)} · ${period}`}
+    >
+      <span className="truncate">{compactName(shift.agent?.name || '')}</span>
+      {showTime ? <span className="shrink-0 opacity-80">{time}</span> : null}
+    </div>
+  )
+})
+
+const MoreIndicator = memo(function MoreIndicator({ count }) {
+  if (!count || count <= 0) return null
+  return <div className="px-0.5 text-[10px] font-semibold leading-none text-gray-600 sm:text-[11px]">+{count}</div>
+})
 
 function map_request_to_event(request) {
   const start = `${request.requested_date}T08:00:00`
@@ -141,6 +160,10 @@ function CalendarPage() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [agents, setAgents] = useState([])
   const [dayDetails, setDayDetails] = useState([])
+  const [isCompactCalendar, setIsCompactCalendar] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth < 640
+  })
 
   const [futureRequestForm, setFutureRequestForm] = useState({ requested_date: '', shift_period: SHIFT_PERIOD_OPTIONS[0], notes: '' })
   const [shiftRequestForm, setShiftRequestForm] = useState({ requested_date: '', shift_period: SHIFT_PERIOD_OPTIONS[0], note: '' })
@@ -159,6 +182,12 @@ function CalendarPage() {
   }, [])
 
   const reloadData = useCallback(() => setReloadKey((k) => k + 1), [])
+
+  useEffect(() => {
+    const onResize = () => setIsCompactCalendar(window.innerWidth < 640)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     if (!user?.id) {
@@ -302,6 +331,24 @@ function CalendarPage() {
     return grouped
   }, [dayDetails])
   const selectedDayItems = selectedDate ? daySummaryMap[selectedDate] || [] : []
+  const maxVisiblePerDay = isCompactCalendar ? 2 : 4
+
+  const renderDayCellContent = useCallback((arg) => {
+    const dateKey = arg.date.toISOString().slice(0, 10)
+    const items = daySummaryMap[dateKey] || []
+    const visibleShifts = getVisibleShifts(items, maxVisiblePerDay)
+    const overflowCount = Math.max(items.length - visibleShifts.length, 0)
+
+    return (
+      <div className="flex h-full flex-col gap-1 overflow-hidden pt-0.5">
+        <div className="fc-daygrid-day-number">{arg.dayNumberText}</div>
+        {visibleShifts.map((shift) => (
+          <ShiftBadge key={shift.id} shift={shift} showTime={!isCompactCalendar} />
+        ))}
+        <MoreIndicator count={overflowCount} />
+      </div>
+    )
+  }, [daySummaryMap, isCompactCalendar, maxVisiblePerDay])
 
   return (
     <div className="space-y-6">
@@ -333,35 +380,7 @@ function CalendarPage() {
                 firstDay={1}
                 height="auto"
                 dayMaxEvents={3}
-                dayCellContent={(arg) => {
-                  const dateKey = arg.date.toISOString().slice(0, 10)
-                  const items = daySummaryMap[dateKey] || []
-                  const safeDayNumber = escapeHtml(arg.dayNumberText)
-                  if (items.length === 0) return { html: `<div class="fc-daygrid-day-number">${safeDayNumber}</div>` }
-                  const lines = items.slice(0, 4).map((shift) => {
-                    const period = inferPeriodFromShift(shift)
-                    const visual = periodVisual(period)
-                    return [
-                      '<div style="display:flex;align-items:center;gap:4px;padding:1px 4px;border-radius:6px;border:1px solid;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:18px;',
-                      `background:${visual.bg};color:${visual.text};border-color:${visual.border};font-size:10px;line-height:12px;">`,
-                      `<span style="font-weight:600;">${escapeHtml(compactName(shift.agent?.name || ''))}</span>`,
-                      `<span style="opacity:.9;">${escapeHtml(compactShiftTime(shift))}</span>`,
-                      '</div>',
-                    ].join('')
-                  }).join('')
-                  const more = items.length > 4
-                    ? `<div style="font-size:10px;line-height:12px;color:#4b5563;font-weight:600;padding-left:2px;">+${items.length - 4}</div>`
-                    : ''
-                  return {
-                    html: [
-                      `<div class="fc-daygrid-day-number">${safeDayNumber}</div>`,
-                      '<div style="display:flex;flex-direction:column;gap:2px;padding-top:2px;">',
-                      lines,
-                      more,
-                      '</div>',
-                    ].join(''),
-                  }
-                }}
+                dayCellContent={renderDayCellContent}
                 datesSet={handleDatesSet}
                 events={events}
                 dateClick={(info) => openDayActions(info.dateStr)}
