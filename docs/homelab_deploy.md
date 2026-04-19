@@ -86,6 +86,35 @@ nano infra/.env.homelab
 O script valida variáveis, porta, compose e build. Se o `up` falhar, o rollback
 é restrito ao stack do AgentEscala.
 
+## Deploy Canônico Local Em Um Comando
+
+Para execução local no CT 102 com a sequência oficial encapsulada em script:
+
+```bash
+cd /opt/repos/AgentEscala
+./infra/scripts/deploy_local_canonical.sh
+```
+
+Esse script executa na ordem correta:
+
+1. valida que o repositório está limpo e na branch `main`;
+2. sincroniza com `origin/main` em modo fast-forward only;
+3. chama `./infra/scripts/rebuild_official_homelab.sh`;
+4. roda `./infra/scripts/run_homelab_validation.sh` ao final.
+
+Exemplos úteis:
+
+```bash
+# mantém a sincronização git padrão
+./infra/scripts/deploy_local_canonical.sh
+
+# repassa flags para o rebuild oficial
+./infra/scripts/deploy_local_canonical.sh -- --allow-dirty
+
+# usa o commit atual sem fetch/merge
+./infra/scripts/deploy_local_canonical.sh --skip-git-sync
+```
+
 ## Atualização De Stack Já Ativo
 
 Quando o stack já está rodando, a porta `18000` estará ocupada pelo próprio
