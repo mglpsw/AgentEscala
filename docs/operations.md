@@ -37,14 +37,20 @@ cd /opt/repos/AgentEscala
 git fetch origin main
 git merge --ff-only FETCH_HEAD
 
-DEBUG=false docker-compose -p agentescala_official \
-  -f infra/docker-compose.homelab.yml \
-  --env-file infra/.env.homelab \
-  up -d --build --force-recreate backend
+./infra/scripts/deploy_local_canonical.sh
 ```
 
-Use `DEBUG=false` para impedir que variáveis exportadas no shell do CT, como
-`DEBUG=release`, sejam injetadas no backend.
+Se houver alteração local intencional ainda não commitada:
+
+```bash
+./infra/scripts/deploy_local_canonical.sh --skip-git-sync -- --allow-dirty
+```
+
+Os scripts canônicos já protegem o `DEBUG`, validam frontend antes do rebuild e
+tratam tanto `docker compose` plugin quanto `docker-compose` v1 do host.
+
+`infra/.env.homelab` ativo não pode permanecer com `CHANGE_ME_*`; placeholders
+pertencem apenas ao `.env.homelab.example`.
 
 ## Validação Mínima
 
@@ -73,6 +79,10 @@ curl -k -X POST https://escala.ks-sm.net/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"admin@agentescala.com","password":"admin"}'
 ```
+
+O script `./infra/scripts/run_homelab_validation.sh` deve ser executado no CT
+102 sem testar `:9443` diretamente. Use `--check-public-port` apenas a partir
+de um cliente externo que atinja a borda do roteador/firewall.
 
 ## Logs E Troubleshooting
 

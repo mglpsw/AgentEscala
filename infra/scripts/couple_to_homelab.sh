@@ -49,14 +49,18 @@ set +a
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-agentescala}"
 
 compose_cmd() {
-    if command -v docker-compose >/dev/null 2>&1; then
-        docker-compose "$@"
-    elif command -v docker >/dev/null 2>&1; then
+    if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
         docker compose "$@"
-    else
-        echo "Erro: Docker Compose não encontrado (docker compose ou docker-compose)." >&2
-        exit 1
+        return
     fi
+
+    if command -v docker-compose >/dev/null 2>&1; then
+        env PYTHONPATH="/usr/lib/python3/dist-packages${PYTHONPATH:+:$PYTHONPATH}" docker-compose "$@"
+        return
+    fi
+
+    echo "Erro: Docker Compose não encontrado (docker compose ou docker-compose)." >&2
+    exit 1
 }
 
 require_var() {

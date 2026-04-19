@@ -54,7 +54,23 @@ source "$ENV_FILE"
 set +a
 
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-agentescala}"
-DB_CONTAINER_ID="$(docker-compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps -q db)"
+
+compose_cmd() {
+    if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+        return
+    fi
+
+    if command -v docker-compose >/dev/null 2>&1; then
+        env PYTHONPATH="/usr/lib/python3/dist-packages${PYTHONPATH:+:$PYTHONPATH}" docker-compose "$@"
+        return
+    fi
+
+    echo "Erro: Docker Compose não encontrado (docker compose ou docker-compose)." >&2
+    exit 1
+}
+
+DB_CONTAINER_ID="$(compose_cmd -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps -q db)"
 
 if [[ -z "$DB_CONTAINER_ID" ]]; then
     echo "Erro: não foi possível localizar o container do banco do AgentEscala."
@@ -78,17 +94,17 @@ if [[ "$CONFIRM" != true ]]; then
     exit 1
 fi
 
-docker-compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" stop backend
+compose_cmd -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" stop backend
 
 cleanup() {
-    docker-compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" start backend >/dev/null 2>&1 || true
+    compose_cmd -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" start backend >/dev/null 2>&1 || true
 }
 
 trap cleanup EXIT
 
 docker cp "$DUMP_FILE" "$DB_CONTAINER_ID:/tmp/agentescala_restore.dump"
 
-docker-compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T db sh -c '
+compose_cmd -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T db sh -c '
     psql -U "$POSTGRES_USER" -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '\''$POSTGRES_DB'\'' AND pid <> pg_backend_pid();" &&
     dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB" &&
     createdb -U "$POSTGRES_USER" "$POSTGRES_DB" &&

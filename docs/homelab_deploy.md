@@ -72,6 +72,10 @@ INTERNAL_NETWORK_NAME=agentescala_official_internal
 `VITE_API_BASE_URL` precisa incluir `:9443`, porque o navegador dos usuários vê
 essa origem externa. O NPM, por outro lado, escuta em `443` dentro do CT.
 
+`infra/.env.homelab` ativo precisa manter segredos reais e coerentes com o
+volume Postgres persistido do stack oficial. Valores `CHANGE_ME_*` pertencem ao
+template `.env.homelab.example`, não ao ambiente de produção local.
+
 ## Primeira Subida
 
 ```bash
@@ -101,6 +105,15 @@ Esse script executa na ordem correta:
 2. sincroniza com `origin/main` em modo fast-forward only;
 3. chama `./infra/scripts/rebuild_official_homelab.sh`;
 4. roda `./infra/scripts/run_homelab_validation.sh` ao final.
+
+Observação operacional:
+
+- o script canônico já lida com `docker compose` plugin ou `docker-compose` v1
+  do Debian;
+- a validação final no CT 102 testa `https://escala.ks-sm.net` e o backend
+  direto em `18000`;
+- testes explícitos em `:9443` devem ser feitos apenas de um cliente externo,
+  porque essa porta pertence à borda do roteador/firewall.
 
 Exemplos úteis:
 
@@ -204,6 +217,18 @@ Via NPM interno:
 curl -kfsS https://escala.ks-sm.net/health
 curl -kfsS https://escala.ks-sm.net/api/v1/info
 curl -kfsS https://escala.ks-sm.net/login | grep AgentEscala
+```
+
+Checklist automatizado no CT 102:
+
+```bash
+./infra/scripts/run_homelab_validation.sh
+```
+
+Validação da borda externa real, somente fora do CT 102:
+
+```bash
+./infra/scripts/run_homelab_validation.sh --check-public-port
 ```
 
 CORS/login simulando a origem externa real:

@@ -5,6 +5,10 @@
 Sistema de automação de escalas médicas. Stack: FastAPI + React + PostgreSQL.
 Roda no homelab (CT102). Acesso externo: `https://escala.ks-sm.net:9443`.
 
+Dentro do CT102, valide o NPM por `https://escala.ks-sm.net` e o backend por
+`http://192.168.3.155:18000`. A porta `9443` fica na borda do roteador/firewall
+e não deve ser usada como verificação interna única.
+
 Clone canônico: `/opt/repos/AgentEscala`
 Compose canônico: `infra/docker-compose.homelab.yml`
 Stack canônica: `agentescala_official`
@@ -133,15 +137,18 @@ reports/          Relatórios gerados por agentes
 # Backend: rodar testes
 cd /opt/repos/AgentEscala && python -m pytest tests/ -v
 
-# Backend: verificar API em produção
-curl -s https://escala.ks-sm.net:9443/api/health | jq .
+# Backend: verificar API a partir do CT102
+curl -sk https://escala.ks-sm.net/health | jq .
 
 # Backend local (dev)
-curl -s http://192.168.3.155:18000/api/health | jq .
+curl -s http://192.168.3.155:18000/health | jq .
 
 # Frontend: build local
 cd frontend && npm run build
 ```
+
+`infra/.env.homelab` ativo nunca deve ficar com placeholders `CHANGE_ME_*`; isso
+fica restrito ao `.env.homelab.example`.
 
 ## Rebuild de Produção
 

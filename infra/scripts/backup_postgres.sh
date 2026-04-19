@@ -47,6 +47,21 @@ TARGET_DIR="$BACKUP_ROOT/$TIMESTAMP"
 ARCHIVE_FILE="$TARGET_DIR/${POSTGRES_DB}.dump"
 METADATA_FILE="$TARGET_DIR/metadata.env"
 
+compose_cmd() {
+    if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+        return
+    fi
+
+    if command -v docker-compose >/dev/null 2>&1; then
+        env PYTHONPATH="/usr/lib/python3/dist-packages${PYTHONPATH:+:$PYTHONPATH}" docker-compose "$@"
+        return
+    fi
+
+    echo "Erro: Docker Compose não encontrado (docker compose ou docker-compose)." >&2
+    exit 1
+}
+
 mkdir -p "$TARGET_DIR"
 
 echo "=== Backup do PostgreSQL AgentEscala ==="
@@ -59,9 +74,9 @@ if [[ "$DRY_RUN" == true ]]; then
     exit 0
 fi
 
-docker-compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps db >/dev/null
+compose_cmd -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps db >/dev/null
 
-docker-compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T db \
+compose_cmd -p "$PROJECT_NAME" -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T db \
     pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "$ARCHIVE_FILE"
 
 if [[ ! -s "$ARCHIVE_FILE" ]]; then
