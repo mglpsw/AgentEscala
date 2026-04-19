@@ -11,6 +11,11 @@ Este arquivo define como agentes de IA (Codex, Claude Code, Copilot, etc.) devem
 - **Acesso externo:** https://escala.ks-sm.net:9443
 - **Clone canônico:** `/opt/repos/AgentEscala`
 
+Observação de rede canônica: dentro do CT102, valide o NPM por
+`https://escala.ks-sm.net` e o backend por `http://192.168.3.155:18000`.
+`9443` pertence à borda do roteador/firewall e não é critério de validação
+interna do CT.
+
 ## Regras Invioláveis
 
 1. **Nunca fazer push direto para `main`** — sempre via branch + PR
@@ -103,12 +108,16 @@ python -m pytest tests/ -v
 # Build frontend
 cd frontend && npm run build
 
-# Saúde da API (produção)
-curl -s https://escala.ks-sm.net:9443/api/health | jq .
+# Saúde da API no CT 102
+curl -sk https://escala.ks-sm.net/health | jq .
+curl -s http://192.168.3.155:18000/health | jq .
 
 # Estado git limpo
 git status && git diff --stat
 ```
+
+`infra/.env.homelab` ativo nunca deve ficar com placeholders `CHANGE_ME_*`. Eles
+existem apenas no `.example`.
 
 ## Contexto do Homelab
 

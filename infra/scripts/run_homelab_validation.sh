@@ -5,10 +5,11 @@ DOMAIN="${DOMAIN:-escala.ks-sm.net}"
 PUBLIC_PORT="${PUBLIC_PORT:-9443}"
 LOCAL_BASE_URL="${LOCAL_BASE_URL:-http://192.168.3.155:18000}"
 PRINT_ONLY=false
+CHECK_PUBLIC_PORT=false
 
 usage() {
   cat <<USAGE
-Uso: $0 [--domain DOMINIO] [--public-port PORTA] [--local-base-url URL] [--print-only]
+Uso: $0 [--domain DOMINIO] [--public-port PORTA] [--local-base-url URL] [--check-public-port] [--print-only]
 
 Executa um checklist prático de validação de deploy/roteamento do AgentEscala no homelab.
 
@@ -16,6 +17,9 @@ Opções:
   --domain          Domínio público (default: escala.ks-sm.net)
   --public-port     Porta HTTPS pública (default: 9443)
   --local-base-url  URL local do backend (default: http://192.168.3.155:18000)
+  --check-public-port
+                    Testa diretamente DOMAIN:PUBLIC_PORT. Use apenas a partir de
+                    um cliente que realmente alcance o roteador/firewall.
   --print-only      Apenas imprime os comandos sem executar
   -h, --help        Exibe esta ajuda
 USAGE
@@ -34,6 +38,10 @@ while [[ $# -gt 0 ]]; do
     --local-base-url)
       LOCAL_BASE_URL="$2"
       shift 2
+      ;;
+    --check-public-port)
+      CHECK_PUBLIC_PORT=true
+      shift
       ;;
     --print-only)
       PRINT_ONLY=true
@@ -65,6 +73,7 @@ echo "=== AgentEscala | Validação de Deploy Homelab ==="
 echo "Domínio: $DOMAIN"
 echo "Porta pública: $PUBLIC_PORT"
 echo "URL local: $LOCAL_BASE_URL"
+echo "Checar ${DOMAIN}:${PUBLIC_PORT} diretamente: $CHECK_PUBLIC_PORT"
 
 if [[ "$PRINT_ONLY" == true ]]; then
   printf "\n[modo print-only]\n"
@@ -85,9 +94,15 @@ printf "\n## 3) DNS e TLS externo\n"
 run_or_print "nslookup ${DOMAIN}"
 run_or_print "curl -k -sSI https://${DOMAIN}/"
 run_or_print "curl -k -sSI https://${DOMAIN}/login"
-run_or_print "openssl s_client -connect ${DOMAIN}:${PUBLIC_PORT} -servername ${DOMAIN} </dev/null | head -n 40"
-run_or_print "curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/"
-run_or_print "curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/login"
+if [[ "$CHECK_PUBLIC_PORT" == true ]]; then
+  run_or_print "openssl s_client -connect ${DOMAIN}:${PUBLIC_PORT} -servername ${DOMAIN} </dev/null | head -n 40"
+  run_or_print "curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/"
+  run_or_print "curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/login"
+else
+  echo "Pulando testes diretos em :${PUBLIC_PORT} neste host."
+  echo "No CT 102, ${PUBLIC_PORT} e externo ao container e chega via roteador/firewall para o 443 do NPM."
+  echo "Use --check-public-port apenas de um cliente que enxergue a borda externa."
+fi
 
 printf "\n## 4) NPM/OpenResty (se Docker disponível)\n"
 if command -v docker >/dev/null 2>&1; then
@@ -109,9 +124,11 @@ cat <<SUGGEST
 # - upstream: http://192.168.3.155:18000
 # - dentro do CT 102 o NPM escuta em 443; :${PUBLIC_PORT} é port-forward externo do roteador
 
-# Revalidação final:
+# Revalidação final no CT 102:
 curl -k -sSI https://${DOMAIN}/
 curl -k -sSI https://${DOMAIN}/login
+
+# Revalidação externa real (somente fora do CT 102, com alcance ao roteador):
 curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/
 curl -k -sSI https://${DOMAIN}:${PUBLIC_PORT}/login
 curl -k -s https://${DOMAIN}:${PUBLIC_PORT}/ | head -n 40

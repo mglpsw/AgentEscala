@@ -147,11 +147,11 @@ python -m pytest tests/ -v
 # Teste rápido de um módulo específico
 python -m pytest tests/test_shift_service.py -v
 
-# Verificar saúde da API em produção
-curl -s https://escala.ks-sm.net:9443/api/health | jq .
+# Verificar saúde da API via NPM interno no CT102
+curl -sk https://escala.ks-sm.net/health | jq .
 
 # Verificar API local (dev)
-curl -s http://192.168.3.155:18000/api/health | jq .
+curl -s http://192.168.3.155:18000/health | jq .
 
 # Build do frontend (verifica erros de compilação)
 cd frontend && npm run build && cd ..
@@ -313,7 +313,7 @@ git push origin HEAD
 gh pr create --title "feat: ..." --body "..."
 
 # Saúde da API
-curl -s https://escala.ks-sm.net:9443/api/health | jq .
+curl -sk https://escala.ks-sm.net/health | jq .
 
 # Rodar testes
 python -m pytest tests/ -v
